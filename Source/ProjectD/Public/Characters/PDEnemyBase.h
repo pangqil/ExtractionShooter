@@ -2,16 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Characters/PDCharacterBase.h"
+#include "Type/Types.h"
 #include "PDEnemyBase.generated.h"
-
-UENUM(BlueprintType)
-enum class EPDEnemyState : uint8
-{
-	Idle,
-	Chase,
-	Attack,
-	Dead
-};
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTD_API APDEnemyBase : public APDCharacterBase

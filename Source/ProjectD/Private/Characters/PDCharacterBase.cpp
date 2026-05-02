@@ -1,4 +1,8 @@
 #include "Characters/PDCharacterBase.h"
+#include "AbilitySystemComponent.h"    
+#include "GameplayEffectTypes.h"  
+#include "GameplayTagContainer.h"
+#include "Type/Types.h"
 
 APDCharacterBase::APDCharacterBase()
 {
@@ -8,19 +12,33 @@ APDCharacterBase::APDCharacterBase()
 void APDCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
-	CurrentHealth = MaxHealth;
 }
 
 void APDCharacterBase::ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo)
 {
-	if (!IsAlive_Implementation()) return;
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC) return;
 
-	CurrentHealth = FMath::Clamp(CurrentHealth - DamageInfo.BaseDamage, 0.f, MaxHealth);
+	FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+	Context.AddHitResult(DamageInfo.HitResult);
+	Context.AddInstigator(DamageInfo.Instigator.Get(), DamageInfo.Instigator.Get());
 
-	if (!IsAlive_Implementation())
-	{
-		HandleDeath(DamageInfo.Instigator.Get());
-	}
+	FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
+	if (!Spec.IsValid()) return;
+
+	Spec.Data->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag("Data.Damage"), DamageInfo.BaseDamage);
+	ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+}
+
+float APDCharacterBase::GetCurrentHealth_Implementation() const
+{
+	//TODO : AS Complete -> AttributeSet(HP Return)
+	return 0.f;
+}
+
+bool APDCharacterBase::IsAlive_Implementation() const
+{
+	return GetCurrentHealth_Implementation()>0.f;
 }
 
 void APDCharacterBase::HandleDeath(AActor* Killer)

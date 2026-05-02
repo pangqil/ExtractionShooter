@@ -3,4 +3,5 @@
 UPDInteractable::UPDInteractable(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
+	
 }
