@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Characters/PDCharacterBase.h"
+#include "Characters/Base/PDCharacterBase.h"
 #include "Type/Types.h"
 #include "PDEnemyBase.generated.h"
 
@@ -21,12 +21,12 @@ protected:
 public:
 	UFUNCTION(BlueprintCallable, Category = "PD|AI")
 	void SetEnemyState(EPDEnemyState NewState);
-	
+
 	FORCEINLINE EPDEnemyState GetEnemyState() const { return CurrentState; }
+
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|AI")
 	void OnEnemyStateChanged(EPDEnemyState NewState);
-	
-	
+
 	virtual void HandleDeath(AActor* Killer) override;
 };

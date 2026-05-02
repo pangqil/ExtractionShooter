@@ -2,10 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
+#include "Type/Types.h"
 #include "PDDamageable.generated.h"
-
-
-struct FPDDamageInfo;
 
 UINTERFACE(MinimalAPI, Blueprintable)
 class UPDDamageable : public UInterface

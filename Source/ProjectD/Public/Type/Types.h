@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Types.generated.h"
 
 USTRUCT(BlueprintType)
 struct FPDDamageInfo
