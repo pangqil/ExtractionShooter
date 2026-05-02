@@ -7,6 +7,8 @@
 #include "AbilitySystemInterface.h"
 #include "PDCharacterBase.generated.h"
 
+class UPDAttributeSet;
+class UGameplayAbility;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDeathSignature, AActor*, Killer);
 class UGameplayEffect;
 
@@ -27,6 +29,16 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|GAS")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
+	
+	UPROPERTY(EditAnywhere, Category = "PD|GAS")
+	TArray<TSubclassOf<UGameplayAbility>> StartupAbilities;
+
+	UPROPERTY(EditAnywhere, Category = "PD|GAS")
+	TSubclassOf<UGameplayEffect> DefaultAttributes;
+	
+	void GiveStartupAbilities();
+	void InitializeAttributes();
+	
 
 public:
 	UPROPERTY(BlueprintAssignable, Category = "PD|Damage")
@@ -37,7 +49,7 @@ public:
 	virtual float GetMaxHealth_Implementation() const override;
 	virtual bool IsAlive_Implementation() const override;
 	virtual void Interact_Implementation(AActor* Interactor) override {}
-	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override {return nullptr;}
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override {return ASC;}
 	
 	UFUNCTION(BlueprintCallable, Category = "PD|Weapon")
 	void AttachActorToWeaponSocket(AActor* ActorToAttach);
@@ -46,8 +58,14 @@ public:
 	void OnDeath(AActor* Killer);
 
 	virtual void HandleDeath(AActor* Killer);
-protected:
-
 	
+protected:
+	UPROPERTY()
+	TObjectPtr<UAbilitySystemComponent> ASC;
+
+	UPROPERTY()
+	TObjectPtr<UPDAttributeSet> AttributeSet;
+	
+	virtual void InitAbilitySystem();
 	virtual void BeginPlay() override;
 };

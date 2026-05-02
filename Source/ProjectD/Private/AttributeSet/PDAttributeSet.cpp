@@ -16,27 +16,27 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 {
 	Super::PostGameplayEffectExecute(Data);
 
-	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
+	if (Data.EvaluatedData.Attribute==GetDamageAttribute())
 	{
-		const float LocalDamage = GetDamage();
+		const float LocalDamage=GetDamage();
 		SetDamage(0.f);
 
-		if (LocalDamage <= 0.f) return;
+		if (LocalDamage<=0.f) return;
 		
-		EBodyPart Part = EBodyPart::Torso;
-		if (const FHitResult* HitResult = Data.EffectSpec.GetContext().GetHitResult())
+		EBodyPart Part=EBodyPart::Torso;
+		if (const FHitResult* HitResult=Data.EffectSpec.GetContext().GetHitResult())
 		{//HitResult´Â EffectContext ¾È¿¡
 			if (BodyPartConfig)
 			{
-				Part = BodyPartConfig->GetBodyPartFromName(HitResult->BoneName);
+				Part=BodyPartConfig->GetBodyPartFromName(HitResult->BoneName);
 			}
 		}
-		const float NewHP = FMath::Max(GetHPByPart(Part) - LocalDamage, 0.f);
+		const float NewHP=FMath::Max(GetHPByPart(Part) - LocalDamage, 0.f);
 		SetHPByPart(Part, NewHP);
 		
-		if (GetTorsoHP() <= 0.f || GetHeadHP() <= 0.f)
+		if (GetTorsoHP()<=0.f||GetHeadHP()<=0.f)
 		{
-			if (APDCharacterBase* Owner = Cast<APDCharacterBase>(GetOwningActor()))
+			if (APDCharacterBase* Owner=Cast<APDCharacterBase>(GetOwningActor()))
 			{
 				Owner->HandleDeath(Data.EffectSpec.GetContext().GetInstigator());
 			}
@@ -61,37 +61,37 @@ FGameplayAttribute UPDAttributeSet::GetAttributeByPart(EBodyPart Part) const
 {
 	switch (Part)
 	{
-	case EBodyPart::Head:  return GetHeadHPAttribute();
-	case EBodyPart::Arm_L: return GetArmLHPAttribute();
-	case EBodyPart::Arm_R: return GetArmRHPAttribute();
-	case EBodyPart::Leg_L: return GetLegLHPAttribute();
-	case EBodyPart::Leg_R: return GetLegRHPAttribute();
-	default:               return GetTorsoHPAttribute();
+		case EBodyPart::Head:  return GetHeadHPAttribute();
+		case EBodyPart::Arm_L: return GetArmLHPAttribute();
+		case EBodyPart::Arm_R: return GetArmRHPAttribute();
+		case EBodyPart::Leg_L: return GetLegLHPAttribute();
+		case EBodyPart::Leg_R: return GetLegRHPAttribute();
+		default:               return GetTorsoHPAttribute();
 	}
 }
 void UPDAttributeSet::ApplyDamageToPart(EBodyPart Part, float DamageAmount)
 {
 	switch (Part)
 	{
-	case EBodyPart::Head:
-		SetHeadHP(FMath::Max(GetHeadHP() - DamageAmount, 0.f));
-		break;
-	case EBodyPart::Arm_L:
-		SetArmLHP(FMath::Max(GetArmLHP() - DamageAmount, 0.f));
-		break;
-	case EBodyPart::Arm_R:
-		SetArmRHP(FMath::Max(GetArmRHP() - DamageAmount, 0.f));
-		break;
-	case EBodyPart::Leg_L:
-		SetLegLHP(FMath::Max(GetLegLHP() - DamageAmount, 0.f));
-		break;
-	case EBodyPart::Leg_R:
-		SetLegRHP(FMath::Max(GetLegRHP() - DamageAmount, 0.f));
-		break;
-	case EBodyPart::Torso:
-	default:
-		SetTorsoHP(FMath::Max(GetTorsoHP() - DamageAmount, 0.f));
-		break;
+		case EBodyPart::Head:
+			SetHeadHP(FMath::Max(GetHeadHP() - DamageAmount, 0.f));
+			break;
+		case EBodyPart::Arm_L:
+			SetArmLHP(FMath::Max(GetArmLHP() - DamageAmount, 0.f));
+			break;
+		case EBodyPart::Arm_R:
+			SetArmRHP(FMath::Max(GetArmRHP() - DamageAmount, 0.f));
+			break;
+		case EBodyPart::Leg_L:
+			SetLegLHP(FMath::Max(GetLegLHP() - DamageAmount, 0.f));
+			break;
+		case EBodyPart::Leg_R:
+			SetLegRHP(FMath::Max(GetLegRHP() - DamageAmount, 0.f));
+			break;
+		case EBodyPart::Torso:
+		default:
+			SetTorsoHP(FMath::Max(GetTorsoHP() - DamageAmount, 0.f));
+			break;
 	}
 }
 

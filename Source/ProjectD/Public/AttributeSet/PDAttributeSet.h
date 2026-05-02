@@ -21,7 +21,7 @@ UCLASS()
 class PROJECTD_API UPDAttributeSet : public UAttributeSet
 {
 	GENERATED_BODY()
-	
+public:
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Health")
 	FGameplayAttributeData HeadHP;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, HeadHP)

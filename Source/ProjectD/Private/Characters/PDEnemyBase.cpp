@@ -1,8 +1,10 @@
 #include "Characters/PDEnemyBase.h"
+#include "AbilitySystemComponent.h"
 
 APDEnemyBase::APDEnemyBase()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	ASC->SetIsReplicated(true);
+	ASC->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 }
 
 void APDEnemyBase::SetEnemyState(EPDEnemyState NewState)
