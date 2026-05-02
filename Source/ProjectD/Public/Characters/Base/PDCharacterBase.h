@@ -25,7 +25,7 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon")
-	FName WeaponSocketName = TEXT("WeaponSocket");
+	FName WeaponSocketName=TEXT("WeaponSocket");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|GAS")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;

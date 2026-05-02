@@ -3,7 +3,7 @@
 
 #include "AttributeSet/PDAttributeSet.h"
 #include "GameplayEffectExtension.h"
-#include "Characters/PDCharacterBase.h"
+#include "Characters/Base/PDCharacterBase.h"
 #include "Data/PDBodyPartConfig.h"
 
 void UPDAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
@@ -25,7 +25,7 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		
 		EBodyPart Part=EBodyPart::Torso;
 		if (const FHitResult* HitResult=Data.EffectSpec.GetContext().GetHitResult())
-		{//HitResult´Â EffectContext ¾È¿¡
+		{//HitResultï¿½ï¿½ EffectContext ï¿½È¿ï¿½
 			if (BodyPartConfig)
 			{
 				Part=BodyPartConfig->GetBodyPartFromName(HitResult->BoneName);

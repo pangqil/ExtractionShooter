@@ -1,4 +1,4 @@
-#include "Characters/PDCharacterBase.h"
+#include "Characters/Base/PDCharacterBase.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
@@ -9,8 +9,8 @@ APDCharacterBase::APDCharacterBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	ASC = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("ASC"));
-	AttributeSet = CreateDefaultSubobject<UPDAttributeSet>(TEXT("AttributeSet"));
+	ASC=CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("ASC"));
+	AttributeSet=CreateDefaultSubobject<UPDAttributeSet>(TEXT("AttributeSet"));
 }
 
 void APDCharacterBase::BeginPlay()
@@ -47,7 +47,7 @@ void APDCharacterBase::GiveStartupAbilities()
 {
 	if (!ASC) return;
 
-	for (TSubclassOf<UGameplayAbility> Ability : StartupAbilities)
+	for (TSubclassOf<UGameplayAbility>Ability:StartupAbilities)
 	{
 		if (Ability) ASC->GiveAbility(FGameplayAbilitySpec(Ability, 1));
 	}
@@ -57,11 +57,11 @@ void APDCharacterBase::ApplyDamage_Implementation(const FPDDamageInfo& DamageInf
 {
 	if (!ASC) return;
 
-	FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+	FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
 	Context.AddHitResult(DamageInfo.HitResult);
 	Context.AddInstigator(DamageInfo.Instigator.Get(), DamageInfo.Instigator.Get());
 
-	FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
+	FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
 	if (!Spec.IsValid()) return;
 
 	Spec.Data->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag("Data.Damage"), DamageInfo.BaseDamage);
