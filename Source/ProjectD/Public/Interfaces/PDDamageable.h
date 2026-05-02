@@ -2,22 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
+#include "Type/Types.h"
 #include "PDDamageable.generated.h"
-
-USTRUCT(BlueprintType)
-struct FPDDamageInfo
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float BaseDamage = 0.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TWeakObjectPtr<AActor> Instigator;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<UDamageType> DamageTypeClass;
-};
 
 UINTERFACE(MinimalAPI, Blueprintable)
 class UPDDamageable : public UInterface
