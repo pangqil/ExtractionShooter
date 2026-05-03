@@ -4,6 +4,7 @@
 #include "GameFramework/PlayerController.h"
 #include "PDPlayerController.generated.h"
 
+struct FGameplayTag;
 class UNiagaraSystem;
 class UInputMappingContext;
 class UInputAction;

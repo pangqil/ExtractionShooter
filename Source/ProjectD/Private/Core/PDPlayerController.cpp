@@ -73,9 +73,10 @@ void APDPlayerController::OnAbilityInputPressed(FGameplayTag InputTag)
 
 void APDPlayerController::OnAbilityInputReleased(FGameplayTag InputTag)
 {
-	if (UAbilitySystemComponent* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+	if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
-		ASC->CancelAbilities(&FGameplayTagContainer(InputTag));
+		FGameplayTagContainer TagContainer(InputTag);
+		ASC->CancelAbilities(&TagContainer);
 	}
 }
 
