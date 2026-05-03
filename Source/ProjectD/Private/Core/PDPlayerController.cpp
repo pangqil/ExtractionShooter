@@ -1,118 +1,98 @@
 #include "Core/PDPlayerController.h"
+
+#include "AbilitySystemComponent.h"
 #include "GameFramework/Pawn.h"
-#include "Blueprint/AIBlueprintHelperLibrary.h"
-#include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
-#include "Navigation/PathFollowingComponent.h"
+#include "GameplayTag/PDGameplayTags.h"
 #include "InputActionValue.h"
 #include "EnhancedInputSubsystems.h"
+#include "Core/PDGameMode.h"
 #include "Engine/LocalPlayer.h"
-
-DEFINE_LOG_CATEGORY(LogPDCharacter);
+#include "AbilitySystemBlueprintLibrary.h"
+#include "Input/PDInputComponent.h"
 
 APDPlayerController::APDPlayerController()
 {
-	bIsTouch = false;
-	bMoveToMouseCursor = false;
+	bShowMouseCursor=true;
+	PrimaryActorTick.bCanEverTick=true;
+}
 
-	PathFollowingComponent = CreateDefaultSubobject<UPathFollowingComponent>(TEXT("Path Following Component"));
+void APDPlayerController::RequestExtraction()
+{
+	if (APDGameMode* GM=GetWorld()->GetAuthGameMode<APDGameMode>())
+	{
+		GM->RequestExtraction(this);
+	}
+}
 
-	bShowMouseCursor = true;
-	DefaultMouseCursor = EMouseCursor::Default;
-	CachedDestination = FVector::ZeroVector;
-	FollowTime = 0.f;
+void APDPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+	UpdateAimRotation();
 }
 
 void APDPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-
-	if (IsLocalPlayerController())
+	
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem=
+		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
-		}
+		Subsystem->AddMappingContext(DefaultMappingContext, 0);
+	}
 
-		if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
-		{
-			EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &APDPlayerController::OnInputStarted);
-			EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &APDPlayerController::OnSetDestinationTriggered);
-			EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &APDPlayerController::OnSetDestinationReleased);
-			EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &APDPlayerController::OnSetDestinationReleased);
+	UPDInputComponent* PDIC=CastChecked<UPDInputComponent>(InputComponent);
+	if (!InputConfig) return;
 
-			EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &APDPlayerController::OnInputStarted);
-			EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &APDPlayerController::OnTouchTriggered);
-			EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &APDPlayerController::OnTouchReleased);
-			EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &APDPlayerController::OnTouchReleased);
-		}
-		else
-		{
-			UE_LOG(LogPDCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input Component!"), *GetNameSafe(this));
-		}
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Move, 
+		ETriggerEvent::Triggered, this, &APDPlayerController::OnMove);
+	PDIC->BindAbilityActions(InputConfig, this, &APDPlayerController::OnAbilityInputPressed,
+		&APDPlayerController::OnAbilityInputReleased);
+}
+
+void APDPlayerController::OnMove(const struct FInputActionValue& Value)
+{
+	APawn* ControlledPawn =GetPawn();
+	if (!ControlledPawn) return;
+
+	const FVector2D MoveInput=Value.Get<FVector2D>();
+	ControlledPawn->AddMovementInput(FVector::ForwardVector, MoveInput.Y);
+	ControlledPawn->AddMovementInput(FVector::RightVector, MoveInput.X);
+}
+
+void APDPlayerController::OnAbilityInputPressed(FGameplayTag InputTag)
+{
+	if (UAbilitySystemComponent* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+	{
+		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
 	}
 }
 
-void APDPlayerController::OnInputStarted()
-{
-	StopMovement();
-	UpdateCachedDestination();
-}
 
-void APDPlayerController::OnSetDestinationTriggered()
+void APDPlayerController::OnAbilityInputReleased(FGameplayTag InputTag)
 {
-	FollowTime += GetWorld()->GetDeltaSeconds();
-	UpdateCachedDestination();
-
-	APawn* ControlledPawn = GetPawn();
-	if (ControlledPawn != nullptr)
+	if (UAbilitySystemComponent* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
-		FVector WorldDirection = (CachedDestination - ControlledPawn->GetActorLocation()).GetSafeNormal();
-		ControlledPawn->AddMovementInput(WorldDirection, 1.0, false);
+		ASC->CancelAbilities(&FGameplayTagContainer(InputTag));
 	}
 }
 
-void APDPlayerController::OnSetDestinationReleased()
-{
-	if (FollowTime <= ShortPressThreshold)
-	{
-		UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, CachedDestination);
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, FXCursor, CachedDestination, FRotator::ZeroRotator, FVector(1.f, 1.f, 1.f), true, true, ENCPoolMethod::None, true);
-	}
 
-	FollowTime = 0.f;
-}
-
-void APDPlayerController::OnTouchTriggered()
+void APDPlayerController::UpdateAimRotation()
 {
-	bIsTouch = true;
-	OnSetDestinationTriggered();
-}
+	APawn* ControlledPawn =GetPawn();
+	if (!ControlledPawn) return;
 
-void APDPlayerController::OnTouchReleased()
-{
-	bIsTouch = false;
-	OnSetDestinationReleased();
-}
-
-void APDPlayerController::UpdateCachedDestination()
-{
 	FHitResult Hit;
-	bool bHitSuccessful = false;
+	if (!GetHitResultUnderCursor(ECC_Visibility, true, Hit)) return;
 
-	if (bIsTouch)
-	{
-		bHitSuccessful = GetHitResultUnderFinger(ETouchIndex::Touch1, ECollisionChannel::ECC_Visibility, true, Hit);
-	}
-	else
-	{
-		bHitSuccessful = GetHitResultUnderCursor(ECollisionChannel::ECC_Visibility, true, Hit);
-	}
+	FVector AimDirection=Hit.Location-ControlledPawn->GetActorLocation();
+	AimDirection.Z=0.f;
 
-	if (bHitSuccessful)
+	if (!AimDirection.IsNearlyZero())
 	{
-		CachedDestination = Hit.Location;
+		ControlledPawn->SetActorRotation(AimDirection.Rotation());
 	}
 }

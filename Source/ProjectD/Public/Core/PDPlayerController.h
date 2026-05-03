@@ -11,46 +11,36 @@ class UPathFollowingComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 
+class UInputMappingContext;
+class UPDInputConfig;
+
 UCLASS(abstract)
 class PROJECTD_API APDPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
-protected:
-	UPROPERTY(VisibleDefaultsOnly, Category = AI)
-	TObjectPtr<UPathFollowingComponent> PathFollowingComponent;
-
-	UPROPERTY(EditAnywhere, Category="Input")
-	float ShortPressThreshold;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UNiagaraSystem> FXCursor;
-
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputMappingContext> DefaultMappingContext;
-
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> SetDestinationClickAction;
-
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> SetDestinationTouchAction;
-
-	uint32 bMoveToMouseCursor : 1;
-	uint32 bIsTouch : 1;
-
-	FVector CachedDestination;
-	float FollowTime = 0.0f;
-
 public:
 	APDPlayerController();
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Raid")
+	void RequestExtraction();
+
+	virtual void PlayerTick(float DeltaTime) override; 
+
 protected:
+	UPROPERTY(EditAnywhere, Category = "PD|Input")
+	TObjectPtr<UInputMappingContext> DefaultMappingContext;
+
+	UPROPERTY(EditAnywhere, Category = "PD|Input")
+	TObjectPtr<UPDInputConfig> InputConfig;
+
 	virtual void SetupInputComponent() override;
 
-	void OnInputStarted();
-	void OnSetDestinationTriggered();
-	void OnSetDestinationReleased();
-	void OnTouchTriggered();
-	void OnTouchReleased();
-	void UpdateCachedDestination();
+private:
+	void OnMove(const struct FInputActionValue& Value);
+	void OnAbilityInputPressed(FGameplayTag InputTag);
+	void OnAbilityInputReleased(FGameplayTag InputTag);
+	void UpdateAimRotation();
+	
+	bool bShowMouseCursor=true;
 };
