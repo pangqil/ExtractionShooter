@@ -1,0 +1,10 @@
+#pragma once
+#include "NativeGameplayTags.h"
+
+namespace PDGameplayTags
+{
+	//Input
+	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Move)
+	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Fire)
+	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Interact)
+}
