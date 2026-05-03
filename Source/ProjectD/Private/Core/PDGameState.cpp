@@ -1,1 +1,8 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+#include "Core/PDGameState.h"
+
+void APDGameState::SetRaidState(ERaidState NewState)
+{
+	if (CurrentRaidState==NewState) return;
+	CurrentRaidState=NewState;
+	OnRaidStateChanged(NewState);
+}

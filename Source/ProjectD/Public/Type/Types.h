@@ -53,3 +53,13 @@ struct FBodyPartMapping
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EBodyPart BodyPart=EBodyPart::None;
 };
+
+UENUM(BlueprintType)
+enum class ERaidState : uint8
+{
+	Idle,
+	InProgress,
+	Extracting,
+	Ended
+};
+
