@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -20,7 +19,7 @@ public:
 	void BindNativeAction(const UPDInputConfig* InputConfig, const FGameplayTag& InputTag,
 						  ETriggerEvent TriggerEvent, UserClass* Object, FuncType Func)
 	{
-		if (const UInputAction* IA = InputConfig->FindNativeInputActionForTag(InputTag))
+		if (const UInputAction* IA=InputConfig->FindNativeInputActionForTag(InputTag))
 		{
 			BindAction(IA, TriggerEvent, Object, Func);
 		}
@@ -31,9 +30,9 @@ public:
 	void BindAbilityActions(const UPDInputConfig* InputConfig, UserClass* Object,
 							PressedFuncType PressedFunc, ReleasedFuncType ReleasedFunc)
 	{
-		for (const FPDInputAction& Entry : InputConfig->AbilityInputActions)
+		for (const FPDInputAction& Entry:InputConfig->AbilityInputActions)
 		{
-			if (!Entry.InputAction || !Entry.InputTag.IsValid()) continue;
+			if (!Entry.InputAction||!Entry.InputTag.IsValid()) continue;
 
 			BindAction(Entry.InputAction, ETriggerEvent::Started, Object, PressedFunc, Entry.InputTag);
 			BindAction(Entry.InputAction, ETriggerEvent::Completed, Object, ReleasedFunc, Entry.InputTag);

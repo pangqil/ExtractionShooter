@@ -1,16 +1,15 @@
 #include "Core/PDPlayerController.h"
-
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Pawn.h"
-#include "NiagaraFunctionLibrary.h"
 #include "Engine/World.h"
-#include "EnhancedInputComponent.h"
+
 #include "GameplayTag/PDGameplayTags.h"
 #include "InputActionValue.h"
 #include "EnhancedInputSubsystems.h"
 #include "Core/PDGameMode.h"
 #include "Engine/LocalPlayer.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "GameFramework/Character.h"
 #include "Input/PDInputComponent.h"
 
 APDPlayerController::APDPlayerController()
@@ -48,6 +47,8 @@ void APDPlayerController::SetupInputComponent()
 
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Move, 
 		ETriggerEvent::Triggered, this, &APDPlayerController::OnMove);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Jump,
+	ETriggerEvent::Started, this, &APDPlayerController::OnJump);
 	PDIC->BindAbilityActions(InputConfig, this, &APDPlayerController::OnAbilityInputPressed,
 		&APDPlayerController::OnAbilityInputReleased);
 }
@@ -60,6 +61,14 @@ void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 	const FVector2D MoveInput=Value.Get<FVector2D>();
 	ControlledPawn->AddMovementInput(FVector::ForwardVector, MoveInput.Y);
 	ControlledPawn->AddMovementInput(FVector::RightVector, MoveInput.X);
+}
+
+void APDPlayerController::OnJump()
+{
+	if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetPawn()))
+	{
+		OwnerCharacter->Jump();
+	}
 }
 
 void APDPlayerController::OnAbilityInputPressed(FGameplayTag InputTag)

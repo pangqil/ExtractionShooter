@@ -39,6 +39,7 @@ protected:
 
 private:
 	void OnMove(const struct FInputActionValue& Value);
+	void OnJump();
 	void OnAbilityInputPressed(FGameplayTag InputTag);
 	void OnAbilityInputReleased(FGameplayTag InputTag);
 	void UpdateAimRotation();
