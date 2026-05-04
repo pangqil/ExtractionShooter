@@ -91,9 +91,3 @@ private:
     float ComputeTargetSpeed() const;
 };
 
-class PDLocomotionComponent
-{
-public:
-	
-	
-};
