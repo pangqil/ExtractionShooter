@@ -2,6 +2,7 @@
 #include "AbilitySystemComponent.h"
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
+#include "Ability/PDGameplayAbilityBase.h"
 #include "AttributeSet/PDAttributeSet.h"
 #include "Core/PDGameMode.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -20,6 +21,8 @@ void APDCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 	InitAbilitySystem();
+	GiveStartupAbilities();
+	GiveActiveAbilities();
 }
 
 void APDCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
@@ -44,21 +47,40 @@ void APDCharacterBase::InitAbilitySystem()
 void APDCharacterBase::InitializeAttributes()
 {
 	if (!ASC||!DefaultAttributes) return;
-
-	FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
-	FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(DefaultAttributes, 1.f, Context);
-	if (!Spec.IsValid()) return;
-
-	ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	FGameplayEffectContextHandle ContextHandle=ASC->MakeEffectContext();
+	FGameplayEffectSpecHandle SpecHandle=ASC->MakeOutgoingSpec(DefaultAttributes, 1.f, ContextHandle);
+	ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+	//AS가 Pre에서 컴파일되는 문제...
+	if (AttributeSet)
+	{
+		AttributeSet->SetHeadHP (AttributeSet->GetMaxHeadHP());
+		AttributeSet->SetTorsoHP(AttributeSet->GetMaxTorsoHP());
+		AttributeSet->SetArmLHP (AttributeSet->GetMaxArmLHP());
+		AttributeSet->SetArmRHP (AttributeSet->GetMaxArmRHP());
+		AttributeSet->SetLegLHP (AttributeSet->GetMaxLegLHP());
+		AttributeSet->SetLegRHP (AttributeSet->GetMaxLegRHP());
+		AttributeSet->SetStamina(AttributeSet->GetMaxStamina());
+		AttributeSet->SetMoveSpeed(AttributeSet->GetMaxMoveSpeed());
+	}
 }
 
 void APDCharacterBase::GiveStartupAbilities()
 {
 	if (!ASC) return;
-
-	for (TSubclassOf<UGameplayAbility>Ability:StartupAbilities)
+	for (const auto& StartupAbility : StartupAbilities)
 	{
-		if (Ability) ASC->GiveAbility(FGameplayAbilitySpec(Ability, 1));
+		FGameplayAbilitySpec AbilitySpec(StartupAbility);
+		ASC->GiveAbility(AbilitySpec);
+	}
+}
+
+void APDCharacterBase::GiveActiveAbilities()
+{
+	if (!ASC) return;
+	for (const auto& ActiveAbility : StartupAbilities)
+	{
+		FGameplayAbilitySpec AbilitySpec(ActiveAbility);
+		ASC->GiveAbility(AbilitySpec);
 	}
 }
 

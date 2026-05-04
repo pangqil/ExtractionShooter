@@ -37,6 +37,10 @@ protected:
 	TArray<TSubclassOf<UGameplayAbility>> StartupAbilities;
 
 	UPROPERTY(EditAnywhere, Category = "PD|GAS")
+	TArray<TSubclassOf<UGameplayAbility>> ActiveAbilities;
+
+	
+	UPROPERTY(EditAnywhere, Category = "PD|GAS")
 	TSubclassOf<UGameplayEffect> DefaultAttributes;
 
 	UPROPERTY(EditDefaultsOnly, Category = "PD|StatusEffect")
@@ -55,6 +59,7 @@ protected:
 	TSubclassOf<UGameplayEffect> ArmCrippledEffectClass;
 
 	void GiveStartupAbilities();
+	void GiveActiveAbilities();
 	void InitializeAttributes();
 
 public:

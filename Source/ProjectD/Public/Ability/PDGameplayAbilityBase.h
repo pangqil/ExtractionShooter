@@ -19,6 +19,9 @@ class PROJECTD_API UPDGameplayAbilityBase : public UGameplayAbility
 public:
 	UPDGameplayAbilityBase();
 	
+	UPROPERTY(EditDefaultsOnly, Category="PD|Ability")
+	FGameplayTag StartupInputTag;
+	
 protected:
 	UFUNCTION(BlueprintCallable, Category="PD|Ability")
 	APDCharacterBase* GetPDCharacter() const;
@@ -32,6 +35,5 @@ protected:
 	UFUNCTION(BlueprintCallable, Category="PD|Ability")
 	void PlayAbilityMontage(UAnimMontage* Montage, float PlayRate=1.f);
 	
-	UPROPERTY(EditDefaultsOnly, Category="PD|Ability")
-	FGameplayTag StartupInputTag;
+	
 };
