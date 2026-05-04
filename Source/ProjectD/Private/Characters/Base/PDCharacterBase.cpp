@@ -4,6 +4,7 @@
 #include "GameplayTagContainer.h"
 #include "AttributeSet/PDAttributeSet.h"
 #include "Core/PDGameMode.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "Type/Types.h"
 
@@ -21,12 +22,18 @@ void APDCharacterBase::BeginPlay()
 	InitAbilitySystem();
 }
 
+void APDCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
+{
+	GetCharacterMovement()->MaxWalkSpeed=Data.NewValue;
+}
+
 void APDCharacterBase::InitAbilitySystem()
 {
 	if (!ASC) return;
-
 	ASC->InitAbilityActorInfo(this, this);
-
+	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetMoveSpeedAttribute())
+		.AddUObject(this, &APDCharacterBase::OnMoveSpeedChanged);
+	
 	if (HasAuthority())
 	{
 		InitializeAttributes();
@@ -36,10 +43,10 @@ void APDCharacterBase::InitAbilitySystem()
 
 void APDCharacterBase::InitializeAttributes()
 {
-	if (!ASC || !DefaultAttributes) return;
+	if (!ASC||!DefaultAttributes) return;
 
-	FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
-	FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(DefaultAttributes, 1.f, Context);
+	FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
+	FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(DefaultAttributes, 1.f, Context);
 	if (!Spec.IsValid()) return;
 
 	ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());

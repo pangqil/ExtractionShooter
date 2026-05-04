@@ -9,30 +9,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f7ee8a82-7f14-42e3-9911-51da30a537a6" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_ArmDamaged.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_Damage.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_DefaultAttribute.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_LegCrippled.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_LegDamaged.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Ability/PDGameplayAbilityBase.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Ability/PDPassiveLegInjury.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Zone/PDExtractionZone.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Ability/PDGameplayAbilityBase.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Ability/PDPassiveLegInjury.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Zone/PDExtractionZone.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/BP/Ability/GE/GE_Damage.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/BP/Ability/GE/GE_DefaultAttribute.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/BP_Charecter.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_BaseWeapon.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_TopDownCharacter.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_TopDownController.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_TopDownGameMode.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_BaseWeapon.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownCharacter.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownController.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownGameMode.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Lvl_TopDown.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/TopDown/Lvl_TopDown.umap" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/AttributeSet/PDAttributeSet.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/AttributeSet/PDAttributeSet.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/AttributeSet/PDAttributeSet.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/AttributeSet/PDAttributeSet.h" afterDir="false" />
@@ -174,7 +150,7 @@
       <workItem from="1777707797573" duration="21681000" />
       <workItem from="1777739350024" duration="1952000" />
       <workItem from="1777783626584" duration="9204000" />
-      <workItem from="1777853637018" duration="19156000" />
+      <workItem from="1777853637018" duration="19933000" />
     </task>
     <servers />
   </component>

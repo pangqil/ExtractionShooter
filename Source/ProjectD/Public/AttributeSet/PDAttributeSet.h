@@ -15,7 +15,7 @@ GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
 class UPDBodyPartConfig;
-class APDCharacterBase;
+class IPDStatusEffectSource;
 
 UCLASS()
 class PROJECTD_API UPDAttributeSet : public UAttributeSet
@@ -71,6 +71,13 @@ public:
 	FGameplayAttributeData MaxStamina;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxStamina)
 	
+	UPROPERTY(BlueprintReadOnly, Category="PD|Movement")
+	FGameplayAttributeData MoveSpeed;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MoveSpeed)
+	UPROPERTY(BlueprintReadOnly, Category ="PD|Movement")
+	FGameplayAttributeData MaxMoveSpeed;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxMoveSpeed)
+	
 	//Meta Attribute
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Meta")
 	FGameplayAttributeData Damage;
@@ -83,14 +90,19 @@ protected:
 	//Post -> GE (Death, Apply Damage)
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+	
+
 private:
 	void HandleAttributeClamp(const FGameplayAttribute& Attribute, float& NewValue) const;
 	void ApplyDamageToPart(EBodyPart Part, float DamageAmount);
-	
+
 	float GetHPByPart(EBodyPart Part) const;
 	void SetHPByPart(EBodyPart Part, float NewValue);
-	
+
 	FGameplayAttribute GetAttributeByPart(EBodyPart Part) const;
-	
-	
+
+	// 부상 GE 적용 — PostGameplayEffectExecute 캡슐화
+	void CheckAndApplyInjuryEffects(UAbilitySystemComponent* ASC, IPDStatusEffectSource* Source);
+	void TryApplyInjuryEffect(UAbilitySystemComponent* ASC,
+		TSubclassOf<UGameplayEffect> EffectClass, const FGameplayTag& GuardTag);
 };

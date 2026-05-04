@@ -3,8 +3,11 @@
 
 #include "AttributeSet/PDAttributeSet.h"
 #include "GameplayEffectExtension.h"
-#include "Characters/Base/PDCharacterBase.h"
+#include "GameplayEffect.h"
 #include "Data/PDBodyPartConfig.h"
+#include "Interfaces/PDStatusEffectSource.h"
+#include "GameplayTag/PDGameplayTags.h"
+#include "Characters/Base/PDCharacterBase.h"
 
 void UPDAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
@@ -25,21 +28,30 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		
 		EBodyPart Part=EBodyPart::Torso;
 		if (const FHitResult* HitResult=Data.EffectSpec.GetContext().GetHitResult())
-		{//HitResult�� EffectContext �ȿ�
+		{
 			if (BodyPartConfig)
 			{
 				Part=BodyPartConfig->GetBodyPartFromName(HitResult->BoneName);
 			}
 		}
-		const float NewHP=FMath::Max(GetHPByPart(Part) - LocalDamage, 0.f);
+		const float NewHP=FMath::Max(GetHPByPart(Part)-LocalDamage, 0.f);
 		SetHPByPart(Part, NewHP);
 		
-		if (GetTorsoHP()<=0.f||GetHeadHP()<=0.f)
+		AActor* OwnerActor=GetOwningActor();
+		
+		if (APDCharacterBase* Owner=Cast<APDCharacterBase>(OwnerActor))
 		{
-			if (APDCharacterBase* Owner=Cast<APDCharacterBase>(GetOwningActor()))
+			if (GetTorsoHP()<=0.f||GetHeadHP()<=0.f)
 			{
 				Owner->HandleDeath(Data.EffectSpec.GetContext().GetInstigator());
+				return;
 			}
+		}
+		
+		UAbilitySystemComponent* ASC=GetOwningAbilitySystemComponent();
+		if (IPDStatusEffectSource* Source=Cast<IPDStatusEffectSource>(OwnerActor))
+		{
+			CheckAndApplyInjuryEffects(ASC, Source);
 		}
 	}
 }
@@ -55,6 +67,7 @@ void UPDAttributeSet::HandleAttributeClamp(const FGameplayAttribute& Attribute, 
 	else if (Attribute==GetLegLHPAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxLegLHP());
 	else if (Attribute==GetLegRHPAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxLegRHP());
 	else if (Attribute==GetStaminaAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxStamina());
+	else if (Attribute==GetMoveSpeedAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxMoveSpeed());
 }
 
 FGameplayAttribute UPDAttributeSet::GetAttributeByPart(EBodyPart Part) const
@@ -120,4 +133,42 @@ void UPDAttributeSet::SetHPByPart(EBodyPart Part, float NewValue)
 		case EBodyPart::Leg_L: SetLegLHP(NewValue);  break;
 		case EBodyPart::Leg_R: SetLegRHP(NewValue);  break;
 	}
+}
+
+void UPDAttributeSet::CheckAndApplyInjuryEffects(UAbilitySystemComponent* ASC, IPDStatusEffectSource* Source)
+{
+	if (!ASC||!Source) return;
+	
+	const bool bLeftLegDown=GetLegLHP()<=0.f;
+	const bool bRightLegDown=GetLegRHP()<=0.f;
+
+	if (bLeftLegDown&&bRightLegDown)
+	{
+		TryApplyInjuryEffect(ASC, Source->GetLegCrippledEffectClass(), PDGameplayTags::State_Debuff_LegCrippled);
+	}
+	else if (bLeftLegDown||bRightLegDown)
+	{
+		TryApplyInjuryEffect(ASC, Source->GetLegDamagedEffectClass(), PDGameplayTags::State_Debuff_LegDamaged);
+	}
+	
+	const bool bLeftArmDown=GetArmLHP()<=0.f;
+	const bool bRightArmDown=GetArmRHP()<=0.f;
+
+	if (bLeftArmDown&&bRightArmDown)
+	{
+		TryApplyInjuryEffect(ASC, Source->GetArmCrippledEffectClass(), PDGameplayTags::State_Debuff_ArmCrippled);
+	}
+	else if (bLeftArmDown||bRightArmDown)
+	{
+		TryApplyInjuryEffect(ASC, Source->GetArmDamagedEffectClass(), PDGameplayTags::State_Debuff_ArmDamaged);
+	}
+}
+
+void UPDAttributeSet::TryApplyInjuryEffect(UAbilitySystemComponent* ASC,
+	TSubclassOf<UGameplayEffect> EffectClass, const FGameplayTag& GuardTag)
+{
+	if (!EffectClass||ASC->HasMatchingGameplayTag(GuardTag)) return;
+
+	FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
+	ASC->ApplyGameplayEffectToSelf(EffectClass->GetDefaultObject<UGameplayEffect>(), 1.f, Context);
 }
