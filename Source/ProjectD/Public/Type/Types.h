@@ -117,8 +117,6 @@ enum class ERaidState : uint8
 	Extracting,
 	Ended
 };
-<<<<<<< HEAD
-=======
 
 UENUM(BlueprintType)
 enum class EWeaponType : uint8
@@ -167,4 +165,4 @@ struct FWeaponLevelStats
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	float Accuracy = 0.95f;
 };
->>>>>>> Weapon
+
