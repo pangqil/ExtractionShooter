@@ -1,4 +1,4 @@
-
+ï»¿
 #pragma once
 
 #include "CoreMinimal.h"
@@ -14,7 +14,7 @@ class PROJECTD_API UPDInputComponent : public UEnhancedInputComponent
 
 public:
 	UPDInputComponent();
-	//ÀÌµ¿, ½Ã¾ß ÀüÈ¯, GAS¾È °ÅÄ¡°í Áï°¢ ½ÇÇàµÇ´Â ±âº» µ¿ÀÛµé ¿©±â¿¡ ¹ÙÀÎµù ÇÏ¸é µÊ.
+	//ï¿½Ìµï¿½, ï¿½Ã¾ï¿½ ï¿½ï¿½È¯, GASï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï°¢ ï¿½ï¿½ï¿½ï¿½Ç´ï¿½ ï¿½âº» ï¿½ï¿½ï¿½Ûµï¿½ ï¿½ï¿½ï¿½â¿¡ ï¿½ï¿½ï¿½Îµï¿½ ï¿½Ï¸ï¿½ ï¿½ï¿½.
 	template<class UserClass, typename FuncType>
 	void BindNativeAction(const UPDInputConfig* InputConfig, const FGameplayTag& InputTag,
 						  ETriggerEvent TriggerEvent, UserClass* Object, FuncType Func)
@@ -25,7 +25,7 @@ public:
 		}
 	}
 	
-	//»ç°Ý, ½ºÅ³, GAS Ability ÇÊ¿äÇÑ µ¿ÀÛµé ¿©±â¼­ È°¿ë.(Started, Completed) ÇÊ¿äÇÏ´Ù¸é release°°Àº°Å Ãß°¡ÇÏ¸é µË´Ï´Ù.
+	//ï¿½ï¿½ï¿½, ï¿½ï¿½Å³, GAS Ability ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ûµï¿½ ï¿½ï¿½ï¿½â¼­ È°ï¿½ï¿½.(Started, Completed) ï¿½Ê¿ï¿½ï¿½Ï´Ù¸ï¿½ releaseï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ß°ï¿½ï¿½Ï¸ï¿½ ï¿½Ë´Ï´ï¿½.
 	template<class UserClass, typename PressedFuncType, typename ReleasedFuncType>
 	void BindAbilityActions(const UPDInputConfig* InputConfig, UserClass* Object,
 							PressedFuncType PressedFunc, ReleasedFuncType ReleasedFunc)
