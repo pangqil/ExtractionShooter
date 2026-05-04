@@ -3,6 +3,8 @@
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
 #include "AttributeSet/PDAttributeSet.h"
+#include "Core/PDGameMode.h"
+#include "GameplayTag/PDGameplayTags.h"
 #include "Type/Types.h"
 
 APDCharacterBase::APDCharacterBase()
@@ -64,7 +66,7 @@ void APDCharacterBase::ApplyDamage_Implementation(const FPDDamageInfo& DamageInf
 	FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
 	if (!Spec.IsValid()) return;
 
-	Spec.Data->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag("Data.Damage"), DamageInfo.BaseDamage);
+	Spec.Data->SetSetByCallerMagnitude(PDGameplayTags::Data_Damage, DamageInfo.BaseDamage);
 	ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 }
 
@@ -89,6 +91,14 @@ void APDCharacterBase::HandleDeath(AActor* Killer)
 {
 	OnDeathDelegate.Broadcast(Killer);
 	OnDeath(Killer);
+	
+	if (APlayerController* PC=Cast<APlayerController>(GetController()))
+	{
+		if (APDGameMode* GM=GetWorld()->GetAuthGameMode<APDGameMode>())
+		{
+			GM->OnPlayerDied(PC, Killer);
+		}
+	}
 }
 
 void APDCharacterBase::AttachActorToWeaponSocket(AActor* ActorToAttach)
