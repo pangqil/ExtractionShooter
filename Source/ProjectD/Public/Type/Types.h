@@ -1,7 +1,62 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/DataTable.h"
+#include "Engine/Texture2D.h"
 #include "Types.generated.h"
+
+USTRUCT(BlueprintType)
+struct FPDPlayerData
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Gold = 0;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Experience = 0;
+	
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	// TArray<FName, int32> StashedItemsIDs;
+	
+	// Skill Data, Activable Weapon? or....
+};
+
+USTRUCT(BlueprintType)
+struct FPDItemData : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName ItemID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<UTexture2D> Icon = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Price = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxStack = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Description;
+};
+
+USTRUCT(BlueprintType)
+struct FPDInventorySlot
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPDItemData ItemData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Quantity = 1;
+};
 
 USTRUCT(BlueprintType)
 struct FPDDamageInfo
@@ -51,7 +106,7 @@ struct FBodyPartMapping
 	FName HitBoxName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	EBodyPart BodyPart=EBodyPart::None;
+	EBodyPart BodyPart = EBodyPart::None;
 };
 
 UENUM(BlueprintType)
@@ -62,4 +117,3 @@ enum class ERaidState : uint8
 	Extracting,
 	Ended
 };
-

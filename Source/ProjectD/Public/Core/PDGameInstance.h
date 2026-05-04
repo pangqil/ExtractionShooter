@@ -4,24 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
+#include "Type/Types.h"
 #include "PDGameInstance.generated.h"
-
-USTRUCT(BlueprintType)
-struct FPDPlayerData
-{
-	GENERATED_BODY()
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Gold=0;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Experience=0;
-	
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	// TArray<FName, int32> StashedItemsIDs;
-	
-	//Skill Data, Activable Weapon? or....
-};
 
 UCLASS()
 class PROJECTD_API UPDGameInstance : public UGameInstance
