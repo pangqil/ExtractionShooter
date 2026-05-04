@@ -9,10 +9,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f7ee8a82-7f14-42e3-9911-51da30a537a6" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveArmInjury.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveLegInjury.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_PD_PlayerCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_PD_PlayerCharacter.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Core/PDGameInstance.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Core/PDGameInstance.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Core/PDGameInstance.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Core/PDGameInstance.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Type/Types.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Type/Types.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -77,6 +78,7 @@
   <component name="KubernetesApiProvider">{
   &quot;isMigrated&quot;: true
 }</component>
+  <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 5
 }</component>
@@ -148,13 +150,14 @@
       <workItem from="1777707797573" duration="21681000" />
       <workItem from="1777739350024" duration="1952000" />
       <workItem from="1777783626584" duration="9204000" />
-      <workItem from="1777853637018" duration="24625000" />
+      <workItem from="1777853637018" duration="28185000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="UnityCheckinConfiguration" checkUnsavedScenes="true" />
   <component name="UnityProjectConfiguration" hasMinimizedUI="false" />
   <component name="VcsManagerConfiguration">
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />

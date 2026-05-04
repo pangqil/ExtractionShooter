@@ -50,7 +50,6 @@ void APDCharacterBase::InitializeAttributes()
 	FGameplayEffectContextHandle ContextHandle=ASC->MakeEffectContext();
 	FGameplayEffectSpecHandle SpecHandle=ASC->MakeOutgoingSpec(DefaultAttributes, 1.f, ContextHandle);
 	ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-	//AS가 Pre에서 컴파일되는 문제...
 	if (AttributeSet)
 	{
 		AttributeSet->SetHeadHP (AttributeSet->GetMaxHeadHP());
