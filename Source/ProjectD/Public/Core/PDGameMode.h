@@ -1,14 +1,14 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameMode.h"
+#include "GameFramework/GameModeBase.h"
 #include "Type/Types.h"
 #include "PDGameMode.generated.h"
 
 class APDPlayerController;
 
 UCLASS(abstract)
-class PROJECTD_API APDGameMode : public AGameMode
+class PROJECTD_API APDGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 

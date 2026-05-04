@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
@@ -117,54 +117,3 @@ enum class ERaidState : uint8
 	Extracting,
 	Ended
 };
-<<<<<<< HEAD
-=======
-
-UENUM(BlueprintType)
-enum class EWeaponType : uint8
-{
-	Rifle   UMETA(DisplayName = "Rifle"),
-	Shotgun UMETA(DisplayName = "Shotgun"),
-	Sniper  UMETA(DisplayName = "Sniper"),
-};
-
-UENUM(BlueprintType)
-enum class EWeaponSlot : uint8
-{
-	Slot1_Rifle   UMETA(DisplayName = "Rifle"),
-	Slot2_Shotgun UMETA(DisplayName = "Shotgun"),
-	Slot3_Sniper  UMETA(DisplayName = "Sniper"),
-	None          UMETA(DisplayName = "None"),
-};
-
-UENUM(BlueprintType)
-enum class EFireMode : uint8
-{
-	Auto   UMETA(DisplayName = "Auto"),
-	Single UMETA(DisplayName = "Single"),
-};
-
-USTRUCT(BlueprintType)
-struct FWeaponLevelStats
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-	float Damage = 10.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-	float FireRate = 0.5f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-	float Range = 1500.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-	int32 MaxAmmo = 30;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-	float ReloadTime = 2.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-	float Accuracy = 0.95f;
-};
->>>>>>> Weapon
