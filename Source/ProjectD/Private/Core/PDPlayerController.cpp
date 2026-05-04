@@ -14,7 +14,6 @@
 
 APDPlayerController::APDPlayerController()
 {
-	bShowMouseCursor=true;
 	PrimaryActorTick.bCanEverTick=true;
 }
 
@@ -51,6 +50,17 @@ void APDPlayerController::SetupInputComponent()
 	ETriggerEvent::Started, this, &APDPlayerController::OnJump);
 	PDIC->BindAbilityActions(InputConfig, this, &APDPlayerController::OnAbilityInputPressed,
 		&APDPlayerController::OnAbilityInputReleased);
+}
+
+void APDPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	bShowMouseCursor=true;  
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false); 
+	SetInputMode(InputMode);
 }
 
 void APDPlayerController::OnMove(const struct FInputActionValue& Value)
