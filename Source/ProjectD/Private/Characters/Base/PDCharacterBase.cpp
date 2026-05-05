@@ -21,8 +21,7 @@ void APDCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 	InitAbilitySystem();
-	GiveStartupAbilities();
-	GiveActiveAbilities();
+
 }
 
 void APDCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
@@ -37,16 +36,19 @@ void APDCharacterBase::InitAbilitySystem()
 	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetMoveSpeedAttribute())
 		.AddUObject(this, &APDCharacterBase::OnMoveSpeedChanged);
 	
-	if (HasAuthority())
-	{
-		InitializeAttributes();
-		GiveStartupAbilities();
-	}
+	InitializeAttributes();
+	GiveStartupAbilities();
+	GiveActiveAbilities();
 }
 
 void APDCharacterBase::InitializeAttributes()
 {
-	if (!ASC||!DefaultAttributes) return;
+	if (!ASC || !DefaultAttributes)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("InitializeAttributes: ASC=%d, DefaultAttributes=%d"), 
+			ASC != nullptr, DefaultAttributes != nullptr);
+		return;
+	}
 	FGameplayEffectContextHandle ContextHandle=ASC->MakeEffectContext();
 	FGameplayEffectSpecHandle SpecHandle=ASC->MakeOutgoingSpec(DefaultAttributes, 1.f, ContextHandle);
 	ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
@@ -60,6 +62,9 @@ void APDCharacterBase::InitializeAttributes()
 		AttributeSet->SetLegRHP (AttributeSet->GetMaxLegRHP());
 		AttributeSet->SetStamina(AttributeSet->GetMaxStamina());
 		AttributeSet->SetMoveSpeed(AttributeSet->GetMaxMoveSpeed());
+		AttributeSet->SetHunger(AttributeSet->GetMaxHunger());
+		AttributeSet->SetThirst(AttributeSet->GetMaxThirst());
+		AttributeSet->bIsInitialized=true;
 	}
 }
 
@@ -76,7 +81,7 @@ void APDCharacterBase::GiveStartupAbilities()
 void APDCharacterBase::GiveActiveAbilities()
 {
 	if (!ASC) return;
-	for (const auto& ActiveAbility : StartupAbilities)
+	for (const auto& ActiveAbility : ActiveAbilities)
 	{
 		FGameplayAbilitySpec AbilitySpec(ActiveAbility);
 		ASC->GiveAbility(AbilitySpec);

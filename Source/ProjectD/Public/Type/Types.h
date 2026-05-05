@@ -74,5 +74,11 @@ struct FPDPlayerData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Experience=0;
 	
+	//Inventory Data
+	
+	//Current Equppied Weapon
+	
+	
+	
 };
 

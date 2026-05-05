@@ -13,7 +13,6 @@ class PROJECTD_API UPDInputComponent : public UEnhancedInputComponent
 	GENERATED_BODY()
 
 public:
-	UPDInputComponent();
 	//이동, 시야 전환, GAS안 거치고 즉각 실행되는 기본 동작들 여기에 바인딩 하면 됨.
 	template<class UserClass, typename FuncType>
 	void BindNativeAction(const UPDInputConfig* InputConfig, const FGameplayTag& InputTag,

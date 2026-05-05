@@ -38,7 +38,6 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "PD|GAS")
 	TArray<TSubclassOf<UGameplayAbility>> ActiveAbilities;
-
 	
 	UPROPERTY(EditAnywhere, Category = "PD|GAS")
 	TSubclassOf<UGameplayEffect> DefaultAttributes;
@@ -78,6 +77,7 @@ public:
 	virtual TSubclassOf<UGameplayEffect> GetLegCrippledEffectClass() const override { return LegCrippledEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetArmDamagedEffectClass()  const override { return ArmDamagedEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetArmCrippledEffectClass() const override { return ArmCrippledEffectClass; }
+	virtual TSubclassOf<UGameplayEffect> GetBleedingEffectClass()    const override { return BleedingEffectClass; }
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Weapon")
 	void AttachActorToWeaponSocket(AActor* ActorToAttach);

@@ -16,6 +16,7 @@ GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
 class UPDBodyPartConfig;
 class IPDStatusEffectSource;
+class IPDSurvivalSource;
 
 UCLASS()
 class PROJECTD_API UPDAttributeSet : public UAttributeSet
@@ -103,6 +104,8 @@ public:
 	
 	UPROPERTY(EditDefaultsOnly)
 	TObjectPtr<UPDBodyPartConfig> BodyPartConfig;
+
+	bool bIsInitialized=false;
 protected:
 	//Pre -> Clamping 
 	//Post -> GE (Death, Apply Damage)
@@ -123,4 +126,9 @@ private:
 	void CheckAndApplyInjuryEffects(UAbilitySystemComponent* ASC, IPDStatusEffectSource* Source);
 	void TryApplyInjuryEffect(UAbilitySystemComponent* ASC,
 		TSubclassOf<UGameplayEffect> EffectClass, const FGameplayTag& GuardTag);
+
+	// 생존 GE 적용/해제 — IPDSurvivalSource 전용
+	void CheckAndApplySurvivalEffects(UAbilitySystemComponent* ASC, IPDSurvivalSource* Source);
+	void TryApplyOrRemoveSurvivalEffect(UAbilitySystemComponent* ASC,
+		TSubclassOf<UGameplayEffect> EffectClass, const FGameplayTag& GuardTag, bool bShouldApply);
 };

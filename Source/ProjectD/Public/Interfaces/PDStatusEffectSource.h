@@ -22,4 +22,5 @@ public:
 	virtual TSubclassOf<UGameplayEffect> GetLegCrippledEffectClass() const = 0;
 	virtual TSubclassOf<UGameplayEffect> GetArmDamagedEffectClass()  const = 0;
 	virtual TSubclassOf<UGameplayEffect> GetArmCrippledEffectClass() const = 0;
+	virtual TSubclassOf<UGameplayEffect> GetBleedingEffectClass() const = 0;
 };

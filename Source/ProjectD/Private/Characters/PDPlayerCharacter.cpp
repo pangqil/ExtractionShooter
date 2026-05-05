@@ -17,7 +17,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 	GetCharacterMovement()->bConstrainToPlane = true;
 	GetCharacterMovement()->bSnapToPlaneAtStart = true;
 
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom=CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->SetUsingAbsoluteRotation(true);
 	CameraBoom->TargetArmLength = 800.f;
@@ -30,4 +30,21 @@ APDPlayerCharacter::APDPlayerCharacter()
 
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
+}
+
+void APDPlayerCharacter::InitAbilitySystem()
+{
+	Super::InitAbilitySystem();
+	
+	auto ApplyInfiniteGE=[&](TSubclassOf<UGameplayEffect> GEClass)
+	{
+		if (!GEClass) return;
+		FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
+		FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(GEClass, 1.f, Context);
+		if (Spec.IsValid())
+			ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	};
+
+	ApplyInfiniteGE(HungerDecayEffectClass);
+	ApplyInfiniteGE(ThirstDecayEffectClass);
 }
