@@ -9,39 +9,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f7ee8a82-7f14-42e3-9911-51da30a537a6" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Injury/GE_ArmCrippled.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Injury/GE_ArmDamaged.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Injury/GE_Bleeding.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Injury/GE_LegCrippled.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Injury/GE_LegDamaged.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_Dehydrated.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_HungerDecay.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_Starving.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_ThristyDecay.uasset" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Component/PDVisionComponent.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Interfaces/PDDetectable.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Component/PDVisionComponent.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Interfaces/PDDetectable.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_ArmCrippled.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_ArmCrippled.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_ArmDamaged.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_ArmDamaged.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_Bleeding.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_Bleeding.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_DefaultAttribute.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_DefaultAttribute.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_LegCrippled.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_LegCrippled.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_LegDamaged.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/GE_LegDamaged.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_PD_PlayerCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_PD_PlayerCharacter.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/AttributeSet/PDAttributeSet.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/AttributeSet/PDAttributeSet.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/PDPlayerCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/PDPlayerCharacter.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Core/PDSaveGame.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Core/PDSaveGame.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Input/PDInputComponent.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Interfaces/PDDamageable.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Interfaces/PDInteractable.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/AttributeSet/PDAttributeSet.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/AttributeSet/PDAttributeSet.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/Base/PDCharacterBase.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/Base/PDCharacterBase.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/PDPlayerCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/PDPlayerCharacter.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Input/PDInputComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Input/PDInputComponent.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Interfaces/PDStatusEffectSource.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Interfaces/PDStatusEffectSource.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Type/Types.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Type/Types.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Injury/GE_ArmCrippled.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Injury/GE_ArmCrippled.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_Dehydrated.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_Dehydrated.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_Starving.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_Starving.uasset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -86,18 +61,22 @@
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Windows/D3D11RHI/Private/D3D11Util.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Private/Ability/PDGameplayAbilityBase.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Private/Ability/PDPassiveLegInjury.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/ProjectD/Private/Component/PDVisionComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Private/Core/PDGameInstance.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Private/Core/PDGameState.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Private/Input/PDInputConfig.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/ProjectD/Private/Interfaces/PDDetectable.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Private/Zone/PDExtractionZone.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Ability/PDGameplayAbilityBase.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Ability/PDPassiveLegInjury.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Component/PDVisionComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Core/PDGameInstance.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Core/PDGameState.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Input/PDInputComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Input/PDInputConfig.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Interfaces/PDDetectable.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Interfaces/PDSurvivalSource.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Type/Types.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/ProjectD/Public/Zone/PDExtractionZone.h" root0="FORCE_HIGHLIGHTING" />
@@ -116,24 +95,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;C/C++ Project.ProjectD.executor&quot;: &quot;Run&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;feature/Core&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "C/C++ Project.ProjectD.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "git-widget-placeholder": "feature/Core",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RunManager" selected="C/C++ Project.ProjectD">
     <configuration name="ProjectD" type="CppProject" factoryName="C++ Project">
       <configuration_1 setup="1">
@@ -180,7 +161,7 @@
       <workItem from="1777739350024" duration="1952000" />
       <workItem from="1777783626584" duration="9204000" />
       <workItem from="1777853637018" duration="29359000" />
-      <workItem from="1777952011519" duration="10888000" />
+      <workItem from="1777952011519" duration="14670000" />
     </task>
     <servers />
   </component>
