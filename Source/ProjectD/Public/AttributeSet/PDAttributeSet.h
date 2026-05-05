@@ -78,6 +78,24 @@ public:
 	FGameplayAttributeData MaxMoveSpeed;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxMoveSpeed)
 	
+	UPROPERTY(BlueprintReadOnly, Category="PD|Hunger")
+	FGameplayAttributeData Hunger;     
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, Hunger)
+	UPROPERTY(BlueprintReadOnly, Category="PD|Hunger")
+	FGameplayAttributeData MaxHunger;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxHunger)
+
+	UPROPERTY(BlueprintReadOnly, Category="PD|Thirst")
+	FGameplayAttributeData Thirst;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, Thirst)
+	UPROPERTY(BlueprintReadOnly, Category="PD|Thirst")
+	FGameplayAttributeData MaxThirst;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxThirst)
+	
+	UPROPERTY(BlueprintReadOnly, Category = "PD|StatusEffect")
+	FGameplayAttributeData BleedingResistance;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, BleedingResistance)
+	
 	//Meta Attribute
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Meta")
 	FGameplayAttributeData Damage;

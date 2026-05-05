@@ -51,9 +51,14 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		UAbilitySystemComponent* ASC=GetOwningAbilitySystemComponent();
 		if (IPDStatusEffectSource* Source=Cast<IPDStatusEffectSource>(OwnerActor))
 		{
+			if (FMath::FRand() < 0.2f)
+			{
+				TryApplyInjuryEffect(ASC, Source->GetBleedingEffectClass(), PDGameplayTags::State_Debuff_Bleeding);
+			}
 			CheckAndApplyInjuryEffects(ASC, Source);
 		}
 	}
+
 }
 
 void UPDAttributeSet::HandleAttributeClamp(const FGameplayAttribute& Attribute, float& NewValue) const
@@ -68,6 +73,9 @@ void UPDAttributeSet::HandleAttributeClamp(const FGameplayAttribute& Attribute, 
 	else if (Attribute==GetLegRHPAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxLegRHP());
 	else if (Attribute==GetStaminaAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxStamina());
 	else if (Attribute==GetMoveSpeedAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxMoveSpeed());
+	else if (Attribute==GetThirstAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxThirst());
+	else if (Attribute==GetHungerAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxHunger());
+	
 }
 
 FGameplayAttribute UPDAttributeSet::GetAttributeByPart(EBodyPart Part) const
