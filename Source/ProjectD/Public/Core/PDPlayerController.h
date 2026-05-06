@@ -36,7 +36,8 @@ protected:
 	TObjectPtr<UPDInputConfig> InputConfig;
 
 	virtual void SetupInputComponent() override;
-
+	virtual void BeginPlay() override;
+	
 private:
 	void OnMove(const struct FInputActionValue& Value);
 	void OnJump();
@@ -45,4 +46,5 @@ private:
 	void UpdateAimRotation();
 	
 	bool bShowMouseCursor=true;
+	
 };

@@ -15,7 +15,8 @@ GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
 class UPDBodyPartConfig;
-class APDCharacterBase;
+class IPDStatusEffectSource;
+class IPDSurvivalSource;
 
 UCLASS()
 class PROJECTD_API UPDAttributeSet : public UAttributeSet
@@ -71,6 +72,43 @@ public:
 	FGameplayAttributeData MaxStamina;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxStamina)
 	
+	UPROPERTY(BlueprintReadOnly, Category="PD|Movement")
+	FGameplayAttributeData MoveSpeed;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MoveSpeed)
+	UPROPERTY(BlueprintReadOnly, Category ="PD|Movement")
+	FGameplayAttributeData MaxMoveSpeed;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxMoveSpeed)
+	
+	UPROPERTY(BlueprintReadOnly, Category="PD|Hunger")
+	FGameplayAttributeData Hunger;     
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, Hunger)
+	UPROPERTY(BlueprintReadOnly, Category="PD|Hunger")
+	FGameplayAttributeData MaxHunger;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxHunger)
+
+	UPROPERTY(BlueprintReadOnly, Category="PD|Thirst")
+	FGameplayAttributeData Thirst;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, Thirst)
+	UPROPERTY(BlueprintReadOnly, Category="PD|Thirst")
+	FGameplayAttributeData MaxThirst;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxThirst)
+	
+	UPROPERTY(BlueprintReadOnly, Category="PD|Vision")
+	FGameplayAttributeData VisionRange;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, VisionRange)
+
+	UPROPERTY(BlueprintReadOnly, Category="PD|Vision")
+	FGameplayAttributeData VisionAngle;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, VisionAngle)
+
+	UPROPERTY(BlueprintReadOnly, Category="PD|Vision")
+	FGameplayAttributeData VisionUpdateInterval;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, VisionUpdateInterval)
+	
+	UPROPERTY(BlueprintReadOnly, Category = "PD|StatusEffect")
+	FGameplayAttributeData BleedingResistance;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, BleedingResistance)
+	
 	//Meta Attribute
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Meta")
 	FGameplayAttributeData Damage;
@@ -78,19 +116,31 @@ public:
 	
 	UPROPERTY(EditDefaultsOnly)
 	TObjectPtr<UPDBodyPartConfig> BodyPartConfig;
+
+	bool bIsInitialized=false;
 protected:
 	//Pre -> Clamping 
 	//Post -> GE (Death, Apply Damage)
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+	
+
 private:
 	void HandleAttributeClamp(const FGameplayAttribute& Attribute, float& NewValue) const;
 	void ApplyDamageToPart(EBodyPart Part, float DamageAmount);
-	
+
 	float GetHPByPart(EBodyPart Part) const;
 	void SetHPByPart(EBodyPart Part, float NewValue);
-	
+
 	FGameplayAttribute GetAttributeByPart(EBodyPart Part) const;
-	
-	
+
+	// 부상 GE 적용 — PostGameplayEffectExecute 캡슐화
+	void CheckAndApplyInjuryEffects(UAbilitySystemComponent* ASC, IPDStatusEffectSource* Source);
+	void TryApplyInjuryEffect(UAbilitySystemComponent* ASC,
+		TSubclassOf<UGameplayEffect> EffectClass, const FGameplayTag& GuardTag);
+
+	// 생존 GE 적용/해제 — IPDSurvivalSource 전용
+	void CheckAndApplySurvivalEffects(UAbilitySystemComponent* ASC, IPDSurvivalSource* Source);
+	void TryApplyOrRemoveSurvivalEffect(UAbilitySystemComponent* ASC,
+		TSubclassOf<UGameplayEffect> EffectClass, const FGameplayTag& GuardTag, bool bShouldApply);
 };
