@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/Base/PDCharacterBase.h"
@@ -9,11 +9,26 @@ class UPDVisionComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponSwapped, APDWeaponBase*, NewWeapon, EWeaponSlot, Slot);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponPickedUp, APDWeaponBase*, Weapon);
+
 UCLASS(abstract)
 class APDPlayerCharacter : public APDCharacterBase,
 						   public IPDSurvivalSource
 {
 	GENERATED_BODY()
+
+public:
+	APDPlayerCharacter();
+
+	UCameraComponent* GetTopDownCameraComponent() const { return TopDownCameraComponent.Get(); }
+	USpringArmComponent* GetCameraBoom() const { return CameraBoom.Get(); }
+
+protected:
+	// 오버라이드
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
+	virtual void HandleDeath(AActor* Killer) override;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))

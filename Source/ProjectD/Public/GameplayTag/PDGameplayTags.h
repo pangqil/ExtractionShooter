@@ -1,11 +1,10 @@
-#pragma once
+﻿#pragma once
 #include "NativeGameplayTags.h"
 
 namespace PDGameplayTags
 {
 	//Input
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Move)
-	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Fire)
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Jump)
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Interact)
 	//Damage Tag
@@ -24,4 +23,12 @@ namespace PDGameplayTags
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_buff_Adrenaline)  
 	
 
+    
+	// 총기 입력
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Fire)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Reload)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_WeaponSlot1)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_WeaponSlot2)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_WeaponSlot3)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_ToggleFireMode)
 }
