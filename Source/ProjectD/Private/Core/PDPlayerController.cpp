@@ -114,5 +114,9 @@ void APDPlayerController::UpdateAimRotation()
 	if (!AimDirection.IsNearlyZero())
 	{
 		ControlledPawn->SetActorRotation(AimDirection.Rotation());
+
+		DrawDebugLine(GetWorld(), ControlledPawn->GetActorLocation(),
+			ControlledPawn->GetActorLocation() + AimDirection.GetSafeNormal() * 200.f,
+			FColor::Blue, false, 0.1f, 0, 2.f);
 	}
 }

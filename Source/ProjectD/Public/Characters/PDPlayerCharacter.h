@@ -4,6 +4,7 @@
 #include "Characters/Base/PDCharacterBase.h"
 #include "PDPlayerCharacter.generated.h"
 
+class APDWeaponBase;
 class UCameraComponent;
 class USpringArmComponent;
 
