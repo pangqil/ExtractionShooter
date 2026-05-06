@@ -18,6 +18,7 @@ class PROJECTD_API UPDPrimaryLayout : public UCommonUserWidget
 public:
 	/** Subsystem에서 Push 대상 스택을 찾을 때 사용. */
 	UCommonActivatableWidgetContainerBase* FindStackByTag(const FGameplayTag& StackTag) const;
+	
 protected:
 	/** BP에서 BindWidget으로 묶은 스택을 태그와 함께 등록. */
 	UFUNCTION(BlueprintCallable, Category = "Layout")
