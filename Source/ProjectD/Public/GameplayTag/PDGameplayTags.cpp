@@ -16,4 +16,8 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Bleeding,    "State.Debuff.Bleeding")
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Starving,    "State.Debuff.Starving")
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Dehydrated,  "State.Debuff.Dehydrated")
+	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Fear,       "State.Debuff.Fear")
+	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_HeadInjury, "State.Debuff.HeadInjury")
+	
+	UE_DEFINE_GAMEPLAY_TAG(State_buff_Adrenaline, "State.buff.Adrenaline")
 }
