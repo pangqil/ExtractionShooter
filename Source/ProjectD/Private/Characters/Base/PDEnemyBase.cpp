@@ -15,6 +15,10 @@ void APDEnemyBase::SetEnemyState(EPDEnemyState NewState)
 	OnEnemyStateChanged(NewState);
 }
 
+void APDEnemyBase::OnVisionExposureChanged_Implementation(AActor* Observer, float Exposure)
+{
+}
+
 void APDEnemyBase::HandleDeath(AActor* Killer)
 {
 	SetEnemyState(EPDEnemyState::Dead);

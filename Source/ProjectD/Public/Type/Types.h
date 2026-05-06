@@ -118,6 +118,23 @@ enum class ERaidState : uint8
 	Ended
 };
 
+USTRUCT(BlueprintType)
+struct FPDPlayerData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Gold=0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Experience=0;
+	
+	//Inventory Data
+	
+	//Current Equppied Weapon
+	
+	
+	
 UENUM(BlueprintType)
 enum class EWeaponType : uint8
 {

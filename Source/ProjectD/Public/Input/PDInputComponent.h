@@ -13,6 +13,7 @@ class PROJECTD_API UPDInputComponent : public UEnhancedInputComponent
 	GENERATED_BODY()
 
 public:
+	//�̵�, �þ� ��ȯ, GAS�� ��ġ�� �ﰢ ����Ǵ� �⺻ ���۵� ���⿡ ���ε� �ϸ� ��.
 	UPDInputComponent();
 	//�̵�, �þ� ��ȯ, GAS�� ��ġ�� �ﰢ ����Ǵ� �⺻ ���۵� ���⿡ ���ε� �ϸ� ��.
 	template<class UserClass, typename FuncType>

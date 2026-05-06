@@ -36,5 +36,19 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category="PD|Raid")
 	void OnRaidStateChanged(ERaidState NewState);
 	
+	UFUNCTION(BlueprintImplementableEvent, Category="PD|Raid")
+	void OnRaidEnded(bool bSuccess);
+	
 	
 };
+/*
+탈출하게 될 경우 
+RequestExtraction()
+→ EndRaid(true)
+→ SaveToDisk()    
+→ OnRaidEnded(true)  
+
+탈출하지 못하고 죽을 경우       
+EndRaid(false)
+-> OnRaidEnded(false) BP에서 사망 UI -> 레벨 전환
+ */
