@@ -8,25 +8,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f7ee8a82-7f14-42e3-9911-51da30a537a6" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_PD_Enemy.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Material/MPC_Vision.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Material/M_Enemy.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Material/M_FogofWar.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveArmInjury.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveArmInjury.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveLegInjury.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveLegInjury.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_Adrenaline.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_Adrenaline.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_HeadInjury.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_HeadInjury.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Vision/GE_VisionPenalty.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Vision/GE_VisionPenalty.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDEnemyBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDEnemyBase.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/PDPlayerCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/PDPlayerCharacter.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Component/PDVisionComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Component/PDVisionComponent.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/Base/PDEnemyBase.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/Base/PDEnemyBase.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/PDPlayerCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/PDPlayerCharacter.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Component/PDVisionComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Component/PDVisionComponent.h" afterDir="false" />
-    </list>
+    <list default="true" id="f7ee8a82-7f14-42e3-9911-51da30a537a6" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -175,7 +157,7 @@
       <workItem from="1777783626584" duration="9204000" />
       <workItem from="1777853637018" duration="29359000" />
       <workItem from="1777952011519" duration="14670000" />
-      <workItem from="1778033098766" duration="12048000" />
+      <workItem from="1778033098766" duration="12746000" />
     </task>
     <servers />
   </component>
