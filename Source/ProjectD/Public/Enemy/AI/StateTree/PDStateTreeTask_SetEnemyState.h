@@ -32,5 +32,5 @@ struct PROJECTD_API FPDStateTreeTask_SetEnemyState : public FStateTreeTaskCommon
 	using FInstanceDataType = FPDStateTreeTask_SetEnemyStateInstanceData;
 	virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
 
-	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) override;
+	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 };

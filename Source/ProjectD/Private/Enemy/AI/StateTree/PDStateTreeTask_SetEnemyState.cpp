@@ -4,7 +4,7 @@
 #include "Characters/Base/PDEnemyBase.h"
 #include "StateTreeExecutionContext.h"
 
-EStateTreeRunStatus FPDStateTreeTask_SetEnemyState::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition)
+EStateTreeRunStatus FPDStateTreeTask_SetEnemyState::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& Instance = Context.GetInstanceData(*this);
 

@@ -11,7 +11,8 @@ public class ProjectD : ModuleRules
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			"AIModule", "NavigationSystem",
 			"StateTreeModule", "GameplayStateTreeModule",
-			"UMG", "Niagara", "CommonUI", "CommonInput"
+			"UMG", "Niagara", "CommonUI", "CommonInput",
+			"PhysicsCore"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
