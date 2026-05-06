@@ -24,10 +24,6 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper")
     TArray<bool> PenetrationPerLevel = { false, false, true };
 
-    /** 발사 후 노리쇠 후퇴·전진 몽타주 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Sniper|Animation")
-    TObjectPtr<UAnimMontage> BoltActionMontage;
-
 public:
     virtual void Fire_Implementation() override;
     virtual void Reload_Implementation() override;
