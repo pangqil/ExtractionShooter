@@ -1,12 +1,17 @@
 ﻿#include "Weapons/PDRifle.h"
+#include "Core/PDPlayerController.h"
+#include "DrawDebugHelpers.h"
 
 APDRifle::APDRifle()
 {
     WeaponType = EWeaponType::Rifle;
 
+    DefaultFOV = 90.f;
+    ZoomedFOV = 70.f;
+
     LevelStats.Add({ 20.f, 0.12f, 1500.f, 30, 2.0f, 0.90f }); // Lv1
-    LevelStats.Add({ 30.f, 0.10f, 1700.f, 35, 1.8f, 0.93f }); // Lv2
-    LevelStats.Add({ 40.f, 0.08f, 2000.f, 40, 1.5f, 0.96f }); // Lv3
+    LevelStats.Add({ 28.f, 0.10f, 1700.f, 35, 1.8f, 0.93f }); // Lv2
+    LevelStats.Add({ 38.f, 0.08f, 2000.f, 40, 1.5f, 0.96f }); // Lv3
 }
 
 void APDRifle::Fire_Implementation()
@@ -15,13 +20,39 @@ void APDRifle::Fire_Implementation()
 
     FHitResult Hit;
     if (PerformLineTrace(Hit))
-    {
         ApplyDamage(Hit.GetActor(), GetCurrentStats().Damage);
-    }
 
     PostFire();
 
+    FTimerHandle T_Shell;
+    GetWorldTimerManager().SetTimer(T_Shell, FTimerDelegate::CreateLambda([this]()
+        {
+            EjectShell();
+        }), 0.05f, false);
+
     if (CurrentAmmo <= 0) StopFire();
+}
+
+void APDRifle::Reload_Implementation()
+{
+    if (bIsReloading) return;
+    if (CurrentAmmo >= GetCurrentStats().MaxAmmo) return;
+
+    bIsReloading = true;
+
+    if (ReloadMontage)
+    {
+        PlayWeaponMontage(ReloadMontage);
+        BindMontageEndedForReload(ReloadMontage);
+    }
+    else
+    {
+        // 몽타주 미설정 시 폴백
+        GetWorldTimerManager().SetTimer(
+            ReloadHandle, this,
+            &APDWeaponBase::FinishReload,
+            GetCurrentStats().ReloadTime, false);
+    }
 }
 
 void APDRifle::StartFire()
@@ -29,10 +60,8 @@ void APDRifle::StartFire()
     if (bIsFiring) return;
     bIsFiring = true;
 
-    // 즉시 1발
     Fire();
 
-    // 연사 모드면 타이머로 반복
     if (FireMode == EFireMode::Auto)
     {
         GetWorldTimerManager().SetTimer(
@@ -51,16 +80,10 @@ void APDRifle::StopFire()
 void APDRifle::ToggleFireMode()
 {
     FireMode = (FireMode == EFireMode::Auto)
-        ? EFireMode::Single
-        : EFireMode::Auto;
+        ? EFireMode::Single : EFireMode::Auto;
 
-    OnFireModeChanged.Broadcast(FireMode);
-
-    // 연사 중이었으면 타이머 정리
     GetWorldTimerManager().ClearTimer(AutoFireHandle);
-
-    UE_LOG(LogTemp, Log, TEXT("FireMode: %s"),
-        FireMode == EFireMode::Auto ? TEXT("Auto") : TEXT("Single"));
+    OnFireModeChanged.Broadcast(FireMode);
 }
 
 void APDRifle::OnUnequip_Implementation()
@@ -72,20 +95,54 @@ void APDRifle::OnUnequip_Implementation()
 bool APDRifle::PerformLineTrace(FHitResult& OutHit)
 {
     const FWeaponLevelStats& Stats = GetCurrentStats();
-    FVector Start = WeaponMesh->GetSocketLocation(MuzzleSocketName);
 
-    float Spread = (1.f - Stats.Accuracy) * 100.f;
-    FVector RandDir = FVector(
-        FMath::RandRange(-Spread, Spread),
-        FMath::RandRange(-Spread, Spread), 0.f);
+    AActor* WeaponOwnerActor = GetWeaponOwner();
+    if (!WeaponOwnerActor) return false;
 
-    FVector End = Start + (WeaponMesh->GetForwardVector() + RandDir) * Stats.Range;
+    APlayerController* PC = Cast<APlayerController>(
+        WeaponOwnerActor->GetInstigatorController());
+
+    // 머즐 소켓 있으면 소켓 위치, 없으면 플레이어 위치
+    FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
+        ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
+        : WeaponOwnerActor->GetActorLocation();
+
+    FVector Forward = WeaponOwnerActor->GetActorForwardVector();
+
+    if (PC)
+    {
+        FHitResult CursorHit;
+        if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
+        {
+            FVector Dir = CursorHit.Location - Start; // Start 기준으로 방향 계산
+            Dir.Z = 0.f;
+            if (!Dir.IsNearlyZero())
+                Forward = Dir.GetSafeNormal();
+        }
+    }
+
+    float SpreadAngle = (1.f - Stats.Accuracy) * 15.f;
+    FVector ShootDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(SpreadAngle));
+    ShootDir.Z = 0.f;
+    ShootDir.Normalize();
+
+    FVector End = Start + ShootDir * Stats.Range;
 
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);
-    Params.AddIgnoredActor(GetWeaponOwner());
+    Params.AddIgnoredActor(WeaponOwnerActor);
 
-    DrawDebugLine(GetWorld(), Start, End, FColor::Red, false, 1.f, 0, 1.f);
+    bool bHit = GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, ECC_Pawn, Params);
 
-    return GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, ECC_Pawn, Params);
+    if (bHit)
+    {
+        DrawDebugLine(GetWorld(), Start, OutHit.Location, FColor::Red, false, 1.f, 0, 1.f);
+        DrawDebugSphere(GetWorld(), OutHit.Location, 10.f, 8, FColor::Red, false, 1.f);
+    }
+    else
+    {
+        DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1.f, 0, 1.f);
+    }
+
+    return bHit;
 }

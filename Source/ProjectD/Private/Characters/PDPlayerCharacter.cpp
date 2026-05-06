@@ -41,12 +41,6 @@ void APDPlayerCharacter::BeginPlay()
     Super::BeginPlay();
 }
 
-void APDPlayerCharacter::Tick(float DeltaTime)
-{
-    Super::Tick(DeltaTime);
-}
-
-// 무기 관리
 void APDPlayerCharacter::PickupWeapon(APDWeaponBase* Weapon)
 {
     if (!Weapon) return;
@@ -84,7 +78,7 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
     NewWeapon->OnEquip(this);
     NewWeapon->SetActorHiddenInGame(false);
 
-    // CharacterBase 소켓에 붙이기
+    // CharacterBase의 WeaponSocketName 소켓에 붙이기
     AttachActorToWeaponSocket(NewWeapon);
 
     OnWeaponSwapped.Broadcast(NewWeapon, Slot);
@@ -97,6 +91,7 @@ void APDPlayerCharacter::DropCurrentWeapon()
 
     CurWeapon->OnUnequip();
     CurWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+    CurWeapon->SetDropped(true);
 
     WeaponSlots[static_cast<int32>(CurrentSlot)] = nullptr;
     CurrentSlot = EWeaponSlot::None;
@@ -109,8 +104,6 @@ void APDPlayerCharacter::HandleDeath(AActor* Killer)
 
     Super::HandleDeath(Killer);
 }
-
-// Getter,내부 함수
 
 APDWeaponBase* APDPlayerCharacter::GetCurrentWeapon() const
 {

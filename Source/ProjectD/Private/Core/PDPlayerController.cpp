@@ -15,6 +15,8 @@
 #include "Characters/PDPlayerCharacter.h"
 #include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDRifle.h"
+#include "Interfaces/PDInteractable.h"
+#include "Interfaces/PDDamageable.h"
 
 APDPlayerController::APDPlayerController()
 {
@@ -72,12 +74,12 @@ void APDPlayerController::SetupInputComponent()
 		ETriggerEvent::Started, this, &APDPlayerController::OnToggleFireMode);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
 		ETriggerEvent::Started, this, &APDPlayerController::OnInteract);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_ToggleZoom,
+		ETriggerEvent::Started, this, &APDPlayerController::OnScopePressed);
 }
 
 void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 {
-	UE_LOG(LogTemp, Warning, TEXT("OnMove 호출됨"));
-
 	APawn* ControlledPawn =GetPawn();
 	if (!ControlledPawn) return;
 
@@ -127,6 +129,10 @@ void APDPlayerController::UpdateAimRotation()
 	if (!AimDirection.IsNearlyZero())
 	{
 		ControlledPawn->SetActorRotation(AimDirection.Rotation());
+
+		DrawDebugLine(GetWorld(), ControlledPawn->GetActorLocation(),
+			ControlledPawn->GetActorLocation() + AimDirection.GetSafeNormal() * 200.f,
+			FColor::Blue, false, 0.1f, 0, 2.f);
 	}
 }
 
@@ -146,65 +152,72 @@ APDWeaponBase* APDPlayerController::GetCurrentWeapon() const
 
 void APDPlayerController::OnFirePressed()
 {
-	APDWeaponBase* CurWeapon = GetCurrentWeapon();
-	if (!CurWeapon) return;
+    APDWeaponBase* CurWeapon = GetCurrentWeapon();
+    if (!CurWeapon) return;
 
-	if (APDRifle* Rifle = Cast<APDRifle>(CurWeapon))
-		Rifle->StartFire();
-	else
-		CurWeapon->Fire();
+    if (APDRifle* Rifle = Cast<APDRifle>(CurWeapon))
+        Rifle->StartFire();
+    else
+        CurWeapon->Fire();
 }
 
 void APDPlayerController::OnFireReleased()
 {
-	if (APDRifle* Rifle = Cast<APDRifle>(GetCurrentWeapon()))
-		Rifle->StopFire();
+    if (APDRifle* Rifle = Cast<APDRifle>(GetCurrentWeapon()))
+        Rifle->StopFire();
 }
 
 void APDPlayerController::OnReload()
 {
-	if (APDWeaponBase* CurWeapon = GetCurrentWeapon())
-		CurWeapon->Reload();
+    if (APDWeaponBase* CurWeapon = GetCurrentWeapon())
+        CurWeapon->Reload();
 }
 
 void APDPlayerController::OnSwitchSlot1()
 {
-	if (APDPlayerCharacter* PC = GetPlayerCharacter())
-		PC->SwitchToSlot(EWeaponSlot::Slot1_Rifle);
+    if (APDPlayerCharacter* PC = GetPlayerCharacter())
+        PC->SwitchToSlot(EWeaponSlot::Slot1_Rifle);
 }
 
 void APDPlayerController::OnSwitchSlot2()
 {
-	if (APDPlayerCharacter* PC = GetPlayerCharacter())
-		PC->SwitchToSlot(EWeaponSlot::Slot2_Shotgun);
+    if (APDPlayerCharacter* PC = GetPlayerCharacter())
+        PC->SwitchToSlot(EWeaponSlot::Slot2_Shotgun);
 }
 
 void APDPlayerController::OnSwitchSlot3()
 {
-	if (APDPlayerCharacter* PC = GetPlayerCharacter())
-		PC->SwitchToSlot(EWeaponSlot::Slot3_Sniper);
+    if (APDPlayerCharacter* PC = GetPlayerCharacter())
+        PC->SwitchToSlot(EWeaponSlot::Slot3_Sniper);
 }
 
 void APDPlayerController::OnToggleFireMode()
 {
-	if (APDRifle* Rifle = Cast<APDRifle>(GetCurrentWeapon()))
-		Rifle->ToggleFireMode();
+    if (APDRifle* Rifle = Cast<APDRifle>(GetCurrentWeapon()))
+        Rifle->ToggleFireMode();
 }
 
 void APDPlayerController::OnInteract()
 {
-	APDPlayerCharacter* PC = GetPlayerCharacter();
-	if (!PC) return;
+    APDPlayerCharacter* PC = GetPlayerCharacter();
+    if (!PC) return;
 
-	TArray<AActor*> OverlappingActors;
-	PC->GetOverlappingActors(OverlappingActors, APDWeaponBase::StaticClass());
+    // 주변 IPDInteractable 액터 탐색
+    TArray<AActor*> OverlappingActors;
+    PC->GetOverlappingActors(OverlappingActors);
 
-	for (AActor* Actor : OverlappingActors)
-	{
-		if (Actor->Implements<UPDInteractable>())
-		{
-			IPDInteractable::Execute_Interact(Actor, PC);
-			break;
-		}
-	}
+    for (AActor* Actor : OverlappingActors)
+    {
+        if (Actor->Implements<UPDInteractable>())
+        {
+            IPDInteractable::Execute_Interact(Actor, PC);
+            break;
+        }
+    }
+}
+
+void APDPlayerController::OnScopePressed()
+{
+	if (APDWeaponBase* CurWeapon = GetCurrentWeapon())
+		CurWeapon->ToggleZoom();
 }

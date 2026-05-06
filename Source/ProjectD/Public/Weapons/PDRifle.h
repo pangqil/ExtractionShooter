@@ -29,21 +29,20 @@ public:
 
 public:
     virtual void Fire_Implementation() override;
+    virtual void Reload_Implementation() override;
     virtual void OnUnequip_Implementation() override;
 
-    // 연사/단발 전환
-    UFUNCTION(BlueprintCallable, Category = "PD|Weapon|Rifle")
-    void ToggleFireMode();
-
-    UFUNCTION(BlueprintPure, Category = "PD|Weapon|Rifle")
-    FORCEINLINE EFireMode GetFireMode() const { return FireMode; }
-
-    // 입력에 연결
     UFUNCTION(BlueprintCallable, Category = "PD|Weapon|Rifle")
     void StartFire();
 
     UFUNCTION(BlueprintCallable, Category = "PD|Weapon|Rifle")
     void StopFire();
+
+    UFUNCTION(BlueprintCallable, Category = "PD|Weapon|Rifle")
+    void ToggleFireMode();
+
+    UFUNCTION(BlueprintPure, Category = "PD|Weapon|Rifle")
+    FORCEINLINE EFireMode GetFireMode() const { return FireMode; }
 
 private:
     bool PerformLineTrace(FHitResult& OutHit);

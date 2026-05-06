@@ -13,4 +13,5 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Input_WeaponSlot2, "Input.WeaponSlot2")
 	UE_DEFINE_GAMEPLAY_TAG(Input_WeaponSlot3, "Input.WeaponSlot3")
 	UE_DEFINE_GAMEPLAY_TAG(Input_ToggleFireMode, "Input.ToggleFireMode")	
+	UE_DEFINE_GAMEPLAY_TAG(Input_ToggleZoom, "Input.ToggleZoom")
 }

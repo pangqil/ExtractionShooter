@@ -57,6 +57,7 @@ private:
 	void OnSwitchSlot3();
 	void OnToggleFireMode();
 	void OnInteract();
+	void OnScopePressed();
 	
 	// 현재 무기 가져오기
 	APDWeaponBase* GetCurrentWeapon() const;

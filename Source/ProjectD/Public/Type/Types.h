@@ -165,4 +165,3 @@ struct FWeaponLevelStats
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	float Accuracy = 0.95f;
 };
-
