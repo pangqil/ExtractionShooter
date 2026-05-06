@@ -4,6 +4,8 @@
 #include "UObject/Interface.h"
 #include "PDDetectable.generated.h"
 
+class AActor;
+
 UINTERFACE(MinimalAPI, Blueprintable)
 class UPDDetectable : public UInterface
 {
@@ -15,8 +17,5 @@ class PROJECTD_API IPDDetectable
 	GENERATED_BODY()
 public:
 	UFUNCTION(BlueprintNativeEvent, Category="PD|Vision")
-	void OnEnterVision(AActor* Observer);
-
-	UFUNCTION(BlueprintNativeEvent, Category="PD|Vision")
-	void OnExitVision(AActor* Observer);
+	void OnVisionExposureChanged(AActor* Observer, float Exposure);
 };

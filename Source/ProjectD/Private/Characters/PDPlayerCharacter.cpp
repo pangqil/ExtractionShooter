@@ -1,5 +1,6 @@
 #include "Characters/PDPlayerCharacter.h"
 #include "Camera/CameraComponent.h"
+#include "Component/PDVisionComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -44,6 +45,11 @@ void APDPlayerCharacter::InitAbilitySystem()
 		if (Spec.IsValid())
 			ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 	};
+	
+	if (UPDVisionComponent* Vision=FindComponentByClass<UPDVisionComponent>())
+	{
+		Vision->BindToAttributeSet(ASC);
+	}
 
 	ApplyInfiniteGE(HungerDecayEffectClass);
 	ApplyInfiniteGE(ThirstDecayEffectClass);

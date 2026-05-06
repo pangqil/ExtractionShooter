@@ -93,6 +93,18 @@ public:
 	FGameplayAttributeData MaxThirst;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxThirst)
 	
+	UPROPERTY(BlueprintReadOnly, Category="PD|Vision")
+	FGameplayAttributeData VisionRange;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, VisionRange)
+
+	UPROPERTY(BlueprintReadOnly, Category="PD|Vision")
+	FGameplayAttributeData VisionAngle;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, VisionAngle)
+
+	UPROPERTY(BlueprintReadOnly, Category="PD|Vision")
+	FGameplayAttributeData VisionUpdateInterval;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, VisionUpdateInterval)
+	
 	UPROPERTY(BlueprintReadOnly, Category = "PD|StatusEffect")
 	FGameplayAttributeData BleedingResistance;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, BleedingResistance)
