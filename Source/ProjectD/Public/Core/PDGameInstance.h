@@ -6,6 +6,8 @@
 #include "Engine/GameInstance.h"
 #include "PDGameInstance.generated.h"
 
+class UPDPrimaryLayout;
+
 USTRUCT(BlueprintType)
 struct FPDPlayerData
 {
@@ -27,8 +29,11 @@ UCLASS()
 class PROJECTD_API UPDGameInstance : public UGameInstance
 {
 	GENERATED_BODY()
-	
+
 public:
+	virtual void Init() override;
+	virtual void Shutdown() override;
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Data")
 	void SavePlayerData(const FPDPlayerData& InData);
 
@@ -36,6 +41,13 @@ public:
 	FPDPlayerData LoadPlayerData() const;
 
 protected:
+	UPROPERTY(EditDefaultsOnly, Category = "PD|UI")
+	TSoftClassPtr<UPDPrimaryLayout> PrimaryLayoutClass;
+
 	UPROPERTY()
 	FPDPlayerData PlayerData;
+
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<UPDPrimaryLayout> PrimaryLayoutWidget;
 };
