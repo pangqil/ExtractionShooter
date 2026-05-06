@@ -76,14 +76,8 @@ struct FPDDamageInfo
 	FHitResult HitResult;
 };
 
-UENUM(BlueprintType)
-enum class EPDEnemyState : uint8
-{
-	Idle,
-	Chase,
-	Attack,
-	Dead
-};
+// 참고: EPDEnemyState 은 Enemy 시스템 전용 enum 으로 분리되어
+//      Public/Enemy/Types/EnemyTypes.h 로 이동. 여기에는 더 이상 정의하지 않음.
 
 UENUM(BlueprintType)
 enum class EBodyPart : uint8
