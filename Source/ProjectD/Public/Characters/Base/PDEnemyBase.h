@@ -2,11 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Characters/Base/PDCharacterBase.h"
+#include "Interfaces/PDDetectable.h"
 #include "Type/Types.h"
 #include "PDEnemyBase.generated.h"
 
 UCLASS(Abstract, Blueprintable)
-class PROJECTD_API APDEnemyBase : public APDCharacterBase
+class PROJECTD_API APDEnemyBase : public APDCharacterBase, public IPDDetectable
 {
 	GENERATED_BODY()
 
@@ -29,4 +30,5 @@ protected:
 	void OnEnemyStateChanged(EPDEnemyState NewState);
 
 	virtual void HandleDeath(AActor* Killer) override;
+	virtual void OnVisionExposureChanged_Implementation(AActor* Observer, float Exposure) override;
 };

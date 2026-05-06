@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Interfaces/PDDetectable.h"
+#include "Kismet/KismetMaterialLibrary.h"
 
 UPDVisionComponent::UPDVisionComponent()
 {
@@ -117,6 +118,7 @@ void UPDVisionComponent::PerformVisionUpdate()
 	}
 
 	VisibleActors=MoveTemp(NewVisible);
+	UpdateFogOfWarMPC();
 }
 
 float UPDVisionComponent::CalcExposure(AActor* Target) const
@@ -129,12 +131,12 @@ float UPDVisionComponent::CalcExposure(AActor* Target) const
 
 bool UPDVisionComponent::IsInCone(AActor* Target) const
 {
+	const FVector ToTargetRaw=Target->GetActorLocation()-GetOwner()->GetActorLocation();
+
+	if (ToTargetRaw.SizeSquared()<FMath::Square(ProximityRadius)) return true;
+
 	const FVector Forward=GetOwner()->GetActorForwardVector();
-	const FVector ToTarget=(Target->GetActorLocation()-GetOwner()->GetActorLocation()).GetSafeNormal();
-	
-	if (ToTarget.SizeSquared()<FMath::Square(ProximityRadius)) return true;
-	
-	const float Dot=FVector::DotProduct(Forward, ToTarget);
+	const float Dot=FVector::DotProduct(Forward, ToTargetRaw.GetSafeNormal());
 	return Dot>=FMath::Cos(FMath::DegreesToRadians(GetEffectiveAngle()*0.5f));
 }
 
@@ -165,6 +167,31 @@ void UPDVisionComponent::ScheduleNextUpdate(float Interval)
 float UPDVisionComponent::GetEffectiveAngle() const
 {
 	return bHasAngleOverride?VisionAngleOverride : VisionAngle;
+}
+
+void UPDVisionComponent::UpdateStaminaScale(float Scale)
+{
+	StaminaScale=FMath::Clamp(Scale, 0.3f, 1.f);
+}
+
+void UPDVisionComponent::UpdateFogOfWarMPC()
+{
+	if (!FogOfWarMPC) return;
+	AActor* Owner=GetOwner();
+	if (!IsValid(Owner)) return;
+
+	const FVector Loc=Owner->GetActorLocation();
+	const FVector Forward=Owner->GetActorForwardVector();
+	const float AngleCos=FMath::Cos(FMath::DegreesToRadians(GetEffectiveAngle()*0.5f));
+
+	UKismetMaterialLibrary::SetVectorParameterValue(GetWorld(), FogOfWarMPC,
+		TEXT("PlayerWorldPosition"), FLinearColor(Loc.X, Loc.Y, Loc.Z, 0.f));
+	UKismetMaterialLibrary::SetVectorParameterValue(GetWorld(), FogOfWarMPC,
+		TEXT("PlayerForwardVector"), FLinearColor(Forward.X, Forward.Y, Forward.Z, 0.f));
+	UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), FogOfWarMPC,
+		TEXT("VisionRange"), VisionRange*StaminaScale);
+	UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), FogOfWarMPC,
+		TEXT("VisionAngleCos"), AngleCos);
 }
 
 

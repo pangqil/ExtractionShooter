@@ -9,19 +9,23 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f7ee8a82-7f14-42e3-9911-51da30a537a6" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_Adrenaline.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_Fear.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_HeadInjury.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Vision/GE_AdrenalineVision.uasset" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Vision/GE_VisionPenalty.uasset" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/BP_JH_PD_Enemy.uasset" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Material/MPC_Vision.uasset" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Material/M_Enemy.uasset" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Material/M_FogofWar.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ProjectD/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_HungerDecay.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Survival/GE_HungerDecay.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveArmInjury.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveArmInjury.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveLegInjury.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/GA_PassiveLegInjury.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_Adrenaline.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_Adrenaline.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_HeadInjury.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GA/VisionUpdate/GA_HeadInjury.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Vision/GE_VisionPenalty.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Developers/jaehyuck/Blueprints/Ability/GE/Vision/GE_VisionPenalty.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDCharacterBase.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDEnemyBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/Base/PDEnemyBase.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/PDPlayerCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Characters/PDPlayerCharacter.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/AttributeSet/PDAttributeSet.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/AttributeSet/PDAttributeSet.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Core/PDPlayerController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Core/PDPlayerController.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/GameplayTag/PDGameplayTags.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Interfaces/PDDetectable.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Interfaces/PDDetectable.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Private/Component/PDVisionComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Private/Component/PDVisionComponent.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/Base/PDEnemyBase.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/Base/PDEnemyBase.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/PDPlayerCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Characters/PDPlayerCharacter.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ProjectD/Public/Component/PDVisionComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ProjectD/Public/Component/PDVisionComponent.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,12 +54,16 @@
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Plugins/Experimental/Mover/Source/MoverEditor/Private/K2Node_PlayMontageOnMoverActor.cpp" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Plugins/Experimental/UAF/UAFAnimGraph/Source/UAFAnimGraph/Public/Traits/SequencePlayerTraitData.h" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Plugins/FX/Niagara/Source/Niagara/Classes/NiagaraDataInterfaceGrid2DCollection.h" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Plugins/FX/Niagara/Source/Niagara/Private/NiagaraEmitter.cpp" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Plugins/Marketplace/Developer/RiderLink/Source/RD/thirdparty/spdlog/include/spdlog/details/backtracer.h" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Plugins/Marketplace/Developer/RiderLink/Source/RD/thirdparty/spdlog/include/spdlog/sinks/base_sink.h" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Plugins/PCG/Source/PCG/Private/Tests/Elements/PCGGetAttributeSetByIndexTest.cpp" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Editor/VREditor/Public/Teleporter/VREditorTeleporter.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Programs/AutomationTool/AutomationTool.csproj" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Programs/AutomationTool/LiveLinkHub/LiveLinkHub.Automation.csproj" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Programs/AutomationTool/Scripts/AutomationScripts.Automation.csproj" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Core/Private/Containers/ContainersTest.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Core/Public/Math/Vector.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Engine/HitResult.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/Controller.h" root0="FORCE_HIGHLIGHTING" />
@@ -167,7 +175,7 @@
       <workItem from="1777783626584" duration="9204000" />
       <workItem from="1777853637018" duration="29359000" />
       <workItem from="1777952011519" duration="14670000" />
-      <workItem from="1778033098766" duration="10273000" />
+      <workItem from="1778033098766" duration="12048000" />
     </task>
     <servers />
   </component>

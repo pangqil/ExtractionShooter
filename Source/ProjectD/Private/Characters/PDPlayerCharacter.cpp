@@ -1,4 +1,6 @@
 #include "Characters/PDPlayerCharacter.h"
+
+#include "AttributeSet/PDAttributeSet.h"
 #include "Camera/CameraComponent.h"
 #include "Component/PDVisionComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -29,6 +31,8 @@ APDPlayerCharacter::APDPlayerCharacter()
 	TopDownCameraComponent->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	TopDownCameraComponent->bUsePawnControlRotation = false;
 
+	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
+
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
 }
@@ -50,7 +54,18 @@ void APDPlayerCharacter::InitAbilitySystem()
 	{
 		Vision->BindToAttributeSet(ASC);
 	}
+	
+	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetStaminaAttribute())
+	.AddUObject(this, &APDPlayerCharacter::OnStaminaChanged);
 
 	ApplyInfiniteGE(HungerDecayEffectClass);
 	ApplyInfiniteGE(ThirstDecayEffectClass);
+}
+
+void APDPlayerCharacter::OnStaminaChanged(const FOnAttributeChangeData& Data)
+{
+	if (!AttributeSet||!VisionComponent) return;
+	const float MaxStamina=AttributeSet->GetMaxStamina();
+	if (MaxStamina<=0.f) return;
+	VisionComponent->UpdateStaminaScale(Data.NewValue/MaxStamina);
 }

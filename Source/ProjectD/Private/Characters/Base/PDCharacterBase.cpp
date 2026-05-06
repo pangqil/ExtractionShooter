@@ -4,6 +4,7 @@
 #include "GameplayTagContainer.h"
 #include "Ability/PDGameplayAbilityBase.h"
 #include "AttributeSet/PDAttributeSet.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Core/PDGameMode.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"

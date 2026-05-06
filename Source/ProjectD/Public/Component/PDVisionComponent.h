@@ -4,10 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "GameplayEffectTypes.h"
 #include "PDVisionComponent.generated.h"
 
-
-struct FOnAttributeChangeData;
 class UAbilitySystemComponent;
 
 namespace EEndPlayReason
@@ -35,8 +34,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Vision")
 	const TSet<AActor*>& GetVisibleActors() const { return VisibleActors; }
 
+	UFUNCTION(BlueprintCallable, Category="PD|Vision")
+	void UpdateStaminaScale(float Scale);
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Vision")
+	TObjectPtr<UMaterialParameterCollection> FogOfWarMPC;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Vision")
 	float ProximityRadius=50.f;
+
+	float VisionRange=1200.f;
+	float VisionAngle=90.f;
+	float UpdateInterval=0.1f;
+	float ThrottledInterval=0.5f;
 	
 protected:
 	virtual void BeginPlay() override;
@@ -55,16 +65,15 @@ private:
 	void OnVisionAngleChanged(const FOnAttributeChangeData& Data);
 	void OnVisionUpdateIntervalChanged(const FOnAttributeChangeData& Data);
 
+	void UpdateFogOfWarMPC();
+
+	float StaminaScale=1.f;
+
 	
 	
 private:
 	TSet<AActor*> VisibleActors;
 	FTimerHandle TimerHandle;
-
-	float VisionRange=1200.f;
-	float VisionAngle=90.f;
-	float UpdateInterval=0.1f;
-	float ThrottledInterval=0.5f;
 
 	bool bHasAngleOverride=false;
 	float VisionAngleOverride=0.f;

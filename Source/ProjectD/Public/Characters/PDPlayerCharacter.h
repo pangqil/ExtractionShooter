@@ -5,6 +5,7 @@
 #include "Interfaces/PDSurvivalSource.h"
 #include "PDPlayerCharacter.generated.h"
 
+class UPDVisionComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -20,6 +21,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USpringArmComponent> CameraBoom;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPDVisionComponent> VisionComponent;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Survival")
@@ -34,9 +38,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Survival")
 	TSubclassOf<UGameplayEffect> DehydratedEffectClass;
 
+	void OnStaminaChanged(const FOnAttributeChangeData& Data);
+	
 public:
 	APDPlayerCharacter();
 	virtual void InitAbilitySystem() override;
+	
 
 	UCameraComponent* GetTopDownCameraComponent() const { return TopDownCameraComponent.Get(); }
 	USpringArmComponent* GetCameraBoom() const { return CameraBoom.Get(); }
