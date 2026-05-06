@@ -126,3 +126,58 @@ enum class ERaidState : uint8
 	Extracting,
 	Ended
 };
+
+// ─── 무기 시스템 ────────────────────────────────────────────────
+
+UENUM(BlueprintType)
+enum class EWeaponType : uint8
+{
+	None,
+	Rifle,
+	Shotgun,
+	Sniper
+};
+
+/** 플레이어 무기 슬롯 (0 = None, 슬롯 인덱스와 1:1 매핑) */
+UENUM(BlueprintType)
+enum class EWeaponSlot : uint8
+{
+	None,
+	Slot1_Rifle,
+	Slot2_Shotgun,
+	Slot3_Sniper
+};
+
+UENUM(BlueprintType)
+enum class EFireMode : uint8
+{
+	Single,
+	Auto
+};
+
+/** 무기 레벨별 스탯. 자식 생성자에서 LevelStats.Add({...}) 형태로 채운다. */
+USTRUCT(BlueprintType)
+struct FWeaponLevelStats
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	float Damage = 0.f;
+
+	/** 연사 간격(초) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	float FireRate = 0.1f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	float Range = 1000.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	int32 MaxAmmo = 10;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	float ReloadTime = 2.f;
+
+	/** 0~1. 1=완벽. 낮을수록 탄 퍼짐 커짐 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	float Accuracy = 0.9f;
+};

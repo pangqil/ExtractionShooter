@@ -21,7 +21,10 @@ class PROJECTD_API UPDVisionComponent : public UActorComponent
 
 public:
 	UPDVisionComponent();
-	
+
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction) override;
+
 	UFUNCTION(BlueprintCallable, Category="PD|Vision")
 	void BindToAttributeSet(UAbilitySystemComponent* ASC);
 
@@ -65,7 +68,10 @@ private:
 	void OnVisionAngleChanged(const FOnAttributeChangeData& Data);
 	void OnVisionUpdateIntervalChanged(const FOnAttributeChangeData& Data);
 
-	void UpdateFogOfWarMPC();
+	/** 매 Tick: PlayerWorldPosition + PlayerForwardVector만 MPC에 밀어넣음 */
+	void UpdateFogOfWarMPC_Transform();
+	/** 어트리뷰트 변경 시: VisionRange + VisionAngleCos만 MPC에 밀어넣음 */
+	void UpdateFogOfWarMPC_Vision();
 
 	float StaminaScale=1.f;
 

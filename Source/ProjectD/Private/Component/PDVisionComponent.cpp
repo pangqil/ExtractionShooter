@@ -11,7 +11,9 @@
 
 UPDVisionComponent::UPDVisionComponent()
 {
-	PrimaryComponentTick.bCanEverTick=false;
+	// Transform(위치/방향)은 매 프레임 MPC 업데이트 필요.
+	PrimaryComponentTick.bCanEverTick=true;
+	PrimaryComponentTick.bStartWithTickEnabled=true;
 }
 
 
@@ -20,6 +22,8 @@ void UPDVisionComponent::BeginPlay()
 	Super::BeginPlay();
 	LastLocation=GetOwner()->GetActorLocation();
 	LastYaw=GetOwner()->GetActorRotation().Yaw;
+	// VisionRange/AngleCos 초기값 한 번 밀어넣기
+	UpdateFogOfWarMPC_Vision();
 	ScheduleNextUpdate(UpdateInterval);
 }
 
@@ -56,14 +60,24 @@ void UPDVisionComponent::ClearVisionAngleOverride()
 	bHasAngleOverride=false;
 }
 
+void UPDVisionComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+	FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	// Transform만 매 프레임 MPC 업데이트 (VisionRange/Angle은 어트리뷰트 변경 시만)
+	UpdateFogOfWarMPC_Transform();
+}
+
 void UPDVisionComponent::OnVisionRangeChanged(const FOnAttributeChangeData& Data)
 {
 	VisionRange=Data.NewValue;
+	UpdateFogOfWarMPC_Vision();
 }
 
 void UPDVisionComponent::OnVisionAngleChanged(const FOnAttributeChangeData& Data)
 {
 	VisionAngle=Data.NewValue;
+	UpdateFogOfWarMPC_Vision();
 }
 
 void UPDVisionComponent::OnVisionUpdateIntervalChanged(const FOnAttributeChangeData& Data)
@@ -118,7 +132,8 @@ void UPDVisionComponent::PerformVisionUpdate()
 	}
 
 	VisibleActors=MoveTemp(NewVisible);
-	UpdateFogOfWarMPC();
+	// Transform은 Tick에서 처리하므로 여기서는 Vision 파라미터(Range/Angle)만 동기화
+	UpdateFogOfWarMPC_Vision();
 }
 
 float UPDVisionComponent::CalcExposure(AActor* Target) const
@@ -172,9 +187,10 @@ float UPDVisionComponent::GetEffectiveAngle() const
 void UPDVisionComponent::UpdateStaminaScale(float Scale)
 {
 	StaminaScale=FMath::Clamp(Scale, 0.3f, 1.f);
+	UpdateFogOfWarMPC_Vision();
 }
 
-void UPDVisionComponent::UpdateFogOfWarMPC()
+void UPDVisionComponent::UpdateFogOfWarMPC_Transform()
 {
 	if (!FogOfWarMPC) return;
 	AActor* Owner=GetOwner();
@@ -182,12 +198,19 @@ void UPDVisionComponent::UpdateFogOfWarMPC()
 
 	const FVector Loc=Owner->GetActorLocation();
 	const FVector Forward=Owner->GetActorForwardVector();
-	const float AngleCos=FMath::Cos(FMath::DegreesToRadians(GetEffectiveAngle()*0.5f));
 
 	UKismetMaterialLibrary::SetVectorParameterValue(GetWorld(), FogOfWarMPC,
 		TEXT("PlayerWorldPosition"), FLinearColor(Loc.X, Loc.Y, Loc.Z, 0.f));
 	UKismetMaterialLibrary::SetVectorParameterValue(GetWorld(), FogOfWarMPC,
 		TEXT("PlayerForwardVector"), FLinearColor(Forward.X, Forward.Y, Forward.Z, 0.f));
+}
+
+void UPDVisionComponent::UpdateFogOfWarMPC_Vision()
+{
+	if (!FogOfWarMPC) return;
+
+	const float AngleCos=FMath::Cos(FMath::DegreesToRadians(GetEffectiveAngle()*0.5f));
+
 	UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), FogOfWarMPC,
 		TEXT("VisionRange"), VisionRange*StaminaScale);
 	UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), FogOfWarMPC,
