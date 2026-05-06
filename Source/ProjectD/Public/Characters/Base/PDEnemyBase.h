@@ -4,6 +4,7 @@
 #include "Characters/Base/PDCharacterBase.h"
 #include "Enemy/Types/EnemyTypes.h"
 #include "Enemy/Interfaces/PDCombatInterface.h"
+#include "Interfaces/PDDetectable.h"
 #include "PDEnemyBase.generated.h"
 
 class UAIPerceptionStimuliSourceComponent;
@@ -22,7 +23,7 @@ class UAIPerceptionStimuliSourceComponent;
  *              Stim source는 모든 적이 가져야 하므로 여기서 생성.
  */
 UCLASS(Abstract, Blueprintable)
-class PROJECTD_API APDEnemyBase : public APDCharacterBase, public IPDCombatInterface
+class PROJECTD_API APDEnemyBase : public APDCharacterBase, public IPDCombatInterface, public IPDDetectable
 {
 	GENERATED_BODY()
 
@@ -68,4 +69,5 @@ protected:
 	virtual void OnEnterState_Dead();
 
 	virtual void HandleDeath(AActor* Killer) override;
+	virtual void OnVisionExposureChanged_Implementation(AActor* Observer, float Exposure) override;
 };

@@ -90,7 +90,10 @@ void APDEnemyBase::OnEnterState_Dead()
 
 void APDEnemyBase::HandleDeath(AActor* Killer)
 {
-	// Mid: 상태 전이가 먼저 — Dead 진입 hook 에서 충돌/이동 정리 후 부모의 OnDeath broadcast.
 	SetEnemyState(EPDEnemyState::Dead);
 	Super::HandleDeath(Killer);
+}
+
+void APDEnemyBase::OnVisionExposureChanged_Implementation(AActor* Observer, float Exposure)
+{
 }
