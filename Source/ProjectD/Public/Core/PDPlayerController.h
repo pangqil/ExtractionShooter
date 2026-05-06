@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -9,6 +9,10 @@ class UNiagaraSystem;
 class UInputMappingContext;
 class UInputAction;
 class UPathFollowingComponent;
+class UPDInputConfig;
+class APDWeaponBase;
+class APDRifle;
+class APDPlayerCharacter;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 
@@ -44,6 +48,22 @@ private:
 	void OnAbilityInputPressed(FGameplayTag InputTag);
 	void OnAbilityInputReleased(FGameplayTag InputTag);
 	void UpdateAimRotation();
+	
+	// 무기 입력
+	void OnFirePressed();
+	void OnFireReleased();
+	void OnReload();
+	void OnSwitchSlot1();
+	void OnSwitchSlot2();
+	void OnSwitchSlot3();
+	void OnToggleFireMode();
+	void OnInteract();
+	
+	// 현재 무기 가져오기
+	APDWeaponBase* GetCurrentWeapon() const;
+
+	// 소유 PlayerCharacter 가져오기
+	APDPlayerCharacter* GetPlayerCharacter() const;
 	
 	bool bShowMouseCursor=true;
 	
