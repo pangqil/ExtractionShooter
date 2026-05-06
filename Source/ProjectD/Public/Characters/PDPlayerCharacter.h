@@ -2,11 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Characters/Base/PDCharacterBase.h"
-#include "Type/Types.h"
-#include "Weapons/PDWeaponBase.h"
-#include "Weapons/PDRifle.h"
+#include "Interfaces/PDSurvivalSource.h"
 #include "PDPlayerCharacter.generated.h"
 
+class UPDVisionComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -14,7 +13,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponSwapped, APDWeaponBase*, N
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponPickedUp, APDWeaponBase*, Weapon);
 
 UCLASS(abstract)
-class APDPlayerCharacter : public APDCharacterBase
+class APDPlayerCharacter : public APDCharacterBase,
+						   public IPDSurvivalSource
 {
 	GENERATED_BODY()
 
@@ -36,44 +36,36 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USpringArmComponent> CameraBoom;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPDVisionComponent> VisionComponent;
 
 protected:
-	// 무기 슬롯
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Player|Weapon")
-	TArray<TObjectPtr<APDWeaponBase>> WeaponSlots;
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Survival")
+	TSubclassOf<UGameplayEffect> HungerDecayEffectClass;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Player|Weapon")
-	EWeaponSlot CurrentSlot = EWeaponSlot::None;
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Survival")
+	TSubclassOf<UGameplayEffect> ThirstDecayEffectClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Survival")
+	TSubclassOf<UGameplayEffect> StarvingEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Survival")
+	TSubclassOf<UGameplayEffect> DehydratedEffectClass;
+
+	void OnStaminaChanged(const FOnAttributeChangeData& Data);
+	
 public:
-	// 델리게이트
-	UPROPERTY(BlueprintAssignable, Category = "PD|Player|Events")
-	FOnWeaponSwapped OnWeaponSwapped;
+	APDPlayerCharacter();
+	virtual void InitAbilitySystem() override;
+	
 
-	UPROPERTY(BlueprintAssignable, Category = "PD|Player|Events")
-	FOnWeaponPickedUp OnWeaponPickedUp;
+	UCameraComponent* GetTopDownCameraComponent() const { return TopDownCameraComponent.Get(); }
+	USpringArmComponent* GetCameraBoom() const { return CameraBoom.Get(); }
 
-public:
-	// 무기 관리
-	UFUNCTION(BlueprintCallable, Category = "PD|Player|Weapon")
-	void PickupWeapon(APDWeaponBase* Weapon);
-
-	UFUNCTION(BlueprintCallable, Category = "PD|Player|Weapon")
-	void SwitchToSlot(EWeaponSlot Slot);
-
-	UFUNCTION(BlueprintCallable, Category = "PD|Player|Weapon")
-	void DropCurrentWeapon();
-
-	// Getter
-	UFUNCTION(BlueprintPure, Category = "PD|Player|Weapon")
-	APDWeaponBase* GetCurrentWeapon() const;
-
-	UFUNCTION(BlueprintPure, Category = "PD|Player|Weapon")
-	APDWeaponBase* GetWeaponInSlot(EWeaponSlot Slot) const;
-
-	UFUNCTION(BlueprintPure, Category = "PD|Player")
-	FORCEINLINE EWeaponSlot GetCurrentSlot() const { return CurrentSlot; }
-
-protected:	
-	EWeaponSlot GetSlotForWeaponType(EWeaponType Type) const;
+	// IPDSurvivalSource
+	virtual TSubclassOf<UGameplayEffect> GetHungerDecayEffectClass()  const override { return HungerDecayEffectClass; }
+	virtual TSubclassOf<UGameplayEffect> GetThirstDecayEffectClass()  const override { return ThirstDecayEffectClass; }
+	virtual TSubclassOf<UGameplayEffect> GetStarvingEffectClass()     const override { return StarvingEffectClass; }
+	virtual TSubclassOf<UGameplayEffect> GetDehydratedEffectClass()   const override { return DehydratedEffectClass; }
 };

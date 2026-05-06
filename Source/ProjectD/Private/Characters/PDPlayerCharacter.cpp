@@ -1,5 +1,9 @@
+#include "Characters/PDPlayerCharacter.h"
+
+#include "AttributeSet/PDAttributeSet.h"
 ﻿#include "Characters/PDPlayerCharacter.h"
 #include "Camera/CameraComponent.h"
+#include "Component/PDVisionComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -19,7 +23,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 	GetCharacterMovement()->bConstrainToPlane = true;
 	GetCharacterMovement()->bSnapToPlaneAtStart = true;
 
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom=CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->SetUsingAbsoluteRotation(true);
 	CameraBoom->TargetArmLength = 800.f;
@@ -29,6 +33,8 @@ APDPlayerCharacter::APDPlayerCharacter()
 	TopDownCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("TopDownCamera"));
 	TopDownCameraComponent->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	TopDownCameraComponent->bUsePawnControlRotation = false;
+
+	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
 
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
@@ -41,6 +47,37 @@ void APDPlayerCharacter::BeginPlay()
     Super::BeginPlay();
 }
 
+void APDPlayerCharacter::InitAbilitySystem()
+{
+	Super::InitAbilitySystem();
+	
+	auto ApplyInfiniteGE=[&](TSubclassOf<UGameplayEffect> GEClass)
+	{
+		if (!GEClass) return;
+		FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
+		FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(GEClass, 1.f, Context);
+		if (Spec.IsValid())
+			ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	};
+	
+	if (UPDVisionComponent* Vision=FindComponentByClass<UPDVisionComponent>())
+	{
+		Vision->BindToAttributeSet(ASC);
+	}
+	
+	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetStaminaAttribute())
+	.AddUObject(this, &APDPlayerCharacter::OnStaminaChanged);
+
+	ApplyInfiniteGE(HungerDecayEffectClass);
+	ApplyInfiniteGE(ThirstDecayEffectClass);
+}
+
+void APDPlayerCharacter::OnStaminaChanged(const FOnAttributeChangeData& Data)
+{
+	if (!AttributeSet||!VisionComponent) return;
+	const float MaxStamina=AttributeSet->GetMaxStamina();
+	if (MaxStamina<=0.f) return;
+	VisionComponent->UpdateStaminaScale(Data.NewValue/MaxStamina);
 void APDPlayerCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);

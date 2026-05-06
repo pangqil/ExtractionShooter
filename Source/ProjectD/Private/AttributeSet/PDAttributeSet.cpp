@@ -3,8 +3,12 @@
 
 #include "AttributeSet/PDAttributeSet.h"
 #include "GameplayEffectExtension.h"
-#include "Characters/Base/PDCharacterBase.h"
+#include "GameplayEffect.h"
 #include "Data/PDBodyPartConfig.h"
+#include "Interfaces/PDStatusEffectSource.h"
+#include "Interfaces/PDSurvivalSource.h"
+#include "GameplayTag/PDGameplayTags.h"
+#include "Characters/Base/PDCharacterBase.h"
 
 void UPDAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
@@ -18,6 +22,8 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 
 	if (Data.EvaluatedData.Attribute==GetDamageAttribute())
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Damage Source GE: %s | Amount: %f"),
+		*Data.EffectSpec.Def->GetName(), GetDamage());
 		const float LocalDamage=GetDamage();
 		SetDamage(0.f);
 
@@ -25,21 +31,49 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		
 		EBodyPart Part=EBodyPart::Torso;
 		if (const FHitResult* HitResult=Data.EffectSpec.GetContext().GetHitResult())
-		{//HitResult�� EffectContext �ȿ�
+		{
 			if (BodyPartConfig)
 			{
 				Part=BodyPartConfig->GetBodyPartFromName(HitResult->BoneName);
 			}
 		}
-		const float NewHP=FMath::Max(GetHPByPart(Part) - LocalDamage, 0.f);
+		const float NewHP=FMath::Max(GetHPByPart(Part)-LocalDamage, 0.f);
 		SetHPByPart(Part, NewHP);
 		
-		if (GetTorsoHP()<=0.f||GetHeadHP()<=0.f)
+		AActor* OwnerActor=GetOwningActor();
+		
+		if (APDCharacterBase* Owner=Cast<APDCharacterBase>(OwnerActor))
 		{
-			if (APDCharacterBase* Owner=Cast<APDCharacterBase>(GetOwningActor()))
+			if (GetTorsoHP()<=0.f||GetHeadHP()<=0.f)
 			{
 				Owner->HandleDeath(Data.EffectSpec.GetContext().GetInstigator());
+				return;
 			}
+		}
+		
+		UAbilitySystemComponent* ASC=GetOwningAbilitySystemComponent();
+		if (IPDStatusEffectSource* Source=Cast<IPDStatusEffectSource>(OwnerActor))
+		{
+			const float Resistance=FMath::Clamp(GetBleedingResistance(), 0.f, 100.f);
+			const float BleedChance=0.2f*(1.f-Resistance/100.f);
+
+			if (FMath::FRand()<BleedChance)
+			{
+				TryApplyInjuryEffect(ASC, Source->GetBleedingEffectClass(), PDGameplayTags::State_Debuff_Bleeding);
+			}
+			CheckAndApplyInjuryEffects(ASC, Source);
+		}
+	}
+	
+	if (Data.EvaluatedData.Attribute == GetHungerAttribute() ||
+		Data.EvaluatedData.Attribute == GetThirstAttribute())
+	{
+		if (!bIsInitialized) return;
+		AActor* OwnerActor=GetOwningActor();
+		UAbilitySystemComponent* ASC=GetOwningAbilitySystemComponent();
+		if (IPDSurvivalSource* Survival=Cast<IPDSurvivalSource>(OwnerActor))
+		{
+			CheckAndApplySurvivalEffects(ASC, Survival);
 		}
 	}
 }
@@ -55,6 +89,10 @@ void UPDAttributeSet::HandleAttributeClamp(const FGameplayAttribute& Attribute, 
 	else if (Attribute==GetLegLHPAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxLegLHP());
 	else if (Attribute==GetLegRHPAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxLegRHP());
 	else if (Attribute==GetStaminaAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxStamina());
+	else if (Attribute==GetMoveSpeedAttribute()) NewValue=FMath::Clamp(NewValue, GetMaxMoveSpeed()*0.2f, GetMaxMoveSpeed());
+	else if (Attribute==GetThirstAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxThirst());
+	else if (Attribute==GetHungerAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxHunger());
+	
 }
 
 FGameplayAttribute UPDAttributeSet::GetAttributeByPart(EBodyPart Part) const
@@ -119,5 +157,84 @@ void UPDAttributeSet::SetHPByPart(EBodyPart Part, float NewValue)
 		case EBodyPart::Arm_R: SetArmRHP(NewValue);  break;
 		case EBodyPart::Leg_L: SetLegLHP(NewValue);  break;
 		case EBodyPart::Leg_R: SetLegRHP(NewValue);  break;
+	}
+}
+
+void UPDAttributeSet::CheckAndApplyInjuryEffects(UAbilitySystemComponent* ASC, IPDStatusEffectSource* Source)
+{
+	if (!ASC||!Source) return;
+	
+	const bool bLeftLegDown=GetLegLHP()<=0.f;
+	const bool bRightLegDown=GetLegRHP()<=0.f;
+
+	if (bLeftLegDown&&bRightLegDown)
+	{
+		TryApplyInjuryEffect(ASC, Source->GetLegCrippledEffectClass(), PDGameplayTags::State_Debuff_LegCrippled);
+	}
+	else if (bLeftLegDown||bRightLegDown)
+	{
+		TryApplyInjuryEffect(ASC, Source->GetLegDamagedEffectClass(), PDGameplayTags::State_Debuff_LegDamaged);
+	}
+	
+	const bool bLeftArmDown=GetArmLHP()<=0.f;
+	const bool bRightArmDown=GetArmRHP()<=0.f;
+
+	if (bLeftArmDown&&bRightArmDown)
+	{
+		TryApplyInjuryEffect(ASC, Source->GetArmCrippledEffectClass(), PDGameplayTags::State_Debuff_ArmCrippled);
+	}
+	else if (bLeftArmDown||bRightArmDown)
+	{
+		TryApplyInjuryEffect(ASC, Source->GetArmDamagedEffectClass(), PDGameplayTags::State_Debuff_ArmDamaged);
+	}
+}
+
+void UPDAttributeSet::TryApplyInjuryEffect(UAbilitySystemComponent* ASC,
+	TSubclassOf<UGameplayEffect> EffectClass, const FGameplayTag& GuardTag)
+{
+	if (!EffectClass||ASC->HasMatchingGameplayTag(GuardTag)) return;
+	
+	UE_LOG(LogTemp, Warning, TEXT("TryApplyInjuryEffect: %s"), *GuardTag.ToString());
+	
+	FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
+	FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(EffectClass, 1.f, Context);
+	if (Spec.IsValid())
+	{
+		ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	}
+}
+
+void UPDAttributeSet::CheckAndApplySurvivalEffects(UAbilitySystemComponent* ASC, IPDSurvivalSource* Source)
+{
+	if (!ASC || !Source) return;
+
+	TryApplyOrRemoveSurvivalEffect(ASC, Source->GetStarvingEffectClass(),
+		PDGameplayTags::State_Debuff_Starving, GetHunger() <= 0.f);
+
+	TryApplyOrRemoveSurvivalEffect(ASC, Source->GetDehydratedEffectClass(),
+		PDGameplayTags::State_Debuff_Dehydrated, GetThirst() <= 0.f);
+}
+
+void UPDAttributeSet::TryApplyOrRemoveSurvivalEffect(UAbilitySystemComponent* ASC,
+	TSubclassOf<UGameplayEffect> EffectClass, const FGameplayTag& GuardTag, bool bShouldApply)
+{
+	if (!ASC || !EffectClass) return;
+
+	const bool bHasTag = ASC->HasMatchingGameplayTag(GuardTag);
+
+	if (bShouldApply && !bHasTag)
+	{
+		FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+		FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(EffectClass, 1.f, Context);
+		if (Spec.IsValid())
+		{
+			ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+		}
+	}
+	else if (!bShouldApply && bHasTag)
+	{
+		FGameplayTagContainer TagContainer;
+		TagContainer.AddTag(GuardTag);
+		ASC->RemoveActiveEffectsWithTags(TagContainer);
 	}
 }
