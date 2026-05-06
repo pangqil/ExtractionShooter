@@ -55,7 +55,22 @@ struct FPDInventorySlot
 	FPDItemData ItemData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Quantity = 1;
+	int32 Quantity = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bIsEmpty = true;
+
+	bool IsEmpty() const
+	{
+		return bIsEmpty || Quantity <= 0 || ItemData.ItemID.IsNone();
+	}
+
+	void Clear()
+	{
+		ItemData = FPDItemData();
+		Quantity = 0;
+		bIsEmpty = true;
+	}
 };
 
 USTRUCT(BlueprintType)
