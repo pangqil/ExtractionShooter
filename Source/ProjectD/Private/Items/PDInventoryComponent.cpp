@@ -5,43 +5,16 @@ UPDInventoryComponent::UPDInventoryComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
+void UPDInventoryComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	InitializeInventory();
+}
+
 bool UPDInventoryComponent::AddItem(const FPDItemData& ItemData, int32 Quantity)
 {
-	if (ItemData.ItemID.IsNone() || Quantity <= 0)
-	{
-		return false;
-	}
-
-	const int32 MaxStack = FMath::Max(1, ItemData.MaxStack);
-
-	if (MaxStack > 1)
-	{
-		for (FPDInventorySlot& Slot : Items)
-		{
-			if (Slot.ItemData.ItemID == ItemData.ItemID && Slot.Quantity < MaxStack)
-			{
-				const int32 AddAmount = FMath::Min(Quantity, MaxStack - Slot.Quantity);
-				Slot.Quantity += AddAmount;
-				Quantity -= AddAmount;
-
-				if (Quantity <= 0)
-				{
-					return true;
-				}
-			}
-		}
-	}
-
-	while (Quantity > 0)
-	{
-		FPDInventorySlot NewSlot;
-		NewSlot.ItemData = ItemData;
-		NewSlot.Quantity = FMath::Min(Quantity, MaxStack);
-		Items.Add(NewSlot);
-		Quantity -= NewSlot.Quantity;
-	}
-
-	return true;
+	return AddItemPartial(ItemData, Quantity) > 0;
 }
 
 bool UPDInventoryComponent::RemoveItem(FName ItemID, int32 Quantity)
@@ -54,7 +27,8 @@ bool UPDInventoryComponent::RemoveItem(FName ItemID, int32 Quantity)
 	for (int32 Index = Items.Num() - 1; Index >= 0 && Quantity > 0; --Index)
 	{
 		FPDInventorySlot& Slot = Items[Index];
-		if (Slot.ItemData.ItemID != ItemID)
+
+		if (Slot.IsEmpty() || Slot.ItemData.ItemID != ItemID)
 		{
 			continue;
 		}
@@ -65,16 +39,11 @@ bool UPDInventoryComponent::RemoveItem(FName ItemID, int32 Quantity)
 
 		if (Slot.Quantity <= 0)
 		{
-			Items.RemoveAt(Index);
+			Slot.Clear();
 		}
 	}
 
 	return true;
-}
-
-bool UPDInventoryComponent::UseItem(FName ItemID, int32 Quantity)
-{
-	return RemoveItem(ItemID, Quantity);
 }
 
 bool UPDInventoryComponent::HasItem(FName ItemID, int32 Quantity) const
@@ -84,13 +53,20 @@ bool UPDInventoryComponent::HasItem(FName ItemID, int32 Quantity) const
 		return false;
 	}
 
-	int32 FoundQuantity = 0;
+	int32 TotalQuantity = 0;
+
 	for (const FPDInventorySlot& Slot : Items)
 	{
+		if (Slot.IsEmpty())
+		{
+			continue;
+		}
+
 		if (Slot.ItemData.ItemID == ItemID)
 		{
-			FoundQuantity += Slot.Quantity;
-			if (FoundQuantity >= Quantity)
+			TotalQuantity += Slot.Quantity;
+
+			if (TotalQuantity >= Quantity)
 			{
 				return true;
 			}
@@ -110,11 +86,110 @@ void UPDInventoryComponent::AddGold(int32 Amount)
 
 bool UPDInventoryComponent::SpendGold(int32 Amount)
 {
-	if (Amount < 0 || Gold < Amount)
+	if (Amount <= 0 || Gold < Amount)
 	{
 		return false;
 	}
 
 	Gold -= Amount;
 	return true;
+}
+
+int32 UPDInventoryComponent::FindEmptySlot() const
+{
+	for (int32 i = 0; i < Items.Num(); i++)
+	{
+		if (Items[i].IsEmpty())
+		{
+			return i;
+		}
+	}
+
+	return INDEX_NONE;
+}
+
+int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quantity)
+{
+	if (ItemData.ItemID.IsNone() || Quantity <= 0)
+	{
+		return 0;
+	}
+
+	int32 RemainingQuantity = Quantity;
+	int32 AddedQuantity = 0;
+
+	const int32 MaxStack = FMath::Max(1, ItemData.MaxStack);
+
+	if (MaxStack > 1)
+	{
+		for (FPDInventorySlot& Slot : Items)
+		{
+			if (!Slot.IsEmpty() &&
+				Slot.ItemData.ItemID == ItemData.ItemID &&
+				Slot.Quantity < MaxStack)
+			{
+				const int32 AddAmount = FMath::Min(RemainingQuantity, MaxStack - Slot.Quantity);
+
+				Slot.Quantity += AddAmount;
+				RemainingQuantity -= AddAmount;
+				AddedQuantity += AddAmount;
+
+				if (RemainingQuantity <= 0)
+				{
+					return AddedQuantity;
+				}
+			}
+		}
+	}
+
+	while (RemainingQuantity > 0)
+	{
+		const int32 EmptySlot = FindEmptySlot();
+
+		if (EmptySlot == INDEX_NONE)
+		{
+			break;
+		}
+
+		const int32 AddAmount = FMath::Min(RemainingQuantity, MaxStack);
+
+		Items[EmptySlot].ItemData = ItemData;
+		Items[EmptySlot].Quantity = AddAmount;
+		Items[EmptySlot].bIsEmpty = false;
+
+		RemainingQuantity -= AddAmount;
+		AddedQuantity += AddAmount;
+	}
+
+	return AddedQuantity;
+}
+
+void UPDInventoryComponent::InitializeInventory()
+{
+	const int32 MaxSlotCount = GetMaxSlotCount();
+
+	if (MaxSlotCount <= 0)
+	{
+		Items.Empty();
+		return;
+	}
+
+	const int32 OldCount = Items.Num();
+
+	Items.SetNum(MaxSlotCount);
+
+	for (int32 Index = OldCount; Index < Items.Num(); ++Index)
+	{
+		Items[Index].Clear();
+	}
+}
+
+void UPDInventoryComponent::ResetInventory()
+{
+	Items.SetNum(GetMaxSlotCount());
+
+	for (FPDInventorySlot& Slot : Items)
+	{
+		Slot.Clear();
+	}
 }
