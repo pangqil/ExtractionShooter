@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Weapons/PDWeaponBase.h"
+#include "Type/Types.h"
 #include "PDRifle.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFireModeChanged, EFireMode, NewFireMode);

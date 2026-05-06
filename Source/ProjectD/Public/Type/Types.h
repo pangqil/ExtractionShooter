@@ -146,6 +146,21 @@ enum class EWeaponSlot : uint8
 	Slot1_Rifle,
 	Slot2_Shotgun,
 	Slot3_Sniper
+UENUM(BlueprintType)
+enum class EWeaponType : uint8
+{
+	Rifle   UMETA(DisplayName = "Rifle"),
+	Shotgun UMETA(DisplayName = "Shotgun"),
+	Sniper  UMETA(DisplayName = "Sniper"),
+};
+
+UENUM(BlueprintType)
+enum class EWeaponSlot : uint8
+{
+	Slot1_Rifle   UMETA(DisplayName = "Rifle"),
+	Slot2_Shotgun UMETA(DisplayName = "Shotgun"),
+	Slot3_Sniper  UMETA(DisplayName = "Sniper"),
+	None          UMETA(DisplayName = "None"),
 };
 
 UENUM(BlueprintType)
@@ -156,6 +171,10 @@ enum class EFireMode : uint8
 };
 
 /** 무기 레벨별 스탯. 자식 생성자에서 LevelStats.Add({...}) 형태로 채운다. */
+	Auto   UMETA(DisplayName = "Auto"),
+	Single UMETA(DisplayName = "Single"),
+};
+
 USTRUCT(BlueprintType)
 struct FWeaponLevelStats
 {
@@ -180,4 +199,21 @@ struct FWeaponLevelStats
 	/** 0~1. 1=완벽. 낮을수록 탄 퍼짐 커짐 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	float Accuracy = 0.9f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
+	float Damage = 10.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
+	float FireRate = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
+	float Range = 1500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
+	int32 MaxAmmo = 30;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
+	float ReloadTime = 2.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
+	float Accuracy = 0.95f;
 };

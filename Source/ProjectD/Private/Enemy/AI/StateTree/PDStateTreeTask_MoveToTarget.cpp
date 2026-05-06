@@ -4,7 +4,7 @@
 #include "Enemy/AI/StateTree/PDStateTreeTaskCommon.h"
 #include "StateTreeExecutionContext.h"
 
-EStateTreeRunStatus FPDStateTreeTask_MoveToTarget::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition)
+EStateTreeRunStatus FPDStateTreeTask_MoveToTarget::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& Instance = Context.GetInstanceData(*this);
 
@@ -26,7 +26,7 @@ EStateTreeRunStatus FPDStateTreeTask_MoveToTarget::EnterState(FStateTreeExecutio
 	return EStateTreeRunStatus::Running;
 }
 
-EStateTreeRunStatus FPDStateTreeTask_MoveToTarget::Tick(FStateTreeExecutionContext& Context, const float DeltaTime)
+EStateTreeRunStatus FPDStateTreeTask_MoveToTarget::Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const
 {
 	FInstanceDataType& Instance = Context.GetInstanceData(*this);
 
@@ -53,7 +53,7 @@ EStateTreeRunStatus FPDStateTreeTask_MoveToTarget::Tick(FStateTreeExecutionConte
 	return EStateTreeRunStatus::Running;
 }
 
-void FPDStateTreeTask_MoveToTarget::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition)
+void FPDStateTreeTask_MoveToTarget::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& Instance = Context.GetInstanceData(*this);
 

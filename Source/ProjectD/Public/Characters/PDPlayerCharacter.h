@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Characters/Base/PDCharacterBase.h"
 #include "Interfaces/PDSurvivalSource.h"
+#include "Type/Types.h"
 #include "GameplayEffectTypes.h"
 #include "PDPlayerCharacter.generated.h"
 
