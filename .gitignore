@@ -1,7 +1,9 @@
 .vs/
 .idea/
+.claude/
 CLAUDE.MD
 Content/Enemy/
+Content/Developers/yunseong/ExternalAssets/
 
 # Compiled Object files
 *.slo
@@ -93,3 +95,7 @@ Plugins/**/Binaries/*
 Plugins/**/Intermediate/*
 
 # End of https://www.toptal.com/developers/gitignore/api/unrealengine
+/Content/Asset/FogArea
+/Content/Asset/PrivateAsset/AnimStarterPack
+/Content/Asset/PrivateAsset
+/Content/FogArea

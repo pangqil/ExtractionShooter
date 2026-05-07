@@ -67,10 +67,8 @@ private:
 	void OnVisionRangeChanged(const FOnAttributeChangeData& Data);
 	void OnVisionAngleChanged(const FOnAttributeChangeData& Data);
 	void OnVisionUpdateIntervalChanged(const FOnAttributeChangeData& Data);
-
-	/** 매 Tick: PlayerWorldPosition + PlayerForwardVector만 MPC에 밀어넣음 */
-	void UpdateFogOfWarMPC_Transform();
-	/** 어트리뷰트 변경 시: VisionRange + VisionAngleCos만 MPC에 밀어넣음 */
+	
+	void UpdateFogOfWarMPC_Transform(float DeltaTime);
 	void UpdateFogOfWarMPC_Vision();
 
 	float StaminaScale=1.f;
@@ -89,4 +87,7 @@ private:
 	//Threshold
 	float LocationThreshold=5.f;
 	float YawThreshold=5.f;
+	
+	float ForwardSmoothSpeed=10.f;
+	FVector SmoothedForward=FVector::ForwardVector;
 };
