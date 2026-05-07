@@ -87,8 +87,7 @@ private:
 	//Threshold
 	float LocationThreshold=5.f;
 	float YawThreshold=5.f;
-
-	/** 보행 애니메이션 좌우 흔들림 필터링용. 클수록 빠르게 따라감 (기본 10) */
+	
 	float ForwardSmoothSpeed=10.f;
 	FVector SmoothedForward=FVector::ForwardVector;
 };

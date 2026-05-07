@@ -11,7 +11,6 @@
 
 UPDVisionComponent::UPDVisionComponent()
 {
-	// Transform(위치/방향)은 매 프레임 MPC 업데이트 필요.
 	PrimaryComponentTick.bCanEverTick=true;
 	PrimaryComponentTick.bStartWithTickEnabled=true;
 }
@@ -217,6 +216,8 @@ void UPDVisionComponent::UpdateFogOfWarMPC_Vision()
 		TEXT("VisionRange"), VisionRange*StaminaScale);
 	UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), FogOfWarMPC,
 		TEXT("VisionAngleCos"), AngleCos);
+	UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), FogOfWarMPC,
+		TEXT("ProximityRadius"), ProximityRadius);
 }
 
 

@@ -95,3 +95,7 @@ Plugins/**/Binaries/*
 Plugins/**/Intermediate/*
 
 # End of https://www.toptal.com/developers/gitignore/api/unrealengine
+/Content/Asset/FogArea
+/Content/Asset/PrivateAsset/AnimStarterPack
+/Content/Asset/PrivateAsset
+/Content/FogArea
