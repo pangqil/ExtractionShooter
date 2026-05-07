@@ -10,6 +10,14 @@ class UStateTree;
 struct FAIStimulus;
 
 /**
+ * Enemy AI 디버그 전용 로그 카테고리.
+ *  - 콘솔: `Log LogPDAI Verbose` / `Log LogPDAI Off` 로 일괄 토글.
+ *  - Senior 관점: AI 진입 체인(Possess → Perception → StateTree Task → MoveTo)을
+ *    같은 채널로 묶어 정지 원인을 단계별로 좁힐 수 있게 함.
+ */
+PROJECTD_API DECLARE_LOG_CATEGORY_EXTERN(LogPDAI, Log, All);
+
+/**
  * Enemy 전용 AIController 베이스.
  *
  * 구성:
@@ -32,6 +40,16 @@ public:
 
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
+
+	/**
+	 * 디버그 시각화 — 시야 콘, 청각 반경, 현재 타겟/NoiseHint, NavPath 를 매 틱 그림.
+	 *
+	 * 토글: 콘솔 `pd.ai.debugdraw 1` / `pd.ai.debugdraw 0`. shipping 빌드에서는 컴파일 제거.
+	 *
+	 * Senior 관점: 디버그 코드는 AIController 한 곳에 응집 — Perception/Combat/Path 가 모두
+	 *              여기서 접근 가능해 단일 진단 시점 확보. CVar 가드로 런타임 비용 0.
+	 */
+	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION(BlueprintPure, Category = "PD|AI")
 	UPDPerceptionComponent* GetPDPerception() const;
@@ -69,4 +87,8 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|AI")
 	void OnNoiseHeard(AActor* NoiseInstigator, FVector Location);
+
+private:
+	/** Tick 매 프레임 호출 — 시각/청각/타겟/Path 를 DrawDebug 로 시각화. */
+	void DrawAIDebug() const;
 };

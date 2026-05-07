@@ -4,6 +4,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Enemy/Interfaces/PDCombatInterface.h"
+#include "Interfaces/PDDamageable.h"
 
 UPDCombatComponent::UPDCombatComponent()
 {
@@ -43,6 +44,12 @@ bool UPDCombatComponent::HasValidTarget() const
 	if (T->Implements<UPDCombatInterface>())
 	{
 		return IPDCombatInterface::Execute_IsAlive(T);
+	}
+	// IPDCombatInterface 미구현이지만 데미지는 받는 타겟(예: TargetDummy/NoiseEmitter)도
+	// IsAlive 로 사망 판정 — 죽은 더미를 영원히 쏘는 상황을 방지.
+	if (T->Implements<UPDDamageable>())
+	{
+		return IPDDamageable::Execute_IsAlive(T);
 	}
 	return true;
 }
@@ -99,6 +106,24 @@ float UPDCombatComponent::GetCooldownRemaining() const
 
 	const float Elapsed = World->GetTimeSeconds() - LastAttackTime;
 	return FMath::Max(0.f, AttackCooldown - Elapsed);
+}
+
+void UPDCombatComponent::SetLastNoiseLocation(AActor* NoiseInstigator, const FVector& Location)
+{
+	// Senior: 시각 타겟이 있으면 청각은 정보적 가치가 떨어짐 — 호출 측에서 가드해도 되고
+	//         여기서 이중 가드해도 됨. 호출 측(AIController)에서 이미 가드하지만 방어적으로 한 번 더.
+	LastNoiseInstigator = NoiseInstigator;
+	LastNoiseLocation = Location;
+	bHasNoiseHint = true;
+	OnNoiseHintChanged.Broadcast(Location, true);
+}
+
+void UPDCombatComponent::ClearNoiseHint()
+{
+	if (!bHasNoiseHint) return;
+	bHasNoiseHint = false;
+	LastNoiseInstigator.Reset();
+	OnNoiseHintChanged.Broadcast(LastNoiseLocation, false);
 }
 
 void UPDCombatComponent::NotifyAlliesInRadius(float Radius, AActor* SharedTarget)

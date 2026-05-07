@@ -5,6 +5,7 @@
 #include "Enemy/Types/EnemyTypes.h"
 #include "Enemy/Interfaces/PDCombatInterface.h"
 #include "Interfaces/PDDetectable.h"
+#include "GenericTeamAgentInterface.h"
 #include "PDEnemyBase.generated.h"
 
 class UAIPerceptionStimuliSourceComponent;
@@ -23,7 +24,7 @@ class UAIPerceptionStimuliSourceComponent;
  *              Stim source는 모든 적이 가져야 하므로 여기서 생성.
  */
 UCLASS(Abstract, Blueprintable)
-class PROJECTD_API APDEnemyBase : public APDCharacterBase, public IPDCombatInterface, public IPDDetectable
+class PROJECTD_API APDEnemyBase : public APDCharacterBase, public IPDCombatInterface, public IPDDetectable, public IGenericTeamAgentInterface
 {
 	GENERATED_BODY()
 
@@ -35,6 +36,10 @@ public:
 	virtual bool IsAlive_Implementation() const override;
 	virtual EPDBatteryStatus GetBatteryStatus_Implementation() const override;
 	//~ End IPDCombatInterface
+
+	// 엔진 perception 의 affiliation 시스템에 같은 TeamID 를 노출.
+	// AAIController 가 possess 한 폰의 인터페이스로 자동 위임하므로 controller 측 별도 작업 불필요.
+	virtual FGenericTeamId GetGenericTeamId() const override { return FGenericTeamId(TeamID); }
 
 	UFUNCTION(BlueprintCallable, Category = "PD|AI")
 	void SetEnemyState(EPDEnemyState NewState);

@@ -26,7 +26,18 @@ struct PROJECTD_API FPDStateTreeTask_MoveToTargetInstanceData
 
 	/** 타겟 도달 판정 거리. 보통 AttackRange 와 동일하게 디자이너가 입력. */
 	UPROPERTY(EditAnywhere, Category = "Parameter", meta = (ClampMin = "0.0"))
-	float AcceptanceRadius = 1500.f;
+	float AcceptanceRadius = 400.f;
+
+	/** Target 의 navmesh-projected 위치가 이 거리 이상 변하면 MoveTo 재발행. */
+	UPROPERTY(EditAnywhere, Category = "Parameter", meta = (ClampMin = "0.0"))
+	float ReissueThreshold = 200.f;
+
+	/** 마지막 발행 목표 (navmesh projected). reissue 추적용. */
+	UPROPERTY(Transient)
+	FVector IssuedGoal = FVector::ZeroVector;
+
+	UPROPERTY(Transient)
+	bool bHasIssuedGoal = false;
 };
 
 USTRUCT(meta = (DisplayName = "PD Move To Target", Category = "PD|AI"))
