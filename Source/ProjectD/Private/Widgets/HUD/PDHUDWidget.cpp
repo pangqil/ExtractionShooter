@@ -40,14 +40,13 @@ void UPDHUDWidget::TryBindToOwningPawnASC()
 		UPDAttributeSet::GetStaminaAttribute(),
 		UPDAttributeSet::GetMaxStaminaAttribute());
 
-	// AttributeSet에 Hunger/Thirst 추가 후 활성화
-	// BindAttributeToBar(Bar_Hunger,
-	//     UPDAttributeSet::GetHungerAttribute(),
-	//     UPDAttributeSet::GetMaxHungerAttribute());
-	//
-	// BindAttributeToBar(Bar_Thirst,
-	//     UPDAttributeSet::GetThirstAttribute(),
-	//     UPDAttributeSet::GetMaxThirstAttribute());
+	BindAttributeToBar(Bar_Hunger,
+		UPDAttributeSet::GetHungerAttribute(),
+		UPDAttributeSet::GetMaxHungerAttribute());
+
+	BindAttributeToBar(Bar_Thirst,
+		UPDAttributeSet::GetThirstAttribute(),
+		UPDAttributeSet::GetMaxThirstAttribute());
 }
 
 void UPDHUDWidget::BindAttributeToBar(UPDAttributeBarWidget* Bar,

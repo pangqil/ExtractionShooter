@@ -24,18 +24,17 @@ protected:
 	virtual void NativeOnActivated() override;
 	virtual void NativeOnDeactivated() override;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDAttributeBarWidget> Bar_Health;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UPDAttributeBarWidget> Bar_Stamina;
 
-	// AttributeSet에 Hunger/Thirst 추가 후 활성화
-	// UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	// TObjectPtr<UPDAttributeBarWidget> Bar_Hunger;
-	//
-	// UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	// TObjectPtr<UPDAttributeBarWidget> Bar_Thirst;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UPDAttributeBarWidget> Bar_Hunger;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UPDAttributeBarWidget> Bar_Thirst;
 
 private:
 	struct FBoundHandle
