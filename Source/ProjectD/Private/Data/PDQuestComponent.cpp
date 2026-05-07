@@ -78,7 +78,7 @@ bool UPDQuestComponent::GiveReward(FName QuestID, UPDInventoryComponent* Invento
 
 	for (const FPDItemData& RewardItem : QuestProgress->QuestData.Reward.RewardItems)
 	{
-		InventoryComponent->AddItem(RewardItem, 1);
+		InventoryComponent->AddItemPartial(RewardItem, 1);
 	}
 
 	InventoryComponent->AddGold(QuestProgress->QuestData.Reward.RewardGold);

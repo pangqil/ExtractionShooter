@@ -1,4 +1,5 @@
 #include "Core/PDPlayerController.h"
+#include "Characters/PDPlayerCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
@@ -11,6 +12,14 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/Character.h"
 #include "Input/PDInputComponent.h"
+#include "InputCoreTypes.h"
+#include "Widgets/Inventory/PDInventoryWidget.h"
+#include "Widgets/Inventory/PDStashWidget.h"
+#include "Widgets/Inventory/PDMarketWidget.h"
+#include "Items/PDMarketComponent.h"
+#include "Items/PDInventoryComponent.h"
+
+DEFINE_LOG_CATEGORY(LogPDCharacter);
 
 APDPlayerController::APDPlayerController()
 {
@@ -35,19 +44,50 @@ void APDPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem=
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
 		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		if (DefaultMappingContext)
+		{
+			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
 	}
 
-	UPDInputComponent* PDIC=CastChecked<UPDInputComponent>(InputComponent);
-	if (!InputConfig) return;
+	UPDInputComponent* PDIC = CastChecked<UPDInputComponent>(InputComponent);
 
-	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Move, 
+	if (!InputConfig)
+	{
+		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &APDPlayerController::ToggleInventory);
+		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
+		return;
+	}
+
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Move,
 		ETriggerEvent::Triggered, this, &APDPlayerController::OnMove);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Jump,
-	ETriggerEvent::Started, this, &APDPlayerController::OnJump);
+		ETriggerEvent::Started, this, &APDPlayerController::OnJump);
+
+	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Inventory))
+	{
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Inventory,
+			ETriggerEvent::Started, this, &APDPlayerController::ToggleInventory);
+	}
+	else
+	{
+		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &APDPlayerController::ToggleInventory);
+	}
+
+	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Interact))
+	{
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
+			ETriggerEvent::Started, this, &APDPlayerController::TryInteract);
+	}
+	else
+	{
+		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
+	}
+
+
 	PDIC->BindAbilityActions(InputConfig, this, &APDPlayerController::OnAbilityInputPressed,
 		&APDPlayerController::OnAbilityInputReleased);
 }
@@ -55,11 +95,9 @@ void APDPlayerController::SetupInputComponent()
 void APDPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	bShowMouseCursor=true;  
+	bShowMouseCursor = true;
 
-	FInputModeGameAndUI InputMode;
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	InputMode.SetHideCursorDuringCapture(false); 
+	FInputModeGameOnly InputMode;
 	SetInputMode(InputMode);
 }
 
@@ -99,6 +137,212 @@ void APDPlayerController::OnAbilityInputReleased(FGameplayTag InputTag)
 	}
 }
 
+
+void APDPlayerController::OpenMarketInterface(UPDMarketComponent* MarketComponent)
+{
+	if (!MarketComponent)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("MarketComponent is not valid."));
+		return;
+	}
+
+	if (!InventoryWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
+		return;
+	}
+
+	if (!MarketWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("MarketWidgetClass is not set."));
+		return;
+	}
+
+	ActiveMarketComponent = MarketComponent;
+
+	if (IsStashInterfaceOpen())
+	{
+		CloseStashInterface();
+	}
+
+	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
+		if (InventoryWidgetInstance)
+		{
+			InventoryWidgetInstance->AddToViewport();
+		}
+	}
+
+	if (!MarketWidgetInstance || !MarketWidgetInstance->IsInViewport())
+	{
+		MarketWidgetInstance = CreateWidget<UPDMarketWidget>(this, MarketWidgetClass);
+		if (MarketWidgetInstance)
+		{
+			MarketWidgetInstance->InitializeMarket(MarketComponent);
+			MarketWidgetInstance->AddToViewport();
+		}
+	}
+	else
+	{
+		MarketWidgetInstance->InitializeMarket(MarketComponent);
+	}
+}
+
+void APDPlayerController::CloseMarketInterface()
+{
+	if (MarketWidgetInstance && MarketWidgetInstance->IsInViewport())
+	{
+		MarketWidgetInstance->RemoveFromParent();
+	}
+	MarketWidgetInstance = nullptr;
+	ActiveMarketComponent = nullptr;
+
+	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance->RemoveFromParent();
+	}
+	InventoryWidgetInstance = nullptr;
+}
+
+bool APDPlayerController::IsMarketInterfaceOpen() const
+{
+	return MarketWidgetInstance && MarketWidgetInstance->IsInViewport();
+}
+
+void APDPlayerController::OpenStashInterface()
+{
+	if (!InventoryWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
+		return;
+	}
+
+	if (!StashWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("StashWidgetClass is not set."));
+		return;
+	}
+
+	if (IsMarketInterfaceOpen())
+	{
+		CloseMarketInterface();
+	}
+
+	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
+		if (InventoryWidgetInstance)
+		{
+			InventoryWidgetInstance->AddToViewport();
+		}
+	}
+
+	if (!StashWidgetInstance || !StashWidgetInstance->IsInViewport())
+	{
+		StashWidgetInstance = CreateWidget<UPDStashWidget>(this, StashWidgetClass);
+		if (StashWidgetInstance)
+		{
+			StashWidgetInstance->AddToViewport();
+		}
+	}
+}
+
+void APDPlayerController::CloseStashInterface()
+{
+	if (StashWidgetInstance && StashWidgetInstance->IsInViewport())
+	{
+		StashWidgetInstance->RemoveFromParent();
+	}
+	StashWidgetInstance = nullptr;
+
+	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance->RemoveFromParent();
+	}
+	InventoryWidgetInstance = nullptr;
+}
+
+bool APDPlayerController::IsStashInterfaceOpen() const
+{
+	return StashWidgetInstance && StashWidgetInstance->IsInViewport();
+}
+
+
+bool APDPlayerController::SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity)
+{
+	if (!ActiveMarketComponent || !IsMarketInterfaceOpen())
+	{
+		return false;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return false;
+	}
+
+	UPDInventoryComponent* InventoryComponent = ControlledPawn->FindComponentByClass<UPDInventoryComponent>();
+	if (!InventoryComponent)
+	{
+		return false;
+	}
+
+	return ActiveMarketComponent->SellInventorySlot(InventoryComponent, SlotIndex, Quantity);
+}
+
+void APDPlayerController::ToggleInventory()
+{
+	if (IsStashInterfaceOpen())
+	{
+		CloseStashInterface();
+		return;
+	}
+
+	if (IsMarketInterfaceOpen())
+	{
+		CloseMarketInterface();
+		return;
+	}
+
+	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance->RemoveFromParent();
+		InventoryWidgetInstance = nullptr;
+
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+		bShowMouseCursor = true;
+		return;
+	}
+
+	if (!InventoryWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
+		return;
+	}
+
+	InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
+	if (!InventoryWidgetInstance)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Failed to create inventory widget."));
+		return;
+	}
+
+	InventoryWidgetInstance->AddToViewport();
+
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+}
+
+void APDPlayerController::TryInteract()
+{
+	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->TryInteract();
+	}
+}
 
 void APDPlayerController::UpdateAimRotation()
 {

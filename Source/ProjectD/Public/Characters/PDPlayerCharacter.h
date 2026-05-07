@@ -9,6 +9,7 @@
 
 class APDWeaponBase;
 class UPDVisionComponent;
+class UPDInteractionComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -42,6 +43,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDVisionComponent> VisionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDInteractionComponent> InteractionComponent;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
@@ -90,7 +94,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="PD|Player")
 	FORCEINLINE EWeaponSlot GetCurrentSlot() const { return CurrentSlot; }
 
-	// IPDSurvivalSource
+	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
+	void TryInteract();
+
 	virtual TSubclassOf<UGameplayEffect> GetHungerDecayEffectClass()  const override { return HungerDecayEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetThirstDecayEffectClass()  const override { return ThirstDecayEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetStarvingEffectClass()     const override { return StarvingEffectClass; }
