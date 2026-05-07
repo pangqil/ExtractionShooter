@@ -22,7 +22,9 @@ void UPDVisionComponent::BeginPlay()
 	Super::BeginPlay();
 	LastLocation=GetOwner()->GetActorLocation();
 	LastYaw=GetOwner()->GetActorRotation().Yaw;
-	// VisionRange/AngleCos 초기값 한 번 밀어넣기
+	SmoothedForward=GetOwner()->GetActorForwardVector();
+
+	UpdateFogOfWarMPC_Transform(0.f);
 	UpdateFogOfWarMPC_Vision();
 	ScheduleNextUpdate(UpdateInterval);
 }
@@ -64,8 +66,7 @@ void UPDVisionComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	// Transform만 매 프레임 MPC 업데이트 (VisionRange/Angle은 어트리뷰트 변경 시만)
-	UpdateFogOfWarMPC_Transform();
+	UpdateFogOfWarMPC_Transform(DeltaTime);
 }
 
 void UPDVisionComponent::OnVisionRangeChanged(const FOnAttributeChangeData& Data)
@@ -132,7 +133,6 @@ void UPDVisionComponent::PerformVisionUpdate()
 	}
 
 	VisibleActors=MoveTemp(NewVisible);
-	// Transform은 Tick에서 처리하므로 여기서는 Vision 파라미터(Range/Angle)만 동기화
 	UpdateFogOfWarMPC_Vision();
 }
 
@@ -190,19 +190,21 @@ void UPDVisionComponent::UpdateStaminaScale(float Scale)
 	UpdateFogOfWarMPC_Vision();
 }
 
-void UPDVisionComponent::UpdateFogOfWarMPC_Transform()
+void UPDVisionComponent::UpdateFogOfWarMPC_Transform(float DeltaTime)
 {
 	if (!FogOfWarMPC) return;
 	AActor* Owner=GetOwner();
 	if (!IsValid(Owner)) return;
 
 	const FVector Loc=Owner->GetActorLocation();
-	const FVector Forward=Owner->GetActorForwardVector();
+	const FVector RawForward=Owner->GetActorForwardVector();
+	
+	SmoothedForward=FMath::VInterpTo(SmoothedForward, RawForward, DeltaTime, ForwardSmoothSpeed);
 
 	UKismetMaterialLibrary::SetVectorParameterValue(GetWorld(), FogOfWarMPC,
 		TEXT("PlayerWorldPosition"), FLinearColor(Loc.X, Loc.Y, Loc.Z, 0.f));
 	UKismetMaterialLibrary::SetVectorParameterValue(GetWorld(), FogOfWarMPC,
-		TEXT("PlayerForwardVector"), FLinearColor(Forward.X, Forward.Y, Forward.Z, 0.f));
+		TEXT("PlayerForwardVector"), FLinearColor(SmoothedForward.X, SmoothedForward.Y, SmoothedForward.Z, 0.f));
 }
 
 void UPDVisionComponent::UpdateFogOfWarMPC_Vision()
