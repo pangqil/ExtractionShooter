@@ -1,7 +1,9 @@
 .vs/
 .idea/
+.claude/
 CLAUDE.MD
 Content/Enemy/
+Content/Developers/yunseong/ExternalAssets/
 
 # Compiled Object files
 *.slo
