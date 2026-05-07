@@ -5,6 +5,8 @@
 #include "Type/Types.h"
 #include "PDInventoryComponent.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnInventoryChanged);
+
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTD_API UPDInventoryComponent : public UActorComponent
 {
@@ -24,6 +26,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	int32 Gold = 0;
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory")
+	FPDOnInventoryChanged OnInventoryChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	bool AddItem(const FPDItemData& ItemData, int32 Quantity = 1);

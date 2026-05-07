@@ -2,6 +2,7 @@
 #include "AttributeSet/PDAttributeSet.h"
 #include "Camera/CameraComponent.h"
 #include "Component/PDVisionComponent.h"
+#include "Component/PDInteractionComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -32,6 +33,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 	TopDownCameraComponent->bUsePawnControlRotation=false;
 
 	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
+	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
 
 	PrimaryActorTick.bCanEverTick=true;
 	PrimaryActorTick.bStartWithTickEnabled=true;
@@ -158,5 +160,13 @@ EWeaponSlot APDPlayerCharacter::GetSlotForWeaponType(EWeaponType Type) const
 	case EWeaponType::Shotgun: return EWeaponSlot::Slot2_Shotgun;
 	case EWeaponType::Sniper:  return EWeaponSlot::Slot3_Sniper;
 	default:                   return EWeaponSlot::None;
+	}
+}
+
+void APDPlayerCharacter::TryInteract()
+{
+	if (InteractionComponent)
+	{
+		InteractionComponent->Interact();
 	}
 }
