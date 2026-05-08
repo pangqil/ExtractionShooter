@@ -18,7 +18,9 @@ struct FPDAnimInstanceCache
 	float Direction=0.f;
 	bool bIsAiming=false;
 	bool bIsJumping=false;
-	
+	float AimYaw=0.f;
+	float AimPitch=0.f;
+
 	EWeaponType WeaponType=EWeaponType::None;
 	
 	FVector LeftHandIKTarget=FVector::ZeroVector;
@@ -47,7 +49,13 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category="Animation")
 	bool bIsJumping=false;
-	
+
+	UPROPERTY(BlueprintReadOnly, Category="Animation")
+	float AimYaw=0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Animation")
+	float AimPitch=0.f;
+
 	UPROPERTY(BlueprintReadOnly, Category="Animation")
 	EWeaponType WeaponType=EWeaponType::None;
 

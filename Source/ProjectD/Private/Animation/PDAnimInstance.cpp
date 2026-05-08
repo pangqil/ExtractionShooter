@@ -28,6 +28,8 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		OwnerCharacter->GetActorRotation()).Yaw;
 	
 	Cache.bIsAiming=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Aiming);
+	Cache.AimYaw=0.f;
+	Cache.AimPitch=0.f;
 
 	if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Rifle))
 		Cache.WeaponType=EWeaponType::Rifle;
@@ -63,6 +65,8 @@ void UPDAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 	bIsJumping=Cache.bIsJumping;
 	Direction=Cache.Direction;
 	bIsAiming=Cache.bIsAiming;
+	AimYaw=Cache.AimYaw;
+	AimPitch=Cache.AimPitch;
 	WeaponType=Cache.WeaponType;
 	LeftHandIKTarget=Cache.LeftHandIKTarget;
 	LeftHandIKAlpha=Cache.LeftHandIKAlpha;
