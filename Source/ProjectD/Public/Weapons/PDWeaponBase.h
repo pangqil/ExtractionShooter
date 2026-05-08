@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -16,8 +16,6 @@ class UNiagaraSystem;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponFired, APDWeaponBase*, Weapon);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponLevelChanged, APDWeaponBase*, Weapon, int32, NewLevel);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponReloaded, APDWeaponBase*, Weapon);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnZoomToggled, bool, bIsZoomed);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponAnimEvent, APDWeaponBase*, Weapon);
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTD_API APDWeaponBase : public AActor, public IPDInteractable
@@ -31,6 +29,8 @@ protected:
 	virtual void BeginPlay() override;
 
 protected:
+
+	// 컴포넌트
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Weapon|Component")
 	TObjectPtr<USkeletalMeshComponent> WeaponMesh;
 
@@ -40,6 +40,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Component")
 	TObjectPtr<UStaticMeshComponent> MagazineMesh;
 
+	// 설정
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Config")
 	EWeaponType WeaponType = EWeaponType::None;
 
@@ -49,6 +50,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Stats")
 	TArray<FWeaponLevelStats> LevelStats;
 
+	// 애니메이션
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Animation")
 	TObjectPtr<UAnimMontage> ReloadMontage;
 
@@ -73,6 +75,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Animation")
 	float ShellEjectSpeed = 200.f;
 
+	// 상태
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|State")
 	int32 CurrentLevel = 1;
 
@@ -88,30 +91,15 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon")
 	TWeakObjectPtr<AActor> WeaponOwner;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Zoom")
-	float DefaultFOV = 90.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Zoom")
-	float ZoomedFOV = 60.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Zoom")
-	float ZoomInterpSpeed = 10.f;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Zoom")
-	bool bIsZoomed = false;
-
 public:
-	UFUNCTION(BlueprintCallable, Category = "PD|Weapon")
-	void ToggleZoom();
-
-	UFUNCTION(BlueprintPure, Category = "PD|Weapon")
-	FORCEINLINE bool IsZoomed() const { return bIsZoomed; }
 
 	bool bCanFire = true;
 	FTimerHandle FireCooldownHandle;
 	FTimerHandle ReloadHandle;
 
 public:
+	
+	// 게임플레이 이벤트
 	UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|Events")
 	FOnWeaponFired OnWeaponFired;
 
@@ -121,22 +109,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|Events")
 	FOnWeaponReloaded OnWeaponReloaded;
 
-	UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|AnimEvents")
-	FOnWeaponAnimEvent OnShellEjected;
-
-	UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|AnimEvents")
-	FOnWeaponAnimEvent OnMagazineDropped;
-
-	UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|AnimEvents")
-	FOnWeaponAnimEvent OnMagazineAttached;
-
-	UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|AnimEvents")
-	FOnWeaponAnimEvent OnBoltPullEvent;
-
-	UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|AnimEvents")
-	FOnWeaponAnimEvent OnBoltReleaseEvent;
-
 public:
+
+	// 무기 액션
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "PD|Weapon")
 	void Fire();
 
@@ -149,6 +124,7 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "PD|Weapon")
 	void OnUnequip();
 
+	// 애님 노티파이
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "PD|Weapon|Animation")
 	void EjectShell();
 
@@ -169,6 +145,7 @@ public:
 
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
+	// 유틸리티
 	UFUNCTION(BlueprintCallable, Category = "PD|Weapon")
 	void UpgradeLevel();
 
@@ -198,9 +175,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Weapon")
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
-
-	UFUNCTION(BlueprintPure, Category = "PD|Weapon|Zoom")
-	FORCEINLINE bool GetIsZoomed() const { return bIsZoomed; }
 
 	void FinishReload();
 
