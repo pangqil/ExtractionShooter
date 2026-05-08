@@ -43,6 +43,7 @@ bool UPDInventoryComponent::RemoveItem(FName ItemID, int32 Quantity)
 		}
 	}
 
+	OnInventoryChanged.Broadcast();
 	return true;
 }
 
@@ -81,6 +82,7 @@ void UPDInventoryComponent::AddGold(int32 Amount)
 	if (Amount > 0)
 	{
 		Gold += Amount;
+		OnInventoryChanged.Broadcast();
 	}
 }
 
@@ -92,6 +94,7 @@ bool UPDInventoryComponent::SpendGold(int32 Amount)
 	}
 
 	Gold -= Amount;
+	OnInventoryChanged.Broadcast();
 	return true;
 }
 
@@ -136,6 +139,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 				if (RemainingQuantity <= 0)
 				{
+					OnInventoryChanged.Broadcast();
 					return AddedQuantity;
 				}
 			}
@@ -161,6 +165,11 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 		AddedQuantity += AddAmount;
 	}
 
+	if (AddedQuantity > 0)
+	{
+		OnInventoryChanged.Broadcast();
+	}
+
 	return AddedQuantity;
 }
 
@@ -171,6 +180,7 @@ void UPDInventoryComponent::InitializeInventory()
 	if (MaxSlotCount <= 0)
 	{
 		Items.Empty();
+		OnInventoryChanged.Broadcast();
 		return;
 	}
 
@@ -182,6 +192,8 @@ void UPDInventoryComponent::InitializeInventory()
 	{
 		Items[Index].Clear();
 	}
+
+	OnInventoryChanged.Broadcast();
 }
 
 void UPDInventoryComponent::ResetInventory()
@@ -192,4 +204,6 @@ void UPDInventoryComponent::ResetInventory()
 	{
 		Slot.Clear();
 	}
+
+	OnInventoryChanged.Broadcast();
 }

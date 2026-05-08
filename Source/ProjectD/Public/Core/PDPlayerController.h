@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -9,11 +9,20 @@ class UNiagaraSystem;
 class UInputMappingContext;
 class UInputAction;
 class UPathFollowingComponent;
+class UPDInventoryWidget;
+class UPDStashWidget;
+class UPDMarketWidget;
+class UPDMarketComponent;
+class APDPlayerCharacter;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 
 class UInputMappingContext;
 class UPDInputConfig;
+
+class APDPlayerCharacter;
+class APDWeaponBase;       
+class APDRifle;           
 
 UCLASS(abstract)
 class PROJECTD_API APDPlayerController : public APlayerController
@@ -26,6 +35,27 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Raid")
 	void RequestExtraction();
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
+	void OpenStashInterface();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
+	void CloseStashInterface();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Stash")
+	bool IsStashInterfaceOpen() const;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Market")
+	void OpenMarketInterface(UPDMarketComponent* MarketComponent);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Market")
+	void CloseMarketInterface();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Market")
+	bool IsMarketInterfaceOpen() const;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Market")
+	bool SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity = 1);
+
 	virtual void PlayerTick(float DeltaTime) override; 
 
 protected:
@@ -34,6 +64,15 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "PD|Input")
 	TObjectPtr<UPDInputConfig> InputConfig;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDInventoryWidget> InventoryWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDStashWidget> StashWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
 
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
@@ -44,7 +83,30 @@ private:
 	void OnAbilityInputPressed(FGameplayTag InputTag);
 	void OnAbilityInputReleased(FGameplayTag InputTag);
 	void UpdateAimRotation();
+
+	void ToggleInventory();
+	void TryInteract();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDInventoryWidget> InventoryWidgetInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDStashWidget> StashWidgetInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDMarketWidget> MarketWidgetInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDMarketComponent> ActiveMarketComponent;
+
+	void OnInteract();
+	void OnSwitchSlot1();       
+	void OnSwitchSlot2();       
+	void OnSwitchSlot3();       
+	void OnZoom();              
+	void OnToggleFireMode();    
+	void OnDropWeapon();       
 	
 	bool bShowMouseCursor=true;
-	
+
 };

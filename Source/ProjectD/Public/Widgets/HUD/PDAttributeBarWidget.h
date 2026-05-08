@@ -6,11 +6,9 @@
 #include "CommonUserWidget.h"
 #include "PDAttributeBarWidget.generated.h"
 
-class UProgressBar;
-class UTextBlock;
-
 /**
- * GAS Attribute의 Current/Max 값을 받아 ProgressBar로만 표시하는 재사용 컴포넌트.
+ * GAS Attribute의 Current/Max 값을 받아 표시하는 추상 베이스.
+ * 시각화는 서브클래스가 OnValuesUpdated 를 오버라이드해 결정한다.
  * ASC를 직접 참조하지 않음 — 상위 HUD가 push해 준다.
  */
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
@@ -23,9 +21,5 @@ public:
 	void SetValues(float Current, float Max);
 
 protected:
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	TObjectPtr<UProgressBar> ProgressBar;
-
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UTextBlock> Text_Value;
+	virtual void OnValuesUpdated(float Current, float Max, float Percent) {}
 };

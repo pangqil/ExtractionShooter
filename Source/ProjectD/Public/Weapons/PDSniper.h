@@ -9,7 +9,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnScopeToggled, bool, bIsScoped);
 
-UCLASS()
+UCLASS(Blueprintable)
 class PROJECTD_API APDSniper : public APDWeaponBase
 {
 	GENERATED_BODY()

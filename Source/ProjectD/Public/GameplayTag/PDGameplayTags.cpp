@@ -1,4 +1,4 @@
-#include "PDGameplayTags.h"
+﻿#include "PDGameplayTags.h"
 
 namespace PDGameplayTags
 {
@@ -6,6 +6,18 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Input_Fire,     "Input.Fire")
 	UE_DEFINE_GAMEPLAY_TAG(Input_Jump,     "Input.Jump")
 	UE_DEFINE_GAMEPLAY_TAG(Input_Interact, "Input.Interact")
+	UE_DEFINE_GAMEPLAY_TAG(Input_Inventory, "Input.Inventory")
+
+	// Input 무기 GAS 어빌리티
+	UE_DEFINE_GAMEPLAY_TAG(Input_Reload, "Input.Reload")
+
+	// Input 무기
+	UE_DEFINE_GAMEPLAY_TAG(Input_Zoom, "Input.Zoom")
+	UE_DEFINE_GAMEPLAY_TAG(Input_ToggleFireMode, "Input.ToggleFireMode")
+	UE_DEFINE_GAMEPLAY_TAG(Input_SwitchSlot1, "Input.SwitchSlot1")
+	UE_DEFINE_GAMEPLAY_TAG(Input_SwitchSlot2, "Input.SwitchSlot2")
+	UE_DEFINE_GAMEPLAY_TAG(Input_SwitchSlot3, "Input.SwitchSlot3")
+	UE_DEFINE_GAMEPLAY_TAG(Input_DropWeapon, "Input.DropWeapon")
 
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage, "Data.Damage")
 
@@ -29,4 +41,9 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_EquipEnd,      "Anim.Notify.EquipEnd")
 	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_ReloadEnd,     "Anim.Notify.ReloadEnd")
 	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_WeaponVisible, "Anim.Notify.WeaponVisible")
+
+	// Weapon State
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_State_Firing, "Weapon.State.Firing")
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_State_Reloading, "Weapon.State.Reloading")
+
 }

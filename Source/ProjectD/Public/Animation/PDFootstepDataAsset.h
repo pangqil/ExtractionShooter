@@ -31,14 +31,14 @@ class PROJECTD_API UPDFootstepDataAsset : public UDataAsset
 
 public:
 	//Surface별 발소리 매핑
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|Footstep")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footstep")
 	TMap<TEnumAsByte<EPhysicalSurface>, FPDFootstepEntry> SurfaceEntries;
 
 	//Surface 매핑에 없을 때 fallback
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|Footstep")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footstep")
 	FPDFootstepEntry DefaultEntry;
 
 	//Surface로 항목 조회. 없으면 DefaultEntry 반환
-	UFUNCTION(BlueprintPure, Category="PD|Footstep")
+	UFUNCTION(BlueprintPure, Category="Footstep")
 	const FPDFootstepEntry& GetEntryForSurface(EPhysicalSurface Surface) const;
 };
