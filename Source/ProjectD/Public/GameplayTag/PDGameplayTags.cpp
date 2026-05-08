@@ -20,4 +20,13 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_HeadInjury,  "State.Debuff.HeadInjury")
 
 	UE_DEFINE_GAMEPLAY_TAG(State_buff_Adrenaline, "State.buff.Adrenaline")
+	
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Rifle,   "Weapon.Type.Rifle")
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Shotgun, "Weapon.Type.Shotgun")
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Sniper,  "Weapon.Type.Sniper")
+	UE_DEFINE_GAMEPLAY_TAG(State_Aiming, "State.Aiming")
+
+	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_EquipEnd,      "Anim.Notify.EquipEnd")
+	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_ReloadEnd,     "Anim.Notify.ReloadEnd")
+	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_WeaponVisible, "Anim.Notify.WeaponVisible")
 }
