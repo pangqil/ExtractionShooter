@@ -207,6 +207,8 @@ void APDWeaponBase::PostFire()
     bCanFire = false;
     OnWeaponFired.Broadcast(this);
 
+    ApplyRecoil();
+
     GetWorldTimerManager().SetTimer(
         FireCooldownHandle, this,
         &APDWeaponBase::ResetFireCooldown,
@@ -265,4 +267,81 @@ void APDWeaponBase::OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupte
         FinishReload();
     else
         bIsReloading = false;
+}
+
+// 반동로직
+void APDWeaponBase::ApplyRecoil()
+{
+    // 1. 카메라 쉐이크
+    if (FireCameraShakeClass)
+    {
+        if (APlayerController* PC = GetOwnerPlayerController())
+            PC->PlayerCameraManager->StartCameraShake(FireCameraShakeClass);
+    }
+
+    // 2. 스프레드 누적
+    CurrentRecoilSpread = FMath::Min(
+        CurrentRecoilSpread + RecoilSpreadPerShot,
+        MaxRecoilSpread);
+
+    // 스프레드 회복 타이머 (재시작)
+    GetWorldTimerManager().SetTimer(
+        SpreadRecoveryHandle, this,
+        &APDWeaponBase::TickSpreadRecovery,
+        0.016f, true);  // ~60fps
+
+   
+    if (WeaponMesh)
+    {
+        // 원본 회전 저장 (처음 발사 시)
+        if (!GetWorldTimerManager().IsTimerActive(MeshRecoilRecoveryHandle))
+            OriginalMeshRelRotation = WeaponMesh->GetRelativeRotation();
+
+        
+        FRotator KickedRot = WeaponMesh->GetRelativeRotation() + MeshRecoilKick;
+        WeaponMesh->SetRelativeRotation(KickedRot);
+
+        // 메시 복구 타이머
+        GetWorldTimerManager().SetTimer(
+            MeshRecoilRecoveryHandle, this,
+            &APDWeaponBase::TickMeshRecoilRecovery,
+            0.016f, true);
+    }
+}
+
+void APDWeaponBase::TickSpreadRecovery()
+{
+    CurrentRecoilSpread -= RecoilRecoveryRate * 0.016f;
+
+    if (CurrentRecoilSpread <= 0.f)
+    {
+        CurrentRecoilSpread = 0.f;
+        GetWorldTimerManager().ClearTimer(SpreadRecoveryHandle);
+    }
+}
+// 메시 반동 복구
+void APDWeaponBase::TickMeshRecoilRecovery()
+{
+    if (!WeaponMesh) return;
+
+    FRotator Current = WeaponMesh->GetRelativeRotation();
+    FRotator Target = OriginalMeshRelRotation;
+
+    FRotator NewRot = FMath::RInterpTo(Current, Target,
+        0.016f, MeshRecoilRecoverySpeed);
+
+    WeaponMesh->SetRelativeRotation(NewRot);
+
+    // 거의 다 돌아왔으면 타이머 종료
+    if (Current.Equals(Target, 0.1f))
+    {
+        WeaponMesh->SetRelativeRotation(Target);
+        GetWorldTimerManager().ClearTimer(MeshRecoilRecoveryHandle);
+    }
+}
+
+APlayerController* APDWeaponBase::GetOwnerPlayerController() const
+{
+    if (!WeaponOwner.IsValid()) return nullptr;
+    return Cast<APlayerController>(WeaponOwner->GetInstigatorController());
 }

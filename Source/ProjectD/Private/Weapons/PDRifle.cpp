@@ -125,9 +125,10 @@ bool APDRifle::PerformLineTrace(FHitResult& OutHit)
             if (!Dir.IsNearlyZero()) AimDir = Dir.GetSafeNormal();
         }
     }
-
-    const float SpreadRad = FMath::DegreesToRadians((1.f - Stats.Accuracy) * 5.f);
-    const FVector ShootDir = FMath::VRandCone(AimDir, SpreadRad);
+    // 연사시 탄퍼짐
+    const float BaseSpread = (1.f - Stats.Accuracy) * 5.f;
+    const float TotalSpread = FMath::DegreesToRadians(BaseSpread + CurrentRecoilSpread);
+    const FVector ShootDir = FMath::VRandCone(AimDir, TotalSpread);
     const FVector End = Start + ShootDir * Stats.Range;
 
     FCollisionQueryParams Params;
