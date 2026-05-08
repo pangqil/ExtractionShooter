@@ -20,6 +20,8 @@
 #include "Widgets/Inventory/PDMarketWidget.h"
 #include "Items/PDMarketComponent.h"
 #include "Items/PDInventoryComponent.h"
+#include "Widgets/HUD/PDHUDWidget.h"
+#include "Subsystems/PDFrontendUISubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogPDCharacter);
 
@@ -136,8 +138,46 @@ void APDPlayerController::BeginPlay()
 	SetInputMode(InputMode);
 
 	bShowMouseCursor = true;
-	
 	DefaultMouseCursor = EMouseCursor::Default;
+
+	CreateAndAddHUDWidget();
+}
+
+void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (HUDInstance)
+	{
+		HUDInstance->RemoveFromParent();
+		HUDInstance = nullptr;
+	}
+
+	if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
+	{
+		UISubsystem->CloseScreen();
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void APDPlayerController::CreateAndAddHUDWidget()
+{
+	if (!HUDClass) return;
+	if (HUDInstance) return; // 이중 호출 방지
+
+	HUDInstance = CreateWidget<UPDHUDWidget>(this, HUDClass);
+	if (HUDInstance)
+	{
+		HUDInstance->AddToViewport(0); // ZOrder 0 = 가장 아래, 메뉴(10) 밑에 깔림
+		HUDInstance->Activate();
+	}
+}
+
+void APDPlayerController::RequestCloseCurrentScreen()
+{
+	if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
+	{
+		UISubsystem->CloseScreen();
+	}
 }
 
 void APDPlayerController::OnMove(const struct FInputActionValue& Value)
