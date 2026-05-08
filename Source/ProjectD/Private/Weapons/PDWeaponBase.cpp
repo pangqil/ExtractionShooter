@@ -7,11 +7,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
 
-#include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
-#include "NiagaraFunctionLibrary.h"
-
-#include "Kismet/GameplayStatics.h"
 #include "Interfaces/PDDamageable.h"
 
 APDWeaponBase::APDWeaponBase()
@@ -97,6 +93,60 @@ void APDWeaponBase::OnUnequip_Implementation()
     bCanFire = true;
 }
 
+void APDWeaponBase::EjectShell_Implementation()
+{
+    if (!ShellActorClass || !GetWorld()) return;
+
+    FName Socket = WeaponMesh->DoesSocketExist(EjectionPortSocket)
+        ? EjectionPortSocket : MuzzleSocketName;
+
+    FTransform TM = WeaponMesh->GetSocketTransform(Socket);
+
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride =
+        ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+    if (APDShellActor* Shell = GetWorld()->SpawnActor<APDShellActor>(
+        ShellActorClass, TM.GetLocation(), TM.Rotator(), Params))
+    {
+        FVector Dir = TM.TransformVectorNoScale(ShellEjectLocalDir.GetSafeNormal());
+        Shell->Launch(Dir * ShellEjectSpeed * FMath::RandRange(0.9f, 1.1f));
+    }
+}
+
+void APDWeaponBase::DropMagazine_Implementation()
+{
+    if (!MagazineActorClass || !GetWorld()) return;
+
+    if (MagazineMesh) MagazineMesh->SetVisibility(false);
+
+    FTransform MagTM = MagazineMesh
+        ? MagazineMesh->GetComponentTransform()
+        : WeaponMesh->GetSocketTransform(MagazineSocketName);
+
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride =
+        ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+    if (APDMagazineActor* Mag = GetWorld()->SpawnActor<APDMagazineActor>(
+        MagazineActorClass, MagTM.GetLocation(), MagTM.Rotator(), Params))
+    {
+        if (MagazineMesh && MagazineMesh->GetStaticMesh())
+            Mag->InitFromWeapon(MagazineMesh->GetStaticMesh(), MagazineMesh->GetMaterial(0));
+        Mag->Drop();
+    }
+}
+
+void APDWeaponBase::AttachNewMagazine_Implementation()
+{
+    if (MagazineMesh) MagazineMesh->SetVisibility(true);
+}
+
+// 볼트/슬러그 — BP 오버라이드용 빈 구현
+void APDWeaponBase::OnBoltPulled_Implementation() {}
+void APDWeaponBase::OnBoltReleased_Implementation() {}
+void APDWeaponBase::OnShellInserted_Implementation() {}
+
 void APDWeaponBase::UpgradeLevel()
 {
     SetLevel(CurrentLevel + 1);
@@ -173,102 +223,6 @@ void APDWeaponBase::FinishReload()
     CurrentAmmo = GetCurrentStats().MaxAmmo;
     bIsReloading = false;
     OnWeaponReloaded.Broadcast(this);
-}
-
-void APDWeaponBase::ToggleZoom()
-{
-    bIsZoomed = !bIsZoomed;
-
-    AActor* WeaponOwnerActor = GetWeaponOwner();
-    if (!WeaponOwnerActor) return;
-
-    APlayerController* PC = Cast<APlayerController>(
-        WeaponOwnerActor->GetInstigatorController());
-    if (!PC) return;
-
-    APlayerCameraManager* CamManager = PC->PlayerCameraManager;
-    if (!CamManager) return;
-
-    float TargetFOV = bIsZoomed ? ZoomedFOV : DefaultFOV;
-    CamManager->SetFOV(TargetFOV);
-}
-
-void APDWeaponBase::EjectShell_Implementation()
-{
-    if (!ShellActorClass || !GetWorld()) return;
-
-    FName SocketToUse = WeaponMesh->DoesSocketExist(EjectionPortSocket)
-        ? EjectionPortSocket : MuzzleSocketName;
-
-    FTransform SocketTM = WeaponMesh->GetSocketTransform(SocketToUse);
-
-    FActorSpawnParameters Params;
-    Params.SpawnCollisionHandlingOverride =
-        ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-    APDShellActor* Shell = GetWorld()->SpawnActor<APDShellActor>(
-        ShellActorClass, SocketTM.GetLocation(), SocketTM.Rotator(), Params);
-
-    if (Shell)
-    {
-        FVector WorldEjectDir = SocketTM.TransformVectorNoScale(ShellEjectLocalDir.GetSafeNormal());
-        float SpeedWithVariance = ShellEjectSpeed * FMath::RandRange(0.9f, 1.1f);
-        Shell->Launch(WorldEjectDir * SpeedWithVariance);
-    }
-
-    OnShellEjected.Broadcast(this);
-}
-
-void APDWeaponBase::DropMagazine_Implementation()
-{
-    if (!MagazineActorClass || !GetWorld()) return;
-
-    if (MagazineMesh)
-        MagazineMesh->SetVisibility(false);
-
-    FTransform MagTM = MagazineMesh
-        ? MagazineMesh->GetComponentTransform()
-        : WeaponMesh->GetSocketTransform(MagazineSocketName);
-
-    FActorSpawnParameters Params;
-    Params.SpawnCollisionHandlingOverride =
-        ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-    APDMagazineActor* MagActor = GetWorld()->SpawnActor<APDMagazineActor>(
-        MagazineActorClass, MagTM.GetLocation(), MagTM.Rotator(), Params);
-
-    if (MagActor)
-    {
-        if (MagazineMesh && MagazineMesh->GetStaticMesh())
-            MagActor->InitFromWeapon(
-                MagazineMesh->GetStaticMesh(),
-                MagazineMesh->GetMaterial(0));
-        MagActor->Drop();
-    }
-
-    OnMagazineDropped.Broadcast(this);
-}
-
-void APDWeaponBase::AttachNewMagazine_Implementation()
-{
-    if (MagazineMesh)
-        MagazineMesh->SetVisibility(true);
-
-    OnMagazineAttached.Broadcast(this);
-}
-
-void APDWeaponBase::OnBoltPulled_Implementation()
-{
-    OnBoltPullEvent.Broadcast(this);
-}
-
-void APDWeaponBase::OnBoltReleased_Implementation()
-{
-    OnBoltReleaseEvent.Broadcast(this);
-}
-
-void APDWeaponBase::OnShellInserted_Implementation()
-{
 }
 
 void APDWeaponBase::PlayWeaponMontage(UAnimMontage* Montage, FName StartSection)

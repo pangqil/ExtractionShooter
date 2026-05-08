@@ -26,6 +26,7 @@ DEFINE_LOG_CATEGORY(LogPDCharacter);
 #include "Interfaces/PDInteractable.h"
 #include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDRifle.h"
+#include "Weapons/PDSniper.h"
 
 
 APDPlayerController::APDPlayerController()
@@ -429,7 +430,8 @@ void APDPlayerController::OnZoom()
 {
 	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
 		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
-			Weapon->ToggleZoom();
+			if (APDSniper* Sniper = Cast<APDSniper>(Weapon))
+				Sniper->ToggleZoom();
 }
 
 void APDPlayerController::OnToggleFireMode()

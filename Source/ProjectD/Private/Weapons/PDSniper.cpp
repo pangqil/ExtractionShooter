@@ -10,7 +10,7 @@ APDSniper::APDSniper()
 
     // 저격총 줌 FOV 설정
     DefaultFOV = 90.f;
-    ZoomedFOV = 40.f; // 저격총은 더 많이 줌
+    ZoomedFOV = 40.f;
 
     LevelStats.Add({ 80.f, 1.5f,  8000.f, 5, 3.0f, 1.0f }); // Lv1
     LevelStats.Add({ 120.f, 1.3f, 10000.f, 5, 2.7f, 1.0f }); // Lv2
@@ -71,6 +71,20 @@ void APDSniper::Reload_Implementation()
 void APDSniper::OnBoltActionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
     // 필요 시 BP에서 추가 로직 (사운드, 이펙트 등)
+}
+
+void APDSniper::ToggleZoom()
+{
+    bIsZoomed = !bIsZoomed;
+
+    AActor* WeaponOwnerActor = GetWeaponOwner();
+    if (!WeaponOwnerActor) return;
+
+    APlayerController* PC = Cast<APlayerController>(WeaponOwnerActor->GetInstigatorController());
+    if (!PC || !PC->PlayerCameraManager) return;
+
+    PC->PlayerCameraManager->SetFOV(bIsZoomed ? ZoomedFOV : DefaultFOV);
+    OnScopeToggled.Broadcast(bIsZoomed);
 }
 
 void APDSniper::SpawnProjectile(bool bPenetrate)

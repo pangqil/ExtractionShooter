@@ -24,7 +24,26 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper")
     TArray<bool> PenetrationPerLevel = { false, false, true };
 
+    // 줌 (저격총 전용)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper|Zoom")
+    float DefaultFOV = 90.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper|Zoom")
+    float ZoomedFOV = 40.f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Sniper|Zoom")
+    bool bIsZoomed = false;
+
 public:
+    UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|Events")
+    FOnScopeToggled OnScopeToggled;
+
+    UFUNCTION(BlueprintCallable, Category = "PD|Weapon|Sniper")
+    void ToggleZoom();
+
+    UFUNCTION(BlueprintPure, Category = "PD|Weapon|Sniper")
+    FORCEINLINE bool IsZoomed() const { return bIsZoomed; }
+    
     virtual void Fire_Implementation() override;
     virtual void Reload_Implementation() override;
 
