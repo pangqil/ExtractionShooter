@@ -45,6 +45,14 @@ void APDPlayerController::RequestExtraction()
 void APDPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+	static float LogTimer = 0.f;
+	LogTimer += DeltaTime;
+	if (LogTimer >= 1.f)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cursor Visible: %s, Cursor Type: %d"), 
+			bShowMouseCursor ? TEXT("True") : TEXT("False"), (int32)CurrentMouseCursor.GetValue());
+		LogTimer = 0.f;
+	}
 	UpdateAimRotation();
 }
 
@@ -121,10 +129,15 @@ void APDPlayerController::SetupInputComponent()
 void APDPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	bShowMouseCursor = true;
 
-	FInputModeGameOnly InputMode;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
+
+	bShowMouseCursor = true;
+	
+	DefaultMouseCursor = EMouseCursor::Default;
 }
 
 void APDPlayerController::OnMove(const struct FInputActionValue& Value)
@@ -338,7 +351,7 @@ void APDPlayerController::ToggleInventory()
 
 		FInputModeGameOnly InputMode;
 		SetInputMode(InputMode);
-		bShowMouseCursor = true;
+		bShowMouseCursor = false;
 		return;
 	}
 
@@ -357,7 +370,10 @@ void APDPlayerController::ToggleInventory()
 
 	InventoryWidgetInstance->AddToViewport();
 
-	FInputModeGameOnly InputMode;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(InventoryWidgetInstance->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	
 	SetInputMode(InputMode);
 	bShowMouseCursor = true;
 }
@@ -462,3 +478,4 @@ void APDPlayerController::OnInteract()
 	if (ClosestInteractable)
 		IPDInteractable::Execute_Interact(ClosestInteractable, ControlledPawn);
 }
+

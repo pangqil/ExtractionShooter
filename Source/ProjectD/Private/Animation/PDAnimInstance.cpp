@@ -21,10 +21,12 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	const FVector Velocity=OwnerCharacter->GetCharacterMovement()->Velocity;
 	Cache.MovementSpeed=Velocity.Size2D();
+
+	Cache.bIsJumping=OwnerCharacter->GetCharacterMovement()->IsFalling();
 	Cache.Direction=UKismetMathLibrary::NormalizedDeltaRotator(
 		UKismetMathLibrary::MakeRotFromX(Velocity),
 		OwnerCharacter->GetActorRotation()).Yaw;
-
+	
 	Cache.bIsAiming=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Aiming);
 
 	if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Rifle))
@@ -58,6 +60,7 @@ void UPDAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 	Super::NativeThreadSafeUpdateAnimation(DeltaSeconds);
 
 	MovementSpeed=Cache.MovementSpeed;
+	bIsJumping=Cache.bIsJumping;
 	Direction=Cache.Direction;
 	bIsAiming=Cache.bIsAiming;
 	WeaponType=Cache.WeaponType;
