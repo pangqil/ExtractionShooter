@@ -11,17 +11,11 @@ class UPDBossGimmickInterface : public UInterface
 };
 
 /**
- * 보스 전용 기믹 진입점.
- * 현재는 stub. 추후 Phase 전환, GimmickActivated/Deactivated, GimmickPhaseChanged 등
- * 보스 단계 제어 API가 여기로 들어옴.
- *
- * Senior 관점: 보스 기믹은 일반 적과 책임이 다르므로 IPDCombatInterface와 분리하여
- * 일반 적이 불필요한 기믹 API에 노출되지 않도록 함(ISP).
+ * 보스 전용 기믹(Phase 전환, 페이즈별 능력 활성화 등) 진입점.
+ * 현재는 stub — Boss 캐릭터 추가 시점에 함수 정의.
+ * 일반 적은 본 인터페이스를 구현하지 않아 ISP 위배 방지.
  */
 class PROJECTD_API IPDBossGimmickInterface
 {
 	GENERATED_BODY()
-
-public:
-	// 의도적으로 비워둠 — Boss 구현 시점에 함수 추가.
 };

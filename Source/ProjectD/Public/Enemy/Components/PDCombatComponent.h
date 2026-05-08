@@ -5,28 +5,19 @@
 #include "PDCombatComponent.generated.h"
 
 class AActor;
-class APDEnemyAIControllerBase;
 
-/** 타겟이 (재)지정되었을 때. NewTarget이 nullptr이면 타겟 해제. */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnTargetChanged, AActor*, NewTarget);
-/** Combat 컴포넌트가 공격을 요청했을 때. 실제 발사/모션은 BP / 무기 컴포넌트에서 처리. */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnAttackRequested, AActor*, Target);
-/** 청각 자극으로 의심 위치(NoiseHint)가 갱신/해제되었을 때. bHasHint=false 면 hint 소비/만료. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam (FPDOnTargetChanged, AActor*, NewTarget);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam (FPDOnAttackRequested, AActor*, Target);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnNoiseHintChanged, FVector, Location, bool, bHasHint);
 
 /**
- * Enemy 공격 행동 컴포넌트.
- *  - 타겟 추적 (TWeakObjectPtr)
- *  - 공격 쿨다운 관리
- *  - "공격하라" 라는 의도만 broadcast — 실제 데미지/이펙트/애니는 디자이너 BP나
- *    APDWeaponBase 측에서 처리.
- *  - 주변 동료에게 타겟 전파 (NotifyAlliesInRadius).
+ * 적 전투 컴포넌트.
+ *  - 현재 시각 타겟(CurrentTarget)과 청각 의심 위치(NoiseHint)를 분리 보관.
+ *  - 공격 쿨다운만 관리하고 실제 발사는 OnAttackRequested 구독자(무기/캐릭터)가 수행.
+ *  - 같은 팀에 타겟 전파(NotifyAlliesInRadius).
  *
- * Senior 관점: 무기/데미지 시스템과 직접 결합하지 않고 delegate로만 통보 → SRP 준수,
- *              테스트/모킹 용이. 추후 GAS Ability로 교체 시 본 컴포넌트는 디스패처 역할만.
- *
- * Mid 관점: TWeakObjectPtr로 타겟 보유 → 타겟 destroy 시 GC 안전. 쿨다운은 GetWorld()->GetTimeSeconds() 기반으로
- *           타이머 핸들 없이 단순 비교 (메모리 절약, 일시정지 영향 받음 — 의도적 동작).
+ * 결합 분리: 데미지/이펙트/애니메이션 어느 것도 본 컴포넌트에 의존하지 않음.
+ *           추후 GAS Ability 로 교체 시 본 컴포넌트는 디스패처 역할만 유지.
  */
 UCLASS(ClassGroup = (PD), meta = (BlueprintSpawnableComponent))
 class PROJECTD_API UPDCombatComponent : public UActorComponent
@@ -35,8 +26,6 @@ class PROJECTD_API UPDCombatComponent : public UActorComponent
 
 public:
 	UPDCombatComponent();
-
-	// ---------------------- Target ----------------------
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Combat")
 	void SetCurrentTarget(AActor* NewTarget);
@@ -50,32 +39,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Combat")
 	bool HasValidTarget() const;
 
-	// ---------------------- Attack ----------------------
-
 	UFUNCTION(BlueprintPure, Category = "PD|Combat")
 	bool CanAttack() const;
 
-	/**
-	 * 공격 시도. 쿨다운/타겟 검증 통과 시 OnAttackRequested broadcast 후 true.
-	 * 실제 데미지/이펙트/애니메이션은 구독 측에서 처리.
-	 */
+	/** 쿨다운/사거리/타겟 검증 후 OnAttackRequested broadcast. true=요청 성공. */
 	UFUNCTION(BlueprintCallable, Category = "PD|Combat")
 	bool RequestAttack();
 
-	/** 공격 쿨다운 중인지 */
 	UFUNCTION(BlueprintPure, Category = "PD|Combat")
 	bool IsOnCooldown() const;
 
 	UFUNCTION(BlueprintPure, Category = "PD|Combat")
 	float GetCooldownRemaining() const;
 
-	// ---------------------- Noise hint (청각 의심 위치) ----------------------
-	//
-	// Senior 관점: 청각 자극은 "위치 정보"만 제공 — 실제 적 액터를 모르는 상태.
-	//              따라서 CurrentTarget(시각 확정 적) 과는 분리된 hint 슬롯으로 보관.
-	//              Soldier 가 시야로 적을 잡으면 이 hint 는 즉시 소비/폐기.
-	//
-	// Mid 관점: TWeakObjectPtr 로 Instigator 보관 — 노이즈 발생 액터가 destroy 돼도 GC 안전.
+	UFUNCTION(BlueprintPure, Category = "PD|Combat")
+	FORCEINLINE float GetAttackRange() const { return AttackRange; }
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Combat|Noise")
 	void SetLastNoiseLocation(AActor* NoiseInstigator, const FVector& Location);
@@ -95,16 +73,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "PD|Combat|Noise")
 	FPDOnNoiseHintChanged OnNoiseHintChanged;
 
-	// ---------------------- Squad coordination ----------------------
-
-	/**
-	 * Radius 안에 있는 같은 팀 적에게 NewTarget을 전파.
-	 * Combat 진입 시 호출하여 동료를 함께 활성화.
-	 */
+	/** Radius 내 같은 팀에게 타겟 전파(이미 같은 타겟이면 skip). */
 	UFUNCTION(BlueprintCallable, Category = "PD|Combat|Squad")
 	void NotifyAlliesInRadius(float Radius, AActor* SharedTarget);
-
-	// ---------------------- Delegates ----------------------
 
 	UPROPERTY(BlueprintAssignable, Category = "PD|Combat")
 	FPDOnTargetChanged OnTargetChanged;
@@ -113,11 +84,10 @@ public:
 	FPDOnAttackRequested OnAttackRequested;
 
 protected:
-	/** 공격 쿨다운(초). RequestAttack 성공 후 이 시간 동안 재공격 불가. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Combat", meta = (ClampMin = "0.0"))
 	float AttackCooldown = 1.0f;
 
-	/** RequestAttack을 시도할 때 타겟까지의 최대 거리. 초과 시 실패. */
+	/** RequestAttack 시 타겟까지의 최대 거리. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Combat", meta = (ClampMin = "0.0"))
 	float AttackRange = 1500.f;
 
@@ -125,7 +95,6 @@ private:
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AActor> CurrentTarget;
 
-	/** 마지막 RequestAttack 성공 시각(WorldTimeSeconds). */
 	float LastAttackTime = -1.f;
 
 	UPROPERTY(Transient)

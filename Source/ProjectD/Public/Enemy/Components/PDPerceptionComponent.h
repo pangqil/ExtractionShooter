@@ -7,27 +7,14 @@
 class UAISenseConfig_Sight;
 class UAISenseConfig_Hearing;
 
-/** 새 자극이 감지되었거나 자극이 사라졌을 때. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnTargetSensed, AActor*, Actor, bool, bSensed);
-/** 시야 안에서 적이 처음 발견됨. */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnTargetSpotted, AActor*, Target);
-/** 시야에서 적이 사라짐 (Lost). */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam (FPDOnTargetSpotted, AActor*, Target);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnTargetLost, AActor*, Target, FVector, LastKnownLocation);
-/** 의심스러운 소리/움직임을 들었음 (Alert 트리거). */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnNoiseHeard, AActor*, NoiseInstigator, FVector, Location);
 
 /**
- * UAIPerceptionComponent 래퍼.
- *  - 디자이너가 본 컴포넌트의 EditDefaultsOnly 값만 만지면 SightRadius/HearingRange 등이
- *    자동으로 SenseConfig에 적용됨.
- *  - 원시 OnTargetPerceptionUpdated를 도메인 이벤트(Spotted/Lost/NoiseHeard)로 변환하여
- *    StateTree/AIController가 구독.
- *
- * Senior 관점: UAIPerceptionComponent를 직접 상속함으로써 AIController가 자동 인식
- *              (FindComponentByClass<UAIPerceptionComponent>) — 별도 통합 코드 불필요.
- *              SenseConfig는 동적으로 생성하여 Default 클래스 설정과 PIE 설정이 충돌하지 않도록.
- *
- * Mid 관점: SenseConfig 갱신은 BeginPlay에서 한 번만. 매 프레임 갱신은 비용이 큼.
+ * UAIPerceptionComponent 래퍼. Sight + Hearing 자극을 도메인 이벤트로 변환.
+ * AIController가 자동으로 PerceptionComponent 슬롯을 인식하므로 별도 통합 필요 없음.
  */
 UCLASS(ClassGroup = (PD), meta = (BlueprintSpawnableComponent))
 class PROJECTD_API UPDPerceptionComponent : public UAIPerceptionComponent
@@ -51,21 +38,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "PD|Perception")
 	FPDOnNoiseHeard OnNoiseHeard;
 
-	// ---------------------- Debug/외부 조회 ----------------------
-	// SenseConfig 인스턴스는 private 라 외부에서 직접 못 봄.
-	// AIController 의 디버그 시각화 등에서 BP defaults 값을 읽기 위한 getter.
-
-	UFUNCTION(BlueprintPure, Category = "PD|Perception")
-	float GetSightRadius() const { return SightRadius; }
-
-	UFUNCTION(BlueprintPure, Category = "PD|Perception")
-	float GetLoseSightRadius() const { return LoseSightRadius; }
-
-	UFUNCTION(BlueprintPure, Category = "PD|Perception")
-	float GetPeripheralVisionAngleDegrees() const { return PeripheralVisionAngleDegrees; }
-
-	UFUNCTION(BlueprintPure, Category = "PD|Perception")
-	float GetHearingRange() const { return HearingRange; }
+	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetSightRadius()                 const { return SightRadius; }
+	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetLoseSightRadius()             const { return LoseSightRadius; }
+	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetPeripheralVisionAngleDegrees() const { return PeripheralVisionAngleDegrees; }
+	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetHearingRange()                const { return HearingRange; }
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))

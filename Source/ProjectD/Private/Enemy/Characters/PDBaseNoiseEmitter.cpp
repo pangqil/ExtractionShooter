@@ -1,27 +1,11 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "Enemy/Characters/PDBaseNoiseEmitter.h"
 
-#include "Components/CapsuleComponent.h"
-#include "Components/StateTreeComponent.h"
+#include "Engine/World.h"
 #include "Perception/AISense_Hearing.h"
 
 APDBaseNoiseEmitter::APDBaseNoiseEmitter()
 {
 	PrimaryActorTick.bCanEverTick = false;
-
-	TeamID = 1;
-	StateTreeComponent = CreateDefaultSubobject<UStateTreeComponent>(TEXT("StateTreeComponent"));
-}
-
-void APDBaseNoiseEmitter::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (StateTreeComponent)
-	{
-		StateTreeComponent->StartLogic();
-	}
 }
 
 void APDBaseNoiseEmitter::EmitNoise()

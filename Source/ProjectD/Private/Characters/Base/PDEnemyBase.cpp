@@ -2,7 +2,9 @@
 
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Items/PDItemBase.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISense_Hearing.h"
@@ -66,26 +68,26 @@ void APDEnemyBase::SetEnemyState(EPDEnemyState NewState)
 
 void APDEnemyBase::OnEnterState_Dead()
 {
-	// 충돌 비활성화 — 시체가 발사체를 막거나 플레이어를 밀치지 않도록.
+	// 충돌/이동/자극원 정리. 시체가 발사체를 막거나 계속 인지되지 않도록.
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
-	// 이동 컴포넌트도 정지.
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		MoveComp->StopMovementImmediately();
 		MoveComp->DisableMovement();
 	}
 
-	// 자극원 등록 해제 — 시체가 계속 인지되지 않도록.
 	if (StimuliSource)
 	{
 		StimuliSource->UnregisterFromPerceptionSystem();
 	}
 
-	// Junior: 루트박스/시체 액터 스폰은 BP 디자이너가 OnDeath/OnEnemyStateChanged 에서 처리.
+	// 사망 시 드랍 + 시체 컨테이너. 디자이너가 BP 에서 추가 VFX/사운드는 OnLootDropped 로 확장.
+	DropLootOnDeath();
+	SpawnCorpseContainer();
 }
 
 void APDEnemyBase::HandleDeath(AActor* Killer)
@@ -96,4 +98,66 @@ void APDEnemyBase::HandleDeath(AActor* Killer)
 
 void APDEnemyBase::OnVisionExposureChanged_Implementation(AActor* Observer, float Exposure)
 {
+}
+
+void APDEnemyBase::DropLootOnDeath()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	TArray<AActor*> Spawned;
+	const FVector Origin = GetActorLocation();
+
+	for (const FPDLootEntry& Entry : LootTable)
+	{
+		if (!Entry.ItemClass) continue;
+		if (FMath::FRand() > Entry.DropChance) continue;
+
+		const int32 MinQ = FMath::Max(1, Entry.MinQuantity);
+		const int32 MaxQ = FMath::Max(MinQ, Entry.MaxQuantity);
+		const int32 Quantity = FMath::RandRange(MinQ, MaxQ);
+
+		const FVector Offset = (LootSpawnRadius > 0.f)
+			? FMath::VRand() * FMath::FRandRange(0.f, LootSpawnRadius)
+			: FVector::ZeroVector;
+
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		Params.Owner = this;
+
+		APDItemBase* Item = World->SpawnActor<APDItemBase>(
+			Entry.ItemClass,
+			Origin + FVector(Offset.X, Offset.Y, 0.f),
+			FRotator::ZeroRotator,
+			Params);
+
+		if (Item)
+		{
+			Item->Quantity = Quantity;
+			Spawned.Add(Item);
+		}
+	}
+
+	if (Spawned.Num() > 0)
+	{
+		OnLootDropped(Spawned);
+	}
+}
+
+void APDEnemyBase::SpawnCorpseContainer()
+{
+	if (!CorpseContainerClass) return;
+
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	Params.Owner = this;
+
+	World->SpawnActor<AActor>(
+		CorpseContainerClass,
+		GetActorLocation(),
+		GetActorRotation(),
+		Params);
 }

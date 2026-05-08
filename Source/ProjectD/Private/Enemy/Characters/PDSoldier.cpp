@@ -1,76 +1,94 @@
 #include "Enemy/Characters/PDSoldier.h"
 
-#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimMontage.h"
+#include "Engine/World.h"
 #include "Enemy/Components/PDCombatComponent.h"
-#include "Weapons/PDProjectile.h"
+#include "Weapons/PDWeaponBase.h"
 
 APDSoldier::APDSoldier()
 {
-	// 디폴트 팀 ID (예: 2 = Hostile). BP 디폴트에서 오버라이드 가능.
-	TeamID = 2;
+	TeamID = 2; // Hostile.
 }
 
 void APDSoldier::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Senior: CombatComponent 의 OnAttackRequested 는 "공격 의도" 신호.
-	//         실제 발사 효과(Projectile/SFX/애님)는 구독 측 책임 — 본 캐릭터가 디폴트 구현 제공.
+	SpawnAndEquipDefaultWeapon();
+
+	// CombatComponent.OnAttackRequested 는 "공격 의도" 신호 — 무기에게 Fire 위임.
 	if (UPDCombatComponent* Combat = GetCombatComponent())
 	{
 		Combat->OnAttackRequested.AddDynamic(this, &APDSoldier::HandleAttackRequested);
 	}
 }
 
-void APDSoldier::HandleAttackRequested(AActor* Target)
+void APDSoldier::OnEnterState_Dead()
 {
-	if (!bAutoFireProjectile) return;
-	FireProjectile(Target);
+	Super::OnEnterState_Dead();
+
+	// 사망 시 무기 떨굼 — Drop 처리는 무기 측 IsDropped 플래그가 있어 BP 디자이너가 후속 정책 결정.
+	if (EquippedWeapon)
+	{
+		EquippedWeapon->OnUnequip();
+		EquippedWeapon->SetDropped(true);
+	}
 }
 
-void APDSoldier::FireProjectile(AActor* Target)
+void APDSoldier::SpawnAndEquipDefaultWeapon()
 {
-	if (!ProjectileClass || !Target)
-	{
-		return;
-	}
+	if (!DefaultWeaponClass) return;
 
 	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
+	if (!World) return;
 
-	if(AttackMontage)
-	{
-		UE_LOG(LogTemp, Log, TEXT("[%s] Playing attack montage."), *GetName());
-		PlayAnimMontage(AttackMontage);
-	}
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = this;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	// 머즐 위치/회전 결정.
-	FVector MuzzleLocation = GetActorLocation() + GetActorRotation().RotateVector(MuzzleOffset);
-	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	APDWeaponBase* NewWeapon = World->SpawnActor<APDWeaponBase>(
+		DefaultWeaponClass,
+		GetActorLocation(),
+		GetActorRotation(),
+		SpawnParams);
+
+	if (!NewWeapon) return;
+
+	SetEquippedWeapon(NewWeapon, /*bDestroyPrevious=*/true);
+}
+
+void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevious)
+{
+	if (EquippedWeapon == NewWeapon) return;
+
+	if (EquippedWeapon)
 	{
-		if (!MuzzleSocketName.IsNone() && MeshComp->DoesSocketExist(MuzzleSocketName))
+		EquippedWeapon->OnUnequip();
+		if (bDestroyPrevious)
 		{
-			MuzzleLocation = MeshComp->GetSocketLocation(MuzzleSocketName);
+			EquippedWeapon->Destroy();
 		}
 	}
 
+	EquippedWeapon = NewWeapon;
 
-	// Senior: 직사 발사 — 회전은 머즐→타겟 벡터에서 산출. 예측 사격/탄도 보정은
-	//         별도 무기 컴포넌트 도입 시 그쪽에서 처리.
-	const FVector ToTarget = Target->GetActorLocation() - MuzzleLocation;
-	const FRotator MuzzleRotation = ToTarget.IsNearlyZero() ? GetActorRotation() : ToTarget.Rotation();
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	SpawnParams.Owner = this;
-	SpawnParams.Instigator = this;
-
-	APDProjectile* Projectile = World->SpawnActor<APDProjectile>(ProjectileClass, MuzzleLocation, MuzzleRotation, SpawnParams);
-	if (Projectile)
+	if (EquippedWeapon)
 	{
-		Projectile->InitProjectile(ProjectileDamage, this, bProjectileCanPenetrate);
+		AttachActorToWeaponSocket(EquippedWeapon);
+		EquippedWeapon->OnEquip(this);
 	}
+}
+
+void APDSoldier::HandleAttackRequested(AActor* /*Target*/)
+{
+	if (!bAutoFireOnAttackRequested) return;
+	if (!EquippedWeapon) return;
+
+	if (AttackMontage)
+	{
+		PlayAnimMontage(AttackMontage);
+	}
+
+	EquippedWeapon->Fire();
 }

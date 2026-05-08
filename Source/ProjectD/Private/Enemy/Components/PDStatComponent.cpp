@@ -2,8 +2,6 @@
 
 UPDStatComponent::UPDStatComponent()
 {
-	// Junior: Tick 끄기. 본 컴포넌트는 이벤트 기반(콜백 + delegate broadcast).
-	// Mid: TickComponent 비활성화로 매 프레임 비용 절약.
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
@@ -11,7 +9,6 @@ void UPDStatComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Battery 초기값 세팅 (락 안에서 일괄 처리)
 	FScopeLock Lock(&BatteryCS);
 	MaxBattery = FMath::Max(0.f, MaxBattery);
 	CurrentBattery = FMath::Clamp(InitialBattery, 0.f, MaxBattery);
@@ -20,10 +17,7 @@ void UPDStatComponent::BeginPlay()
 
 void UPDStatComponent::SetUseBattery(bool bInUseBattery)
 {
-	if (bUseBattery == bInUseBattery)
-	{
-		return;
-	}
+	if (bUseBattery == bInUseBattery) return;
 
 	bUseBattery = bInUseBattery;
 
@@ -38,10 +32,7 @@ void UPDStatComponent::SetUseBattery(bool bInUseBattery)
 
 float UPDStatComponent::GetCurrentBattery() const
 {
-	if (!bUseBattery)
-	{
-		return 0.f;
-	}
+	if (!bUseBattery) return 0.f;
 	FScopeLock Lock(&BatteryCS);
 	return CurrentBattery;
 }
@@ -55,39 +46,26 @@ float UPDStatComponent::GetMaxBattery() const
 float UPDStatComponent::GetBatteryPercent() const
 {
 	FScopeLock Lock(&BatteryCS);
-	if (!bUseBattery || MaxBattery <= 0.f)
-	{
-		return 0.f;
-	}
+	if (!bUseBattery || MaxBattery <= 0.f) return 0.f;
 	return CurrentBattery / MaxBattery;
 }
 
 EPDBatteryStatus UPDStatComponent::GetBatteryStatus() const
 {
-	if (!bUseBattery)
-	{
-		return EPDBatteryStatus::None;
-	}
-	// CachedBatteryStatus는 ApplyBatteryChange_Internal에서만 갱신.
+	if (!bUseBattery) return EPDBatteryStatus::None;
 	FScopeLock Lock(&BatteryCS);
 	return CachedBatteryStatus;
 }
 
 void UPDStatComponent::SetBattery(float NewValue)
 {
-	if (!bUseBattery)
-	{
-		return;
-	}
+	if (!bUseBattery) return;
 	ApplyBatteryChange_Internal(NewValue);
 }
 
 void UPDStatComponent::SetMaxBattery(float NewMax)
 {
-	if (NewMax < 0.f)
-	{
-		NewMax = 0.f;
-	}
+	if (NewMax < 0.f) NewMax = 0.f;
 
 	float ClampedCurrent = 0.f;
 	{
@@ -95,16 +73,12 @@ void UPDStatComponent::SetMaxBattery(float NewMax)
 		MaxBattery = NewMax;
 		ClampedCurrent = FMath::Clamp(CurrentBattery, 0.f, MaxBattery);
 	}
-	// 값이 새 max에 의해 변경됐다면 일반 경로로 broadcast.
 	ApplyBatteryChange_Internal(ClampedCurrent);
 }
 
 bool UPDStatComponent::ConsumeBattery(float Amount)
 {
-	if (!bUseBattery || Amount <= 0.f)
-	{
-		return false;
-	}
+	if (!bUseBattery || Amount <= 0.f) return false;
 
 	float NewValue = 0.f;
 	bool bFullySatisfied = false;
@@ -119,10 +93,7 @@ bool UPDStatComponent::ConsumeBattery(float Amount)
 
 void UPDStatComponent::RecoverBattery(float Amount)
 {
-	if (!bUseBattery || Amount <= 0.f)
-	{
-		return;
-	}
+	if (!bUseBattery || Amount <= 0.f) return;
 
 	float NewValue = 0.f;
 	{
@@ -157,7 +128,7 @@ void UPDStatComponent::ApplyBatteryChange_Internal(float NewValue)
 
 		if (FMath::IsNearlyEqual(Old, NewClamped))
 		{
-			return; // 변화 없음 — broadcast 생략.
+			return;
 		}
 
 		CurrentBattery = NewClamped;
@@ -170,7 +141,7 @@ void UPDStatComponent::ApplyBatteryChange_Internal(float NewValue)
 		bDepletedNow = (NewClamped <= 0.f && Old > 0.f);
 	}
 
-	// Mid: broadcast는 락 밖에서 — 구독자가 다시 본 컴포넌트를 호출해도 데드락 없도록.
+	// 락 밖에서 broadcast — 구독자가 본 컴포넌트를 다시 호출해도 데드락 없도록.
 	OnBatteryChanged.Broadcast(NewClamped, MaxRef);
 
 	if (OldStatus != NewStatus)
