@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -19,6 +19,10 @@ DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 
 class UInputMappingContext;
 class UPDInputConfig;
+
+class APDPlayerCharacter;
+class APDWeaponBase;       
+class APDRifle;           
 
 UCLASS(abstract)
 class PROJECTD_API APDPlayerController : public APlayerController
@@ -79,6 +83,7 @@ private:
 	void OnAbilityInputPressed(FGameplayTag InputTag);
 	void OnAbilityInputReleased(FGameplayTag InputTag);
 	void UpdateAimRotation();
+
 	void ToggleInventory();
 	void TryInteract();
 
@@ -93,5 +98,15 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketComponent> ActiveMarketComponent;
+
+	void OnInteract();
+	void OnSwitchSlot1();       
+	void OnSwitchSlot2();       
+	void OnSwitchSlot3();       
+	void OnZoom();              
+	void OnToggleFireMode();    
+	void OnDropWeapon();       
 	
+	bool bShowMouseCursor=true;
+
 };

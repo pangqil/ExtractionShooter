@@ -101,4 +101,13 @@ public:
 	virtual TSubclassOf<UGameplayEffect> GetThirstDecayEffectClass()  const override { return ThirstDecayEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetStarvingEffectClass()     const override { return StarvingEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetDehydratedEffectClass()   const override { return DehydratedEffectClass; }
+public:
+	UPROPERTY(EditDefaultsOnly, Category="PD|Player|Animation")
+	TMap<FGameplayTag, TSubclassOf<UAnimInstance>> WeaponAnimLayerMap;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Player|Animation")
+	TSubclassOf<UAnimInstance> DefaultAnimLayerClass;
+private:
+	void OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount);
+	void LinkDefaultAnimLayer();
 };

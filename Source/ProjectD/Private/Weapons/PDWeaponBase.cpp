@@ -1,4 +1,4 @@
-#include "Weapons/PDWeaponBase.h"
+﻿#include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDShellActor.h"
 #include "Weapons/PDMagazineActor.h"
 #include "Characters/PDPlayerCharacter.h"
@@ -141,7 +141,7 @@ void APDWeaponBase::ApplyDamage(AActor* HitActor, float DamageAmount)
 {
     if (!HitActor) return;
     if (!HitActor->Implements<UPDDamageable>()) return;
-    if (!IPDDamageable::Execute_IsAlive(HitActor)) return;
+    if (IPDDamageable::Execute_GetCurrentHealth(HitActor) <= 0.f) return;
 
     FPDDamageInfo DamageInfo;
     DamageInfo.BaseDamage = DamageAmount;

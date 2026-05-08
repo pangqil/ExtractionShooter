@@ -1,4 +1,4 @@
-#include "Characters/PDPlayerCharacter.h"
+﻿#include "Characters/PDPlayerCharacter.h"
 #include "AttributeSet/PDAttributeSet.h"
 #include "Camera/CameraComponent.h"
 #include "Component/PDVisionComponent.h"
@@ -101,6 +101,9 @@ void APDPlayerCharacter::PickupWeapon(APDWeaponBase* Weapon)
 		WeaponSlots[Idx]->OnUnequip();
 
 	WeaponSlots[Idx]=Weapon;
+	Weapon->OnEquip(this);           
+	Weapon->SetActorHiddenInGame(true);
+	AttachActorToWeaponSocket(Weapon);
 	OnWeaponPickedUp.Broadcast(Weapon);
 
 	if (CurrentSlot==EWeaponSlot::None)

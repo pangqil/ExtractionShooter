@@ -73,8 +73,6 @@ private:
 
 	float StaminaScale=1.f;
 
-	
-	
 private:
 	TSet<AActor*> VisibleActors;
 	FTimerHandle TimerHandle;

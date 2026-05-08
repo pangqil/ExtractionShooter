@@ -16,6 +16,9 @@ APDRifle::APDRifle()
 
 void APDRifle::Fire_Implementation()
 {
+    UE_LOG(LogTemp, Warning, TEXT("Fire called! CanFire: %d, Ammo: %d"),
+        CanFire(), CurrentAmmo);
+
     if (!CanFire()) return;
 
     FHitResult Hit;

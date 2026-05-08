@@ -7,7 +7,9 @@
 #include "AbilitySystemComponent.h"
 #include "AttributeSet/PDAttributeSet.h"
 #include "GameFramework/Pawn.h"
+#include "Type/Types.h"
 #include "Widgets/HUD/PDAttributeBarWidget.h"
+#include "Widgets/HUD/PDBodyPartHealthGroupWidget.h"
 
 void UPDHUDWidget::NativeOnActivated()
 {
@@ -32,10 +34,6 @@ void UPDHUDWidget::TryBindToOwningPawnASC()
 
 	CachedASC = ASC;
 
-	BindAttributeToBar(Bar_Health,
-		UPDAttributeSet::GetTorsoHPAttribute(),
-		UPDAttributeSet::GetMaxTorsoHPAttribute());
-
 	BindAttributeToBar(Bar_Stamina,
 		UPDAttributeSet::GetStaminaAttribute(),
 		UPDAttributeSet::GetMaxStaminaAttribute());
@@ -47,6 +45,33 @@ void UPDHUDWidget::TryBindToOwningPawnASC()
 	BindAttributeToBar(Bar_Thirst,
 		UPDAttributeSet::GetThirstAttribute(),
 		UPDAttributeSet::GetMaxThirstAttribute());
+
+	if (Bar_BodyParts)
+	{
+		BindAttributeToBar(Bar_BodyParts->GetBar(EBodyPart::Head),
+			UPDAttributeSet::GetHeadHPAttribute(),
+			UPDAttributeSet::GetMaxHeadHPAttribute());
+
+		BindAttributeToBar(Bar_BodyParts->GetBar(EBodyPart::Torso),
+			UPDAttributeSet::GetTorsoHPAttribute(),
+			UPDAttributeSet::GetMaxTorsoHPAttribute());
+
+		BindAttributeToBar(Bar_BodyParts->GetBar(EBodyPart::Arm_L),
+			UPDAttributeSet::GetArmLHPAttribute(),
+			UPDAttributeSet::GetMaxArmLHPAttribute());
+
+		BindAttributeToBar(Bar_BodyParts->GetBar(EBodyPart::Arm_R),
+			UPDAttributeSet::GetArmRHPAttribute(),
+			UPDAttributeSet::GetMaxArmRHPAttribute());
+
+		BindAttributeToBar(Bar_BodyParts->GetBar(EBodyPart::Leg_L),
+			UPDAttributeSet::GetLegLHPAttribute(),
+			UPDAttributeSet::GetMaxLegLHPAttribute());
+
+		BindAttributeToBar(Bar_BodyParts->GetBar(EBodyPart::Leg_R),
+			UPDAttributeSet::GetLegRHPAttribute(),
+			UPDAttributeSet::GetMaxLegRHPAttribute());
+	}
 }
 
 void UPDHUDWidget::BindAttributeToBar(UPDAttributeBarWidget* Bar,

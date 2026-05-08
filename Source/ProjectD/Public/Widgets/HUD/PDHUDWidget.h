@@ -8,6 +8,7 @@
 #include "PDHUDWidget.generated.h"
 
 class UPDAttributeBarWidget;
+class UPDBodyPartHealthGroupWidget;
 class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 
@@ -25,7 +26,7 @@ protected:
 	virtual void NativeOnDeactivated() override;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UPDAttributeBarWidget> Bar_Health;
+	TObjectPtr<UPDBodyPartHealthGroupWidget> Bar_BodyParts;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UPDAttributeBarWidget> Bar_Stamina;

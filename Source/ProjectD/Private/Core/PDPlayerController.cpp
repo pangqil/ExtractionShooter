@@ -1,5 +1,6 @@
-#include "Core/PDPlayerController.h"
+﻿#include "Core/PDPlayerController.h"
 #include "Characters/PDPlayerCharacter.h"
+
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
@@ -12,6 +13,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/Character.h"
 #include "Input/PDInputComponent.h"
+
 #include "InputCoreTypes.h"
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
@@ -20,6 +22,11 @@
 #include "Items/PDInventoryComponent.h"
 
 DEFINE_LOG_CATEGORY(LogPDCharacter);
+
+#include "Interfaces/PDInteractable.h"
+#include "Weapons/PDWeaponBase.h"
+#include "Weapons/PDRifle.h"
+
 
 APDPlayerController::APDPlayerController()
 {
@@ -90,6 +97,24 @@ void APDPlayerController::SetupInputComponent()
 
 	PDIC->BindAbilityActions(InputConfig, this, &APDPlayerController::OnAbilityInputPressed,
 		&APDPlayerController::OnAbilityInputReleased);
+
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
+		ETriggerEvent::Started, this, &APDPlayerController::OnInteract);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot1,
+		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot1);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot2,
+		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot2);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot3,
+		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot3);
+	
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Zoom,
+		ETriggerEvent::Started, this, &APDPlayerController::OnZoom);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_ToggleFireMode,
+		ETriggerEvent::Started, this, &APDPlayerController::OnToggleFireMode);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_DropWeapon,
+		ETriggerEvent::Started, this, &APDPlayerController::OnDropWeapon);
+
+	
 }
 
 void APDPlayerController::BeginPlay()
@@ -363,4 +388,75 @@ void APDPlayerController::UpdateAimRotation()
 			ControlledPawn->GetActorLocation() + AimDirection.GetSafeNormal() * 200.f,
 			FColor::Blue, false, 0.1f, 0, 2.f);
 	}
+}
+
+// 슬롯 전환
+void APDPlayerController::OnSwitchSlot1()
+{
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		Ch->SwitchToSlot(EWeaponSlot::Slot1_Rifle);
+}
+
+void APDPlayerController::OnSwitchSlot2()
+{
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		Ch->SwitchToSlot(EWeaponSlot::Slot2_Shotgun);
+}
+
+void APDPlayerController::OnSwitchSlot3()
+{
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		Ch->SwitchToSlot(EWeaponSlot::Slot3_Sniper);
+}
+
+void APDPlayerController::OnZoom()
+{
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
+			Weapon->ToggleZoom();
+}
+
+void APDPlayerController::OnToggleFireMode()
+{
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
+			if (APDRifle* Rifle = Cast<APDRifle>(Weapon))
+				Rifle->ToggleFireMode();
+}
+
+void APDPlayerController::OnDropWeapon()
+{
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		Ch->DropCurrentWeapon();
+}
+
+void APDPlayerController::OnInteract()
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn) return;
+
+	TArray<AActor*> OverlappingActors;
+	ControlledPawn->GetOverlappingActors(OverlappingActors);
+
+	AActor* ClosestInteractable = nullptr;
+	float ClosestDist = FLT_MAX;
+
+	for (AActor* Actor : OverlappingActors)
+	{
+		if (!Actor->Implements<UPDInteractable>()) continue;
+		if (Actor->GetAttachParentActor() != nullptr) continue;
+
+		float Dist = FVector::Dist(
+			ControlledPawn->GetActorLocation(),
+			Actor->GetActorLocation());
+
+		if (Dist < ClosestDist)
+		{
+			ClosestDist = Dist;
+			ClosestInteractable = Actor;
+		}
+	}
+
+	if (ClosestInteractable)
+		IPDInteractable::Execute_Interact(ClosestInteractable, ControlledPawn);
 }
