@@ -14,6 +14,8 @@ class UPDStashWidget;
 class UPDMarketWidget;
 class UPDMarketComponent;
 class APDPlayerCharacter;
+class UPDHUDWidget;
+class UPDActivatableBase;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 
@@ -59,6 +61,17 @@ public:
 	virtual void PlayerTick(float DeltaTime) override; 
 
 protected:
+	/** HUD 위젯 클래스. BeginPlay에서 자동 생성되어 viewport ZOrder=0에 깔린다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDHUDWidget> HUDClass;
+
+	/** HUD 위젯 생성 + viewport 추가. BeginPlay에서 호출. 자식 PC가 override 가능. */
+	virtual void CreateAndAddHUDWidget();
+
+	/** 현재 열려 있는 화면을 닫고 싶을 때 BP에서 호출. */
+	UFUNCTION(BlueprintCallable, Category = "PD|UI")
+	void RequestCloseCurrentScreen();
+
 	UPROPERTY(EditAnywhere, Category = "PD|Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
@@ -76,6 +89,7 @@ protected:
 
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 private:
 	void OnMove(const struct FInputActionValue& Value);
@@ -99,14 +113,17 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketComponent> ActiveMarketComponent;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UPDHUDWidget> HUDInstance;
+
 	void OnInteract();
-	void OnSwitchSlot1();       
-	void OnSwitchSlot2();       
-	void OnSwitchSlot3();       
-	void OnZoom();              
-	void OnToggleFireMode();    
-	void OnDropWeapon();       
-	
+	void OnSwitchSlot1();
+	void OnSwitchSlot2();
+	void OnSwitchSlot3();
+	void OnZoom();
+	void OnToggleFireMode();
+	void OnDropWeapon();
+
 	bool bShowMouseCursor=true;
 
 };

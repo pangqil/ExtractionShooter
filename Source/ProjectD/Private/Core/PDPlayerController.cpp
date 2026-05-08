@@ -20,12 +20,15 @@
 #include "Widgets/Inventory/PDMarketWidget.h"
 #include "Items/PDMarketComponent.h"
 #include "Items/PDInventoryComponent.h"
+#include "Widgets/HUD/PDHUDWidget.h"
+#include "Subsystems/PDFrontendUISubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogPDCharacter);
 
 #include "Interfaces/PDInteractable.h"
 #include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDRifle.h"
+#include "Weapons/PDSniper.h"
 
 
 APDPlayerController::APDPlayerController()
@@ -44,6 +47,14 @@ void APDPlayerController::RequestExtraction()
 void APDPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+	static float LogTimer = 0.f;
+	LogTimer += DeltaTime;
+	if (LogTimer >= 1.f)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cursor Visible: %s, Cursor Type: %d"), 
+			bShowMouseCursor ? TEXT("True") : TEXT("False"), (int32)CurrentMouseCursor.GetValue());
+		LogTimer = 0.f;
+	}
 	UpdateAimRotation();
 }
 
@@ -120,10 +131,53 @@ void APDPlayerController::SetupInputComponent()
 void APDPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	bShowMouseCursor = true;
 
-	FInputModeGameOnly InputMode;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
+
+	bShowMouseCursor = true;
+	DefaultMouseCursor = EMouseCursor::Default;
+
+	CreateAndAddHUDWidget();
+}
+
+void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (HUDInstance)
+	{
+		HUDInstance->RemoveFromParent();
+		HUDInstance = nullptr;
+	}
+
+	if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
+	{
+		UISubsystem->CloseScreen();
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void APDPlayerController::CreateAndAddHUDWidget()
+{
+	if (!HUDClass) return;
+	if (HUDInstance) return; // 이중 호출 방지
+
+	HUDInstance = CreateWidget<UPDHUDWidget>(this, HUDClass);
+	if (HUDInstance)
+	{
+		HUDInstance->AddToViewport(0); // ZOrder 0 = 가장 아래, 메뉴(10) 밑에 깔림
+		HUDInstance->Activate();
+	}
+}
+
+void APDPlayerController::RequestCloseCurrentScreen()
+{
+	if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
+	{
+		UISubsystem->CloseScreen();
+	}
 }
 
 void APDPlayerController::OnMove(const struct FInputActionValue& Value)
@@ -337,7 +391,7 @@ void APDPlayerController::ToggleInventory()
 
 		FInputModeGameOnly InputMode;
 		SetInputMode(InputMode);
-		bShowMouseCursor = true;
+		bShowMouseCursor = false;
 		return;
 	}
 
@@ -356,7 +410,10 @@ void APDPlayerController::ToggleInventory()
 
 	InventoryWidgetInstance->AddToViewport();
 
-	FInputModeGameOnly InputMode;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(InventoryWidgetInstance->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	
 	SetInputMode(InputMode);
 	bShowMouseCursor = true;
 }
@@ -413,7 +470,8 @@ void APDPlayerController::OnZoom()
 {
 	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
 		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
-			Weapon->ToggleZoom();
+			if (APDSniper* Sniper = Cast<APDSniper>(Weapon))
+				Sniper->ToggleZoom();
 }
 
 void APDPlayerController::OnToggleFireMode()
@@ -460,3 +518,4 @@ void APDPlayerController::OnInteract()
 	if (ClosestInteractable)
 		IPDInteractable::Execute_Interact(ClosestInteractable, ControlledPawn);
 }
+

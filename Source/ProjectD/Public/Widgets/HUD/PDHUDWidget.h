@@ -13,8 +13,8 @@ class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 
 /**
- * In-Game HUD. Frontend.WidgetStack.GameHud 스택에 push되어 viewport 최하단에 깔리는 활성 위젯.
- * Pawn의 ASC에서 attribute 변경 델리게이트를 구독해 자식 Bar 위젯들을 push 방식으로 갱신한다.
+ * 플레이어 HUD 위젯
+ * Activate 시점에 Pawn의 ASC를 잡아 attribute 변경 델리게이트를 구독하고, Deactivate 시점에 구독을 해제
  */
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
 class PROJECTD_API UPDHUDWidget : public UPDActivatableBase
