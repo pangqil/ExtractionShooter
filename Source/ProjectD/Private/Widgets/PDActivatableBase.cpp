@@ -3,21 +3,75 @@
 
 #include "Widgets/PDActivatableBase.h"
 
-TOptional<FUIInputConfig> UPDActivatableBase::GetDesiredInputConfig() const
-{
-	if (InputMode == EWidgetInputMode::GameAndMenu)
-	{
-		return FUIInputConfig(ECommonInputMode::All, EMouseCaptureMode::CapturePermanently);
-	}
-	if (InputMode == EWidgetInputMode::Menu)
-	{
-		return FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture);
+#include "GameFramework/PlayerController.h"
 
-	}
-	if (InputMode == EWidgetInputMode::Game)
+void UPDActivatableBase::Activate()
+{
+	if (bActivated) return;
+	bActivated = true;
+
+	ApplyInputMode();
+	NativeOnActivated();
+	OnActivated();
+}
+
+void UPDActivatableBase::Deactivate()
+{
+	if (!bActivated) return;
+	bActivated = false;
+
+	NativeOnDeactivated();
+	OnDeactivated();
+}
+
+UWidget* UPDActivatableBase::GetDesiredFocusTarget_Implementation() const
+{
+	return nullptr;
+}
+
+void UPDActivatableBase::NativeOnActivated()
+{
+}
+
+void UPDActivatableBase::NativeOnDeactivated()
+{
+}
+
+void UPDActivatableBase::ApplyInputMode()
+{
+	APlayerController* PC = GetOwningPlayer();
+	if (!PC) return;
+
+	switch (InputMode)
 	{
-		return FUIInputConfig(ECommonInputMode::Game, EMouseCaptureMode::CapturePermanently);
+	case EWidgetInputMode::Game:
+		{
+			FInputModeGameOnly Mode;
+			PC->SetInputMode(Mode);
+			PC->SetShowMouseCursor(false);
+			break;
+		}
+	case EWidgetInputMode::GameAndMenu:
+		{
+			FInputModeGameAndUI Mode;
+			Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			Mode.SetHideCursorDuringCapture(false);
+			PC->SetInputMode(Mode);
+			PC->SetShowMouseCursor(bShowMouseCursor);
+			break;
+		}
+	case EWidgetInputMode::Menu:
+		{
+			FInputModeUIOnly Mode;
+			Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			PC->SetInputMode(Mode);
+			PC->SetShowMouseCursor(bShowMouseCursor);
+			break;
+		}
+	case EWidgetInputMode::Passive:
+		{
+			// 입력/커서 상태를 유지
+			break;
+		}
 	}
-	
-	return FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture);
 }
