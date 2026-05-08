@@ -1,27 +1,16 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Ping/PDPingMarker.h"
+#include "Components/StaticMeshComponent.h"
 
-// Sets default values
 APDPingMarker::APDPingMarker()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
+	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
+	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision); //충돌 x
+	SetRootComponent(MeshComp);
 }
 
-// Called when the game starts or when spawned
-void APDPingMarker::BeginPlay()
+void APDPingMarker::InitializePing(EPDPingType InPingType)
 {
-	Super::BeginPlay();
-	
+	OnPingInitialized(InPingType);
 }
-
-// Called every frame
-void APDPingMarker::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
-
