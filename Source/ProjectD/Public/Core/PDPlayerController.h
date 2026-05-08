@@ -83,7 +83,7 @@ private:
 	void OnAbilityInputPressed(FGameplayTag InputTag);
 	void OnAbilityInputReleased(FGameplayTag InputTag);
 	void UpdateAimRotation();
-<<<<<<< HEAD
+
 	void ToggleInventory();
 	void TryInteract();
 
@@ -98,8 +98,6 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketComponent> ActiveMarketComponent;
-	
-=======
 
 	void OnInteract();
 	void OnSwitchSlot1();       
@@ -111,5 +109,4 @@ private:
 	
 	bool bShowMouseCursor=true;
 
->>>>>>> 1c40b33 ([Add] 플레이어 컨트롤러에 장전,총기장착,총기 슬롯키 추가)
 };

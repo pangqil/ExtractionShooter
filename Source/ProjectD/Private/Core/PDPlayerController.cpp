@@ -1,9 +1,6 @@
-<<<<<<< HEAD
-#include "Core/PDPlayerController.h"
-#include "Characters/PDPlayerCharacter.h"
-=======
 ﻿#include "Core/PDPlayerController.h"
->>>>>>> 1c40b33 ([Add] 플레이어 컨트롤러에 장전,총기장착,총기 슬롯키 추가)
+#include "Characters/PDPlayerCharacter.h"
+
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
@@ -16,7 +13,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/Character.h"
 #include "Input/PDInputComponent.h"
-<<<<<<< HEAD
+
 #include "InputCoreTypes.h"
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
@@ -25,13 +22,11 @@
 #include "Items/PDInventoryComponent.h"
 
 DEFINE_LOG_CATEGORY(LogPDCharacter);
-=======
-#include "Interfaces/PDInteractable.h"
 
-#include "Characters/PDPlayerCharacter.h"
+#include "Interfaces/PDInteractable.h"
 #include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDRifle.h"
->>>>>>> 1c40b33 ([Add] 플레이어 컨트롤러에 장전,총기장착,총기 슬롯키 추가)
+
 
 APDPlayerController::APDPlayerController()
 {
