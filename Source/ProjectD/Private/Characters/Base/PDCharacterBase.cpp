@@ -8,6 +8,9 @@
 #include "Core/PDGameMode.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISense_Sight.h"
+#include "Perception/AISense_Hearing.h"
 #include "Type/Types.h"
 
 APDCharacterBase::APDCharacterBase()
@@ -16,6 +19,15 @@ APDCharacterBase::APDCharacterBase()
 
 	ASC=CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("ASC"));
 	AttributeSet=CreateDefaultSubobject<UPDAttributeSet>(TEXT("AttributeSet"));
+
+	// 자극원 컴포넌트: AI perception 이 본 캐릭터를 인지하려면 등록되어 있어야 함.
+	StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("StimuliSource"));
+	if (StimuliSource)
+	{
+		StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
+		StimuliSource->RegisterForSense(UAISense_Hearing::StaticClass());
+		StimuliSource->bAutoRegister = true;
+	}
 }
 
 void APDCharacterBase::BeginPlay()
@@ -123,9 +135,15 @@ bool APDCharacterBase::IsAlive_Implementation() const
 
 void APDCharacterBase::HandleDeath(AActor* Killer)
 {
+	// 사망체가 perception 으로 계속 인지되지 않도록 자극원 해제.
+	if (StimuliSource)
+	{
+		StimuliSource->UnregisterFromPerceptionSystem();
+	}
+
 	OnDeathDelegate.Broadcast(Killer);
 	OnDeath(Killer);
-	
+
 	if (APlayerController* PC=Cast<APlayerController>(GetController()))
 	{
 		if (APDGameMode* GM=GetWorld()->GetAuthGameMode<APDGameMode>())

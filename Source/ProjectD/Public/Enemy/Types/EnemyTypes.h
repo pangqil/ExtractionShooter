@@ -16,9 +16,9 @@ enum class EPDEnemyState : uint8
 	Dead    UMETA(DisplayName = "Dead"),
 };
 
-/** Battery(스태미너) 등급. Biped만 사용, 그 외는 None. */
+/** Stamina(스태미너) 등급. Biped만 사용, 그 외는 None. */
 UENUM(BlueprintType)
-enum class EPDBatteryStatus : uint8
+enum class EPDStaminaStatus : uint8
 {
 	None       UMETA(DisplayName = "None"),
 	Full       UMETA(DisplayName = "Full"),

@@ -5,28 +5,18 @@
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Items/PDItemBase.h"
-#include "Perception/AIPerceptionStimuliSourceComponent.h"
-#include "Perception/AISense_Sight.h"
-#include "Perception/AISense_Hearing.h"
 
 APDEnemyBase::APDEnemyBase()
 {
-	// Junior: ASC 는 부모(APDCharacterBase) 생성자에서 만들어졌음. nullptr 가드.
-	// Mid: replication 모드는 적 AI 라 Minimal 로 충분. (큰 데이터는 호스트만 보유)
+	// 적 AI 라 Minimal 로 충분. (큰 데이터는 호스트만 보유)
 	if (ASC)
 	{
 		ASC->SetIsReplicated(true);
 		ASC->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 	}
 
-	// 자극원 컴포넌트: 다른 AI가 본 적을 인지하려면 등록되어 있어야 함.
-	StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("StimuliSource"));
-	if (StimuliSource)
-	{
-		StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
-		StimuliSource->RegisterForSense(UAISense_Hearing::StaticClass());
-		StimuliSource->bAutoRegister = true;
-	}
+	// Hostile 기본값. 자식(예: PDSoldier)에서 재정의 가능.
+	TeamID = 2;
 }
 
 uint8 APDEnemyBase::GetTeamID_Implementation() const
@@ -68,7 +58,7 @@ void APDEnemyBase::SetEnemyState(EPDEnemyState NewState)
 
 void APDEnemyBase::OnEnterState_Dead()
 {
-	// 충돌/이동/자극원 정리. 시체가 발사체를 막거나 계속 인지되지 않도록.
+	// 충돌/이동 정리. 시체가 발사체를 막지 않도록. (StimuliSource 해제는 베이스 HandleDeath 에서.)
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -78,11 +68,6 @@ void APDEnemyBase::OnEnterState_Dead()
 	{
 		MoveComp->StopMovementImmediately();
 		MoveComp->DisableMovement();
-	}
-
-	if (StimuliSource)
-	{
-		StimuliSource->UnregisterFromPerceptionSystem();
 	}
 
 	// 사망 시 드랍 + 시체 컨테이너. 디자이너가 BP 에서 추가 VFX/사운드는 OnLootDropped 로 확장.

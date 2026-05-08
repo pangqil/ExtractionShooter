@@ -38,6 +38,9 @@ APDPlayerCharacter::APDPlayerCharacter()
 	PrimaryActorTick.bCanEverTick=true;
 	PrimaryActorTick.bStartWithTickEnabled=true;
 	WeaponSlots.SetNum(3);
+
+	// Player 팀. AI 의 GetTeamAttitudeTowards 에서 적대 판정의 기준이 됨.
+	TeamID = 1;
 }
 
 void APDPlayerCharacter::BeginPlay()
