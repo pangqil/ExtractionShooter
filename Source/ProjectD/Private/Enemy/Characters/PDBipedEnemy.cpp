@@ -17,18 +17,6 @@ APDBipedEnemy::APDBipedEnemy()
 	}
 }
 
-void APDBipedEnemy::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// Senior: HP=0 이벤트를 본 클래스가 처리 — HandleDeath 까지 연결.
-	//         StatComponent 가 GAS attribute 변화를 감시 → 도메인 이벤트로 변환 → 본 캐릭터 사망 처리.
-	if (StatComponent)
-	{
-		StatComponent->OnHealthDepleted.AddDynamic(this, &APDBipedEnemy::HandleHealthDepleted);
-	}
-}
-
 EPDBatteryStatus APDBipedEnemy::GetBatteryStatus_Implementation() const
 {
 	if (StatComponent && StatComponent->IsUsingBattery())
@@ -36,10 +24,4 @@ EPDBatteryStatus APDBipedEnemy::GetBatteryStatus_Implementation() const
 		return StatComponent->GetBatteryStatus();
 	}
 	return EPDBatteryStatus::None;
-}
-
-void APDBipedEnemy::HandleHealthDepleted()
-{
-	// Killer 정보가 없으므로 nullptr — 향후 GAS Effect Context 에서 Instigator 추출하여 전달 가능.
-	HandleDeath(nullptr);
 }

@@ -10,19 +10,6 @@
 
 class UAIPerceptionStimuliSourceComponent;
 
-/**
- * 모든 적의 추상 베이스 클래스.
- *
- * 책임:
- *  - EPDEnemyState 기반 FSM 상태 관리 (실제 전이 정책은 AIController/StateTree 측)
- *  - IPDCombatInterface 구현 (TeamID, IsAlive, GetBatteryStatus 기본값 None)
- *  - AI Perception 시스템에 자극원으로 등록 (UAIPerceptionStimuliSourceComponent)
- *  - 사망 처리: HandleDeath 에서 상태 Dead 전이 + 충돌 비활성/루트 hook
- *
- * Senior 관점: HP/Battery 관리는 자식(BipedEnemy)에서 컴포넌트로 추가하므로,
- *              본 클래스는 "모든 enemy"가 공통으로 가져야 할 최소한만 보유.
- *              Stim source는 모든 적이 가져야 하므로 여기서 생성.
- */
 UCLASS(Abstract, Blueprintable)
 class PROJECTD_API APDEnemyBase : public APDCharacterBase, public IPDCombatInterface, public IPDDetectable, public IGenericTeamAgentInterface
 {

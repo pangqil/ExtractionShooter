@@ -24,9 +24,17 @@ struct PROJECTD_API FPDStateTreeTask_MoveToTargetInstanceData
 	UPROPERTY(EditAnywhere, Category = "Context")
 	TObjectPtr<AAIController> AIController = nullptr;
 
-	/** 타겟 도달 판정 거리. 보통 AttackRange 와 동일하게 디자이너가 입력. */
+	/** MoveToLocation 의 acceptance — path follow 정지 거리. */
 	UPROPERTY(EditAnywhere, Category = "Parameter", meta = (ClampMin = "0.0"))
 	float AcceptanceRadius = 400.f;
+
+	/**
+	 * Succeeded 반환을 위해 AcceptanceRadius 보다 이만큼 더 가까워야 함 — hysteresis.
+	 * Combat 의 TargetInRange Range 가 AcceptanceRadius 이하일 때 Chase ↔ Combat 무한 토글 방지.
+	 * 예: AcceptanceRadius=400, ArrivalHysteresis=80 → Succeeded 거리=320.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Parameter", meta = (ClampMin = "0.0"))
+	float ArrivalHysteresis = 80.f;
 
 	/** Target 의 navmesh-projected 위치가 이 거리 이상 변하면 MoveTo 재발행. */
 	UPROPERTY(EditAnywhere, Category = "Parameter", meta = (ClampMin = "0.0"))

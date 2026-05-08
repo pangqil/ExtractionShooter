@@ -63,9 +63,10 @@ EStateTreeRunStatus FPDStateTreeTask_MoveToTarget::Tick(FStateTreeExecutionConte
 		return EStateTreeRunStatus::Failed;
 	}
 
-	// Target 이 움직이면 navmesh 상의 목표도 같이 갱신. 임계값 이상 변동 시 path 재발행.
 	const FVector RawTargetLoc = Target->GetActorLocation();
 	const FVector NavTargetLoc = PDStateTreeUtil::ProjectToNav(Instance.AIController, RawTargetLoc);
+
+	// 1. Reissue (재발행) 로직
 	if (Instance.bHasIssuedGoal)
 	{
 		const float DriftSq = FVector::DistSquared(NavTargetLoc, Instance.IssuedGoal);
@@ -73,24 +74,38 @@ EStateTreeRunStatus FPDStateTreeTask_MoveToTarget::Tick(FStateTreeExecutionConte
 		{
 			const EPathFollowingRequestResult::Type Result =
 				Instance.AIController->MoveToLocation(NavTargetLoc, Instance.AcceptanceRadius, /*bStopOnOverlap=*/false, /*bUsePathfinding=*/true);
-			UE_LOG(LogPDAI, Verbose, TEXT("[MoveToTarget] Reissue: NewLoc=%s, MoveTo=%s"),
-				*NavTargetLoc.ToString(), PDStateTreeUtil::PathFollowingResultToString(Result));
+
+			// [개선] 경로 요청 자체가 실패한 경우 즉시 취소 처리
+			if (Result == EPathFollowingRequestResult::Failed)
+			{
+				UE_LOG(LogPDAI, Warning, TEXT("[MoveToTarget] Reissue Failed. Target unreachable."));
+				return EStateTreeRunStatus::Failed;
+			}
+
 			Instance.IssuedGoal = NavTargetLoc;
 		}
 	}
 
-	// 도달 검사 — 평면(2D) 거리. Target 이 공중에 있어도 그 아래 ground 까지 가면 도달로 처리.
+	// 2. 도달 거리 검사
 	const float DistSq = FVector::DistSquared2D(OwnerPawn->GetActorLocation(), NavTargetLoc);
 	const float ThresholdSq = Instance.AcceptanceRadius * Instance.AcceptanceRadius;
 
-	UE_LOG(LogPDAI, VeryVerbose, TEXT("[MoveToTarget] Tick: DistSq2D=%.1f, ThresholdSq=%.1f"),
-		DistSq, ThresholdSq);
-
 	if (DistSq <= ThresholdSq)
 	{
-		UE_LOG(LogPDAI, Log, TEXT("[MoveToTarget] Succeeded: DistSq2D=%.1f <= ThresholdSq=%.1f"),
-			DistSq, ThresholdSq);
+		UE_LOG(LogPDAI, Log, TEXT("[MoveToTarget] Succeeded. DistSq: %.1f"), DistSq);
 		return EStateTreeRunStatus::Succeeded;
+	}
+
+	// 3. [핵심 개선] PathFollowing 상태 확인 (무한 대기 방지)
+	// 거리에 도달하지 못했는데, 이동 컴포넌트가 이동을 멈춘 경우 처리
+	const EPathFollowingStatus::Type MoveStatus = Instance.AIController->GetMoveStatus();
+
+	if (MoveStatus == EPathFollowingStatus::Idle)
+	{
+		// 비동기 경로 탐색 대기(Waiting)를 지나 이동을 완전히 멈췄는데 거리가 멀다면: 
+		// 길막힘, NavMesh 이탈, Partial Path 끝 도달 등 이동 불가 상태임
+		UE_LOG(LogPDAI, Warning, TEXT("[MoveToTarget] Failed: AI stopped moving but target not reached. DistSq=%.1f"), DistSq);
+		return EStateTreeRunStatus::Failed;
 	}
 
 	return EStateTreeRunStatus::Running;

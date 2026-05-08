@@ -36,16 +36,9 @@ public:
 	FORCEINLINE UPDCombatComponent* GetCombatComponent() const { return CombatComponent; }
 
 protected:
-	virtual void BeginPlay() override;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPDStatComponent> StatComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Combat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPDCombatComponent> CombatComponent;
-
-private:
-	/** StatComponent::OnHealthDepleted 콜백 — HandleDeath 호출. */
-	UFUNCTION()
-	void HandleHealthDepleted();
 };

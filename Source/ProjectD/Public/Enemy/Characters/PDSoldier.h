@@ -63,6 +63,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	bool bAutoFireProjectile = true;
 
+	// play montage
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
+	UAnimMontage* AttackMontage;
+	
+
 private:
 	UFUNCTION()
 	void HandleAttackRequested(AActor* Target);

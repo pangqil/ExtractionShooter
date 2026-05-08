@@ -107,12 +107,25 @@ void APDEnemyAIControllerBase::HandleTargetSpotted(AActor* Target)
 	// Senior: AIController 가 perception → CombatComponent 결합 책임을 진다.
 	//         이렇게 해야 StateTree 는 단순히 HasValidTarget 만 보고 분기 가능 — perception 이벤트
 	//         자체를 StateTree 에서 구독하지 않아 그래프가 단순해짐.
+	bool bWasNoTarget = false;
 	if (APDBipedEnemy* Biped = Cast<APDBipedEnemy>(GetPawn()))
 	{
 		if (UPDCombatComponent* Combat = Biped->GetCombatComponent())
 		{
+			bWasNoTarget = !Combat->HasValidTarget();
 			Combat->SetCurrentTarget(Target);
 		}
+	}
+
+	// Senior: StateTree 의 Selector 는 자식이 Running 인 동안 재평가하지 않음.
+	//         Idle 의 task 들이 영원히 Running 이라 자체 종료를 못 하므로,
+	//         "처음 타겟이 잡힌 시점" 에 한해 트리 재시작으로 Selector 재평가 강제.
+	//         이미 타겟이 있던 (Chase/Combat 진행 중) 상황에서는 재시작하지 않아 진행 중 state 보존.
+	if (bWasNoTarget && StateTreeAIComponent && StateTreeAIComponent->IsRunning())
+	{
+		UE_LOG(LogPDAI, Log, TEXT("[%s] StateTree restart — TargetAcquired."), *GetNameSafe(this));
+		StateTreeAIComponent->StopLogic(TEXT("TargetAcquired"));
+		StateTreeAIComponent->StartLogic();
 	}
 
 	OnTargetSpotted(Target);
@@ -254,12 +267,14 @@ void APDEnemyAIControllerBase::HandleNoiseHeard(AActor* NoiseInstigator, FVector
 	//         이렇게 해야 StateTree 는 HasNoiseHint / HasValidTarget 두 도메인 신호만 보고 분기 가능.
 	// Mid:    이미 시야 타겟이 있다면 청각 hint 는 무시 — 시각 우선순위 유지.
 	bool bSuppressedByVisualTarget = false;
+	bool bWasNoHint = false;
 	if (APDBipedEnemy* Biped = Cast<APDBipedEnemy>(GetPawn()))
 	{
 		if (UPDCombatComponent* Combat = Biped->GetCombatComponent())
 		{
 			if (!Combat->HasValidTarget())
 			{
+				bWasNoHint = !Combat->HasNoiseHint();
 				Combat->SetLastNoiseLocation(NoiseInstigator, Location);
 			}
 			else
@@ -275,6 +290,14 @@ void APDEnemyAIControllerBase::HandleNoiseHeard(AActor* NoiseInstigator, FVector
 		*GetNameSafe(NoiseInstigator),
 		*Location.ToString(),
 		bSuppressedByVisualTarget ? TEXT("true") : TEXT("false"));
+
+	// "처음 hint 가 잡힌 시점" 에 한해 트리 재시작 — Idle 에 갇혀있을 때 Investigate 로 진입 강제.
+	if (bWasNoHint && StateTreeAIComponent && StateTreeAIComponent->IsRunning())
+	{
+		UE_LOG(LogPDAI, Log, TEXT("[%s] StateTree restart — NoiseHintAcquired."), *GetNameSafe(this));
+		StateTreeAIComponent->StopLogic(TEXT("NoiseHintAcquired"));
+		StateTreeAIComponent->StartLogic();
+	}
 
 	OnNoiseHeard(NoiseInstigator, Location);
 }

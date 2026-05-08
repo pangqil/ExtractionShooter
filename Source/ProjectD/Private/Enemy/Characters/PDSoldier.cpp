@@ -41,6 +41,12 @@ void APDSoldier::FireProjectile(AActor* Target)
 		return;
 	}
 
+	if(AttackMontage)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[%s] Playing attack montage."), *GetName());
+		PlayAnimMontage(AttackMontage);
+	}
+
 	// 머즐 위치/회전 결정.
 	FVector MuzzleLocation = GetActorLocation() + GetActorRotation().RotateVector(MuzzleOffset);
 	if (USkeletalMeshComponent* MeshComp = GetMesh())

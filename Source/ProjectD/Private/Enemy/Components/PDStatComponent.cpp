@@ -1,10 +1,5 @@
 #include "Enemy/Components/PDStatComponent.h"
 
-#include "AbilitySystemComponent.h"
-#include "AbilitySystemInterface.h"
-#include "AttributeSet/PDAttributeSet.h"
-#include "GameFramework/Actor.h"
-
 UPDStatComponent::UPDStatComponent()
 {
 	// Junior: Tick 끄기. 본 컴포넌트는 이벤트 기반(콜백 + delegate broadcast).
@@ -17,32 +12,10 @@ void UPDStatComponent::BeginPlay()
 	Super::BeginPlay();
 
 	// Battery 초기값 세팅 (락 안에서 일괄 처리)
-	{
-		FScopeLock Lock(&BatteryCS);
-		MaxBattery = FMath::Max(0.f, MaxBattery);
-		CurrentBattery = FMath::Clamp(InitialBattery, 0.f, MaxBattery);
-		CachedBatteryStatus = bUseBattery ? ComputeBatteryStatus(GetBatteryPercent()) : EPDBatteryStatus::None;
-	}
-
-	// Senior: GAS 초기화는 부모(APDCharacterBase::BeginPlay)에서 이뤄짐.
-	// 컴포넌트 BeginPlay는 부모 액터 BeginPlay 이후 호출됨이 보장되지 않으므로,
-	// 안전을 위해 약간 지연시켜 ASC가 초기화된 다음에 바인딩.
-	if (AActor* Owner = GetOwner())
-	{
-		if (UWorld* World = GetWorld())
-		{
-			FTimerHandle BindHandle;
-			World->GetTimerManager().SetTimerForNextTick(
-				FTimerDelegate::CreateUObject(this, &UPDStatComponent::BindToAbilitySystem)
-			);
-		}
-	}
-}
-
-void UPDStatComponent::EndPlay(EEndPlayReason::Type EndPlayReason)
-{
-	UnbindFromAbilitySystem();
-	Super::EndPlay(EndPlayReason);
+	FScopeLock Lock(&BatteryCS);
+	MaxBattery = FMath::Max(0.f, MaxBattery);
+	CurrentBattery = FMath::Clamp(InitialBattery, 0.f, MaxBattery);
+	CachedBatteryStatus = bUseBattery ? ComputeBatteryStatus(GetBatteryPercent()) : EPDBatteryStatus::None;
 }
 
 void UPDStatComponent::SetUseBattery(bool bInUseBattery)
@@ -61,39 +34,6 @@ void UPDStatComponent::SetUseBattery(bool bInUseBattery)
 		CachedBatteryStatus = NewStatus;
 		OnBatteryStatusChanged.Broadcast(OldStatus, NewStatus);
 	}
-}
-
-float UPDStatComponent::GetCurrentHealth() const
-{
-	if (!CachedASC.IsValid())
-	{
-		return 0.f;
-	}
-
-	if (const UPDAttributeSet* Set = Cast<UPDAttributeSet>(CachedASC->GetAttributeSet(UPDAttributeSet::StaticClass())))
-	{
-		return Set->GetTorsoHP();
-	}
-	return 0.f;
-}
-
-float UPDStatComponent::GetMaxHealth() const
-{
-	if (!CachedASC.IsValid())
-	{
-		return 0.f;
-	}
-
-	if (const UPDAttributeSet* Set = Cast<UPDAttributeSet>(CachedASC->GetAttributeSet(UPDAttributeSet::StaticClass())))
-	{
-		return Set->GetMaxTorsoHP();
-	}
-	return 0.f;
-}
-
-bool UPDStatComponent::IsAlive() const
-{
-	return GetCurrentHealth() > 0.f;
 }
 
 float UPDStatComponent::GetCurrentBattery() const
@@ -190,70 +130,6 @@ void UPDStatComponent::RecoverBattery(float Amount)
 		NewValue = FMath::Clamp(CurrentBattery + Amount, 0.f, MaxBattery);
 	}
 	ApplyBatteryChange_Internal(NewValue);
-}
-
-void UPDStatComponent::OnTorsoHPChangedNative(const FOnAttributeChangeData& Data)
-{
-	const float NewHP = Data.NewValue;
-	const float MaxHP = GetMaxHealth();
-
-	OnHealthChanged.Broadcast(NewHP, MaxHP);
-
-	// HP=0 도달 1회만 broadcast.
-	if (NewHP <= 0.f && !bHealthDepletedFired)
-	{
-		bHealthDepletedFired = true;
-		OnHealthDepleted.Broadcast();
-	}
-	else if (NewHP > 0.f && bHealthDepletedFired)
-	{
-		// 부활/리셋 시나리오 대비.
-		bHealthDepletedFired = false;
-	}
-}
-
-void UPDStatComponent::BindToAbilitySystem()
-{
-	if (CachedASC.IsValid())
-	{
-		return; // 이미 바인딩됨.
-	}
-
-	AActor* Owner = GetOwner();
-	if (!Owner)
-	{
-		return;
-	}
-
-	IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(Owner);
-	UAbilitySystemComponent* ASC = ASI ? ASI->GetAbilitySystemComponent() : Owner->FindComponentByClass<UAbilitySystemComponent>();
-	if (!ASC)
-	{
-		// Senior: ASC가 아직 준비되지 않은 경우(원격 클라이언트 등) — 1프레임 더 대기.
-		if (UWorld* World = GetWorld())
-		{
-			World->GetTimerManager().SetTimerForNextTick(
-				FTimerDelegate::CreateUObject(this, &UPDStatComponent::BindToAbilitySystem)
-			);
-		}
-		return;
-	}
-
-	CachedASC = ASC;
-	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetTorsoHPAttribute())
-		.AddUObject(this, &UPDStatComponent::OnTorsoHPChangedNative);
-
-	// 초기값을 한번 broadcast하여 UI/StateTree가 동기화되도록 함.
-	OnHealthChanged.Broadcast(GetCurrentHealth(), GetMaxHealth());
-}
-
-void UPDStatComponent::UnbindFromAbilitySystem()
-{
-	if (UAbilitySystemComponent* ASC = CachedASC.Get())
-	{
-		ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetTorsoHPAttribute()).RemoveAll(this);
-	}
-	CachedASC.Reset();
 }
 
 EPDBatteryStatus UPDStatComponent::ComputeBatteryStatus(float Percent) const

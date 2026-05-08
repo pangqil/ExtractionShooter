@@ -86,15 +86,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Hearing", meta = (ClampMin = "0.0"))
 	float HearingMaxAge = 3.f;
 
-	/** Sight/Hearing affiliation: 적팀(=Enemy)만 감지하도록 디자이너에게 노출. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
 	bool bDetectEnemies = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectNeutrals = false;
+	bool bDetectNeutrals = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectFriendlies = false;
+	bool bDetectFriendlies = true;
 
 private:
 	UFUNCTION()
