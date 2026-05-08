@@ -6,9 +6,6 @@ APDRifle::APDRifle()
 {
     WeaponType = EWeaponType::Rifle;
 
-    DefaultFOV = 90.f;
-    ZoomedFOV = 70.f;
-
     LevelStats.Add({ 20.f, 0.12f, 1500.f, 30, 2.0f, 0.90f }); // Lv1
     LevelStats.Add({ 28.f, 0.10f, 1700.f, 35, 1.8f, 0.93f }); // Lv2
     LevelStats.Add({ 38.f, 0.08f, 2000.f, 40, 1.5f, 0.96f }); // Lv3

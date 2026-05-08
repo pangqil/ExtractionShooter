@@ -5,9 +5,6 @@ APDShotgun::APDShotgun()
 {
     WeaponType = EWeaponType::Shotgun;
 
-    DefaultFOV = 90.f;
-    ZoomedFOV = 75.f;
-
     LevelStats.Add({ 15.f, 0.80f,  800.f, 6, 2.5f, 0.80f }); // Lv1
     LevelStats.Add({ 20.f, 0.75f,  900.f, 8, 2.2f, 0.83f }); // Lv2
     LevelStats.Add({ 28.f, 0.70f, 1000.f, 8, 2.0f, 0.87f }); // Lv3
