@@ -9,6 +9,7 @@
 #include "GameFramework/Pawn.h"
 #include "Type/Types.h"
 #include "Widgets/HUD/PDAttributeBarWidget.h"
+#include "ProjectD/ProjectD.h"
 #include "Widgets/HUD/PDBodyPartHealthGroupWidget.h"
 
 void UPDHUDWidget::NativeOnActivated()
@@ -110,6 +111,8 @@ void UPDHUDWidget::RefreshBar(UPDAttributeBarWidget* Bar,
 	Bar->SetValues(
 		ASC->GetNumericAttribute(CurrentAttr),
 		ASC->GetNumericAttribute(MaxAttr));
+	
+	UE_LOG(LogTemp, Warning, TEXT("RefreshBar for '%s': Current=%.1f, Max=%.1f"), *CurrentAttr.AttributeName, ASC->GetNumericAttribute(CurrentAttr), ASC->GetNumericAttribute(MaxAttr));
 }
 
 void UPDHUDWidget::UnbindAll()
