@@ -51,6 +51,22 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "PD|Perception")
 	FPDOnNoiseHeard OnNoiseHeard;
 
+	// ---------------------- Debug/외부 조회 ----------------------
+	// SenseConfig 인스턴스는 private 라 외부에서 직접 못 봄.
+	// AIController 의 디버그 시각화 등에서 BP defaults 값을 읽기 위한 getter.
+
+	UFUNCTION(BlueprintPure, Category = "PD|Perception")
+	float GetSightRadius() const { return SightRadius; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Perception")
+	float GetLoseSightRadius() const { return LoseSightRadius; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Perception")
+	float GetPeripheralVisionAngleDegrees() const { return PeripheralVisionAngleDegrees; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Perception")
+	float GetHearingRange() const { return HearingRange; }
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
 	float SightRadius = 1500.f;
@@ -70,15 +86,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Hearing", meta = (ClampMin = "0.0"))
 	float HearingMaxAge = 3.f;
 
-	/** Sight/Hearing affiliation: 적팀(=Enemy)만 감지하도록 디자이너에게 노출. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
 	bool bDetectEnemies = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectNeutrals = false;
+	bool bDetectNeutrals = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectFriendlies = false;
+	bool bDetectFriendlies = true;
 
 private:
 	UFUNCTION()

@@ -11,6 +11,8 @@ class APDEnemyAIControllerBase;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnTargetChanged, AActor*, NewTarget);
 /** Combat 컴포넌트가 공격을 요청했을 때. 실제 발사/모션은 BP / 무기 컴포넌트에서 처리. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnAttackRequested, AActor*, Target);
+/** 청각 자극으로 의심 위치(NoiseHint)가 갱신/해제되었을 때. bHasHint=false 면 hint 소비/만료. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnNoiseHintChanged, FVector, Location, bool, bHasHint);
 
 /**
  * Enemy 공격 행동 컴포넌트.
@@ -67,6 +69,32 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Combat")
 	float GetCooldownRemaining() const;
 
+	// ---------------------- Noise hint (청각 의심 위치) ----------------------
+	//
+	// Senior 관점: 청각 자극은 "위치 정보"만 제공 — 실제 적 액터를 모르는 상태.
+	//              따라서 CurrentTarget(시각 확정 적) 과는 분리된 hint 슬롯으로 보관.
+	//              Soldier 가 시야로 적을 잡으면 이 hint 는 즉시 소비/폐기.
+	//
+	// Mid 관점: TWeakObjectPtr 로 Instigator 보관 — 노이즈 발생 액터가 destroy 돼도 GC 안전.
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Combat|Noise")
+	void SetLastNoiseLocation(AActor* NoiseInstigator, const FVector& Location);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Combat|Noise")
+	void ClearNoiseHint();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Combat|Noise")
+	bool HasNoiseHint() const { return bHasNoiseHint; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Combat|Noise")
+	FVector GetLastNoiseLocation() const { return LastNoiseLocation; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Combat|Noise")
+	AActor* GetLastNoiseInstigator() const { return LastNoiseInstigator.Get(); }
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Combat|Noise")
+	FPDOnNoiseHintChanged OnNoiseHintChanged;
+
 	// ---------------------- Squad coordination ----------------------
 
 	/**
@@ -99,4 +127,13 @@ private:
 
 	/** 마지막 RequestAttack 성공 시각(WorldTimeSeconds). */
 	float LastAttackTime = -1.f;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AActor> LastNoiseInstigator;
+
+	UPROPERTY(Transient)
+	FVector LastNoiseLocation = FVector::ZeroVector;
+
+	UPROPERTY(Transient)
+	bool bHasNoiseHint = false;
 };

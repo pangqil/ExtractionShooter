@@ -5,14 +5,6 @@
 #include "Enemy/Types/EnemyTypes.h"
 #include "PDStatComponent.generated.h"
 
-class UAbilitySystemComponent;
-class UPDAttributeSet;
-struct FOnAttributeChangeData;
-
-/** HP가 변경됐을 때 (현재값, 최대값) */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnHealthChanged, float, NewValue, float, MaxValue);
-/** HP가 0이 되어 사망 처리를 트리거해야 할 때 */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnHealthDepleted);
 /** Battery가 변경됐을 때 (현재값, 최대값) */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnBatteryChanged, float, NewValue, float, MaxValue);
 /** Battery 임계 구간이 바뀌었을 때 (Full↔Optimal↔Low↔Exhausted) */
@@ -21,24 +13,22 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnBatteryStatusChanged, EPDBatte
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnBatteryDepleted);
 
 /**
- * Enemy의 HP / Battery(스태미너) 관리 컴포넌트.
+ * Enemy 전용 Battery(스태미너) 관리 컴포넌트.
  *
- * 책임 분담:
- *  - HP   : GAS UPDAttributeSet (TorsoHP)에 위임. 본 컴포넌트는 attribute 변화 delegate를
- *           구독하여 도메인 이벤트(Health depleted 등)로 변환만 담당.
- *  - Battery: 본 컴포넌트가 직접 소유. Player 측의 Stamina 어트리뷰트와 분리하여
- *             Enemy 시스템 독립성 확보.
+ * 책임:
+ *  - Battery: 적 전용 자원. AttributeSet 에 없는 도메인이라 본 컴포넌트가 직접 소유.
+ *  - 임계 구간(Full/Optimal/Low/Exhausted) 전이 감지 + delegate broadcast.
  *
- * Senior 관점: HP를 GAS에 위임함으로써 GameplayEffect/Modifier/Replication을 그대로 활용,
- *              Battery는 Enemy 전용 자원이라 비교적 단순한 로컬 상태로 두어 GAS 오버헤드 회피.
- *              두 자원의 변경 알림을 모두 단일 컴포넌트에서 노출 → AI/StateTree 구독 지점 단일화.
+ * Senior 관점: HP 는 GAS UPDAttributeSet (TorsoHP) 가 단일 진실 원천 — 본 컴포넌트는 손대지 않음.
+ *              사망 처리는 UPDAttributeSet::PostGameplayEffectExecute 에서 HandleDeath 호출.
+ *              Battery 만 따로 두는 이유: AttributeSet 의 Stamina 는 Player 자원이고
+ *              Enemy 의 Battery 는 "동력 소진" 도메인 — 의미상 분리.
+ *              (장기적으로 AttributeSet 통합도 가능. 현재는 SRP 우선.)
  *
- * Mid 관점: Battery 접근은 FCriticalSection으로 보호 (UE 게임플레이는 단일 스레드가 일반적이지만,
- *           Animation/Particle/Async 작업에서 호출될 가능성을 대비). 변경 시에만 임계값 비교 후
- *           OnBatteryStatusChanged broadcast → 매 프레임 발사 방지.
+ * Mid 관점: Battery 접근은 FCriticalSection 으로 보호 — Animation/Particle/Async 호출 대비.
+ *           매 프레임 broadcast 방지를 위해 임계값 통과 시에만 OnBatteryStatusChanged 발사.
  *
- * Junior 관점: 컴포넌트는 어디에든 Attach 가능하지만, Battery 사용은 bUseBattery=true 일 때만 의미.
- *              SetMaxBattery 후 SetBattery로 초기화하는 것이 안전.
+ * Junior 관점: Battery 사용은 bUseBattery=true 일 때만 의미. SetMaxBattery 후 SetBattery 로 초기화.
  */
 UCLASS(ClassGroup = (PD), meta = (BlueprintSpawnableComponent))
 class PROJECTD_API UPDStatComponent : public UActorComponent
@@ -50,7 +40,6 @@ public:
 
 	//~ Begin UActorComponent Interface
 	virtual void BeginPlay() override;
-	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 	//~ End UActorComponent Interface
 
 	// ---------------------- Battery 사용 가능 여부 ----------------------
@@ -61,19 +50,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Stat|Battery")
 	FORCEINLINE bool IsUsingBattery() const { return bUseBattery; }
-
-	// ---------------------- Health (GAS 위임) ----------------------
-
-	/** 현재 HP. ASC가 없으면 0. (TorsoHP 기준) */
-	UFUNCTION(BlueprintPure, Category = "PD|Stat|Health")
-	float GetCurrentHealth() const;
-
-	/** 최대 HP. ASC가 없으면 0. */
-	UFUNCTION(BlueprintPure, Category = "PD|Stat|Health")
-	float GetMaxHealth() const;
-
-	UFUNCTION(BlueprintPure, Category = "PD|Stat|Health")
-	bool IsAlive() const;
 
 	// ---------------------- Battery (로컬 관리) ----------------------
 
@@ -107,12 +83,6 @@ public:
 
 	// ---------------------- Delegates ----------------------
 
-	UPROPERTY(BlueprintAssignable, Category = "PD|Stat|Health")
-	FPDOnHealthChanged OnHealthChanged;
-
-	UPROPERTY(BlueprintAssignable, Category = "PD|Stat|Health")
-	FPDOnHealthDepleted OnHealthDepleted;
-
 	UPROPERTY(BlueprintAssignable, Category = "PD|Stat|Battery")
 	FPDOnBatteryChanged OnBatteryChanged;
 
@@ -144,13 +114,6 @@ protected:
 	float LowThreshold = 0.2f;
 
 private:
-	/** GAS 어트리뷰트(TorsoHP) 변화 콜백. */
-	void OnTorsoHPChangedNative(const FOnAttributeChangeData& Data);
-
-	/** Owner의 ASC를 찾아 어트리뷰트 변화 delegate를 구독. */
-	void BindToAbilitySystem();
-	void UnbindFromAbilitySystem();
-
 	/** 비율로부터 EPDBatteryStatus 계산. */
 	EPDBatteryStatus ComputeBatteryStatus(float Percent) const;
 
@@ -167,10 +130,4 @@ private:
 
 	/** Battery 동시 접근 보호. UE 게임플레이는 단일 스레드가 보통이지만, 안전 차원에서 보유. */
 	mutable FCriticalSection BatteryCS;
-
-	/** Bind 시 받은 핸들 (소유 ASC가 살아있는 동안 유효). */
-	TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
-
-	/** HP=0 도달을 한 번만 broadcast하기 위한 가드. */
-	bool bHealthDepletedFired = false;
 };
