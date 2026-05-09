@@ -10,15 +10,15 @@ APDBipedEnemy::APDBipedEnemy()
 
 	if (StatComponent)
 	{
-		StatComponent->SetUseBattery(true);
+		StatComponent->SetUseStamina(true);
 	}
 }
 
-EPDBatteryStatus APDBipedEnemy::GetBatteryStatus_Implementation() const
+EPDStaminaStatus APDBipedEnemy::GetStaminaStatus_Implementation() const
 {
-	if (StatComponent && StatComponent->IsUsingBattery())
+	if (StatComponent && StatComponent->IsUsingStamina())
 	{
-		return StatComponent->GetBatteryStatus();
+		return StatComponent->GetStaminaStatus();
 	}
-	return EPDBatteryStatus::None;
+	return EPDStaminaStatus::None;
 }

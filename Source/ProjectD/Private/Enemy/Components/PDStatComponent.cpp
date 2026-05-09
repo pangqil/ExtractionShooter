@@ -9,121 +9,121 @@ void UPDStatComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	FScopeLock Lock(&BatteryCS);
-	MaxBattery = FMath::Max(0.f, MaxBattery);
-	CurrentBattery = FMath::Clamp(InitialBattery, 0.f, MaxBattery);
-	CachedBatteryStatus = bUseBattery ? ComputeBatteryStatus(GetBatteryPercent()) : EPDBatteryStatus::None;
+	FScopeLock Lock(&StaminaCS);
+	MaxStamina = FMath::Max(0.f, MaxStamina);
+	CurrentStamina = FMath::Clamp(InitialStamina, 0.f, MaxStamina);
+	CachedStaminaStatus = bUseStamina ? ComputeStaminaStatus(GetStaminaPercent()) : EPDStaminaStatus::None;
 }
 
-void UPDStatComponent::SetUseBattery(bool bInUseBattery)
+void UPDStatComponent::SetUseStamina(bool bInUseStamina)
 {
-	if (bUseBattery == bInUseBattery) return;
+	if (bUseStamina == bInUseStamina) return;
 
-	bUseBattery = bInUseBattery;
+	bUseStamina = bInUseStamina;
 
-	const EPDBatteryStatus NewStatus = bUseBattery ? ComputeBatteryStatus(GetBatteryPercent()) : EPDBatteryStatus::None;
-	const EPDBatteryStatus OldStatus = CachedBatteryStatus;
+	const EPDStaminaStatus NewStatus = bUseStamina ? ComputeStaminaStatus(GetStaminaPercent()) : EPDStaminaStatus::None;
+	const EPDStaminaStatus OldStatus = CachedStaminaStatus;
 	if (OldStatus != NewStatus)
 	{
-		CachedBatteryStatus = NewStatus;
-		OnBatteryStatusChanged.Broadcast(OldStatus, NewStatus);
+		CachedStaminaStatus = NewStatus;
+		OnStaminaStatusChanged.Broadcast(OldStatus, NewStatus);
 	}
 }
 
-float UPDStatComponent::GetCurrentBattery() const
+float UPDStatComponent::GetCurrentStamina() const
 {
-	if (!bUseBattery) return 0.f;
-	FScopeLock Lock(&BatteryCS);
-	return CurrentBattery;
+	if (!bUseStamina) return 0.f;
+	FScopeLock Lock(&StaminaCS);
+	return CurrentStamina;
 }
 
-float UPDStatComponent::GetMaxBattery() const
+float UPDStatComponent::GetMaxStamina() const
 {
-	FScopeLock Lock(&BatteryCS);
-	return MaxBattery;
+	FScopeLock Lock(&StaminaCS);
+	return MaxStamina;
 }
 
-float UPDStatComponent::GetBatteryPercent() const
+float UPDStatComponent::GetStaminaPercent() const
 {
-	FScopeLock Lock(&BatteryCS);
-	if (!bUseBattery || MaxBattery <= 0.f) return 0.f;
-	return CurrentBattery / MaxBattery;
+	FScopeLock Lock(&StaminaCS);
+	if (!bUseStamina || MaxStamina <= 0.f) return 0.f;
+	return CurrentStamina / MaxStamina;
 }
 
-EPDBatteryStatus UPDStatComponent::GetBatteryStatus() const
+EPDStaminaStatus UPDStatComponent::GetStaminaStatus() const
 {
-	if (!bUseBattery) return EPDBatteryStatus::None;
-	FScopeLock Lock(&BatteryCS);
-	return CachedBatteryStatus;
+	if (!bUseStamina) return EPDStaminaStatus::None;
+	FScopeLock Lock(&StaminaCS);
+	return CachedStaminaStatus;
 }
 
-void UPDStatComponent::SetBattery(float NewValue)
+void UPDStatComponent::SetStamina(float NewValue)
 {
-	if (!bUseBattery) return;
-	ApplyBatteryChange_Internal(NewValue);
+	if (!bUseStamina) return;
+	ApplyStaminaChange_Internal(NewValue);
 }
 
-void UPDStatComponent::SetMaxBattery(float NewMax)
+void UPDStatComponent::SetMaxStamina(float NewMax)
 {
 	if (NewMax < 0.f) NewMax = 0.f;
 
 	float ClampedCurrent = 0.f;
 	{
-		FScopeLock Lock(&BatteryCS);
-		MaxBattery = NewMax;
-		ClampedCurrent = FMath::Clamp(CurrentBattery, 0.f, MaxBattery);
+		FScopeLock Lock(&StaminaCS);
+		MaxStamina = NewMax;
+		ClampedCurrent = FMath::Clamp(CurrentStamina, 0.f, MaxStamina);
 	}
-	ApplyBatteryChange_Internal(ClampedCurrent);
+	ApplyStaminaChange_Internal(ClampedCurrent);
 }
 
-bool UPDStatComponent::ConsumeBattery(float Amount)
+bool UPDStatComponent::ConsumeStamina(float Amount)
 {
-	if (!bUseBattery || Amount <= 0.f) return false;
+	if (!bUseStamina || Amount <= 0.f) return false;
 
 	float NewValue = 0.f;
 	bool bFullySatisfied = false;
 	{
-		FScopeLock Lock(&BatteryCS);
-		bFullySatisfied = (CurrentBattery >= Amount);
-		NewValue = FMath::Max(0.f, CurrentBattery - Amount);
+		FScopeLock Lock(&StaminaCS);
+		bFullySatisfied = (CurrentStamina >= Amount);
+		NewValue = FMath::Max(0.f, CurrentStamina - Amount);
 	}
-	ApplyBatteryChange_Internal(NewValue);
+	ApplyStaminaChange_Internal(NewValue);
 	return bFullySatisfied;
 }
 
-void UPDStatComponent::RecoverBattery(float Amount)
+void UPDStatComponent::RecoverStamina(float Amount)
 {
-	if (!bUseBattery || Amount <= 0.f) return;
+	if (!bUseStamina || Amount <= 0.f) return;
 
 	float NewValue = 0.f;
 	{
-		FScopeLock Lock(&BatteryCS);
-		NewValue = FMath::Clamp(CurrentBattery + Amount, 0.f, MaxBattery);
+		FScopeLock Lock(&StaminaCS);
+		NewValue = FMath::Clamp(CurrentStamina + Amount, 0.f, MaxStamina);
 	}
-	ApplyBatteryChange_Internal(NewValue);
+	ApplyStaminaChange_Internal(NewValue);
 }
 
-EPDBatteryStatus UPDStatComponent::ComputeBatteryStatus(float Percent) const
+EPDStaminaStatus UPDStatComponent::ComputeStaminaStatus(float Percent) const
 {
-	if (Percent >= FullThreshold)    return EPDBatteryStatus::Full;
-	if (Percent >= OptimalThreshold) return EPDBatteryStatus::Optimal;
-	if (Percent >= LowThreshold)     return EPDBatteryStatus::Low;
-	return EPDBatteryStatus::Exhausted;
+	if (Percent >= FullThreshold)    return EPDStaminaStatus::Full;
+	if (Percent >= OptimalThreshold) return EPDStaminaStatus::Optimal;
+	if (Percent >= LowThreshold)     return EPDStaminaStatus::Low;
+	return EPDStaminaStatus::Exhausted;
 }
 
-void UPDStatComponent::ApplyBatteryChange_Internal(float NewValue)
+void UPDStatComponent::ApplyStaminaChange_Internal(float NewValue)
 {
 	float Old = 0.f;
 	float NewClamped = 0.f;
 	float MaxRef = 0.f;
-	EPDBatteryStatus OldStatus = EPDBatteryStatus::None;
-	EPDBatteryStatus NewStatus = EPDBatteryStatus::None;
+	EPDStaminaStatus OldStatus = EPDStaminaStatus::None;
+	EPDStaminaStatus NewStatus = EPDStaminaStatus::None;
 	bool bDepletedNow = false;
 
 	{
-		FScopeLock Lock(&BatteryCS);
-		MaxRef = MaxBattery;
-		Old = CurrentBattery;
+		FScopeLock Lock(&StaminaCS);
+		MaxRef = MaxStamina;
+		Old = CurrentStamina;
 		NewClamped = FMath::Clamp(NewValue, 0.f, MaxRef);
 
 		if (FMath::IsNearlyEqual(Old, NewClamped))
@@ -131,26 +131,26 @@ void UPDStatComponent::ApplyBatteryChange_Internal(float NewValue)
 			return;
 		}
 
-		CurrentBattery = NewClamped;
+		CurrentStamina = NewClamped;
 
-		OldStatus = CachedBatteryStatus;
+		OldStatus = CachedStaminaStatus;
 		const float Percent = (MaxRef > 0.f) ? (NewClamped / MaxRef) : 0.f;
-		NewStatus = bUseBattery ? ComputeBatteryStatus(Percent) : EPDBatteryStatus::None;
-		CachedBatteryStatus = NewStatus;
+		NewStatus = bUseStamina ? ComputeStaminaStatus(Percent) : EPDStaminaStatus::None;
+		CachedStaminaStatus = NewStatus;
 
 		bDepletedNow = (NewClamped <= 0.f && Old > 0.f);
 	}
 
 	// 락 밖에서 broadcast — 구독자가 본 컴포넌트를 다시 호출해도 데드락 없도록.
-	OnBatteryChanged.Broadcast(NewClamped, MaxRef);
+	OnStaminaChanged.Broadcast(NewClamped, MaxRef);
 
 	if (OldStatus != NewStatus)
 	{
-		OnBatteryStatusChanged.Broadcast(OldStatus, NewStatus);
+		OnStaminaStatusChanged.Broadcast(OldStatus, NewStatus);
 	}
 
 	if (bDepletedNow)
 	{
-		OnBatteryDepleted.Broadcast();
+		OnStaminaDepleted.Broadcast();
 	}
 }

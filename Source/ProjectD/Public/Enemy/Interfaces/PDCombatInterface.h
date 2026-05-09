@@ -12,7 +12,7 @@ class UPDCombatInterface : public UInterface
 };
 
 /**
- * 전투 시스템(BT/Decorator/CombatComponent)이 액터의 팀/생사/배터리를
+ * 전투 시스템(BT/Decorator/CombatComponent)이 액터의 팀/생사/스태미너를
  * 구체 클래스 의존 없이 조회하기 위한 경량 인터페이스.
  */
 class PROJECTD_API IPDCombatInterface
@@ -28,5 +28,5 @@ public:
 	bool IsAlive() const;
 
 	UFUNCTION(BlueprintNativeEvent, Category = "PD|Combat")
-	EPDBatteryStatus GetBatteryStatus() const;
+	EPDStaminaStatus GetStaminaStatus() const;
 };

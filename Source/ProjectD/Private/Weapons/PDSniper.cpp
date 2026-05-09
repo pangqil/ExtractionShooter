@@ -117,8 +117,7 @@ FVector APDSniper::GetAimDirection() const
     AActor* WeaponOwnerActor = GetWeaponOwner();
     if (!WeaponOwnerActor) return FVector::ForwardVector;
 
-    APlayerController* PC = Cast<APlayerController>(
-        WeaponOwnerActor->GetInstigatorController());
+    APlayerController* PC = Cast<APlayerController>(WeaponOwnerActor->GetInstigatorController());
 
     FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
@@ -126,13 +125,22 @@ FVector APDSniper::GetAimDirection() const
 
     if (PC)
     {
+        // 1순위: 커서가 Pawn 위 → 부위 직접 조준
+        FHitResult PawnHit;
+        if (PC->GetHitResultUnderCursorForObjects(
+            { UEngineTypes::ConvertToObjectType(ECC_Pawn) }, true, PawnHit)
+            && PawnHit.GetActor() && PawnHit.GetActor() != WeaponOwnerActor)
+        {
+            FVector Dir = PawnHit.Location - Start;
+            if (!Dir.IsNearlyZero()) return Dir.GetSafeNormal();
+        }
+
+        // 2순위: 지면 커서 → Z 유지
         FHitResult CursorHit;
         if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
         {
             FVector Dir = CursorHit.Location - Start;
-            Dir.Z = 0.f;
-            if (!Dir.IsNearlyZero())
-                return Dir.GetSafeNormal();
+            if (!Dir.IsNearlyZero()) return Dir.GetSafeNormal();
         }
     }
 
@@ -141,6 +149,5 @@ FVector APDSniper::GetAimDirection() const
 
 bool APDSniper::CanPenetrate() const
 {
-    int32 Idx = FMath::Clamp(CurrentLevel - 1, 0, PenetrationPerLevel.Num() - 1);
-    return PenetrationPerLevel[Idx];
+    return PenetrationPerLevel[FMath::Clamp(CurrentLevel - 1, 0, PenetrationPerLevel.Num() - 1)];
 }

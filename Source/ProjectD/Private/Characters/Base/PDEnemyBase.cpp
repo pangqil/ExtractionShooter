@@ -31,10 +31,10 @@ bool APDEnemyBase::IsAlive_Implementation() const
 	return IPDDamageable::Execute_IsAlive(this);
 }
 
-EPDBatteryStatus APDEnemyBase::GetBatteryStatus_Implementation() const
+EPDStaminaStatus APDEnemyBase::GetStaminaStatus_Implementation() const
 {
 	// 비-Biped 디폴트. Biped 자식 클래스가 StatComponent로부터 실제 상태 반환.
-	return EPDBatteryStatus::None;
+	return EPDStaminaStatus::None;
 }
 
 void APDEnemyBase::SetEnemyState(EPDEnemyState NewState)

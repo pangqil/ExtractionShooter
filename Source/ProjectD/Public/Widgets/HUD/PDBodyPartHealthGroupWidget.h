@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "CommonUserWidget.h"
+#include "Blueprint/UserWidget.h"
 #include "Type/Types.h"
 #include "PDBodyPartHealthGroupWidget.generated.h"
 
@@ -14,7 +14,7 @@ class UPDAttributeBarWidget;
  * ASC를 직접 참조하지 않음 — 상위 HUD가 GetBar(Part)로 개별 바를 가져가 push.
  */
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
-class PROJECTD_API UPDBodyPartHealthGroupWidget : public UCommonUserWidget
+class PROJECTD_API UPDBodyPartHealthGroupWidget : public UUserWidget
 {
 	GENERATED_BODY()
 

@@ -43,6 +43,8 @@ protected:
 	/** C++에서 위젯 비활성화 시, 넣고 싶은 로직 작성*/
 	virtual void NativeOnDeactivated();
 
+	virtual void NativeOnFocusLost(const FFocusEvent& InFocusEvent) override;
+
 	/** BP에서 위젯 활성화 시, 넣고 싶은 로직 작성 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|UI", DisplayName = "On Activated")
 	void OnActivated();
@@ -56,6 +58,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	bool bShowMouseCursor{true};
+
+	/** 포커스를 잃었을 때 위젯을 닫을지 여부입니다. */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	bool bLightDismissable{false};
 
 private:
 	void ApplyInputMode();
