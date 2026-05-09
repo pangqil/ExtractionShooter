@@ -20,7 +20,7 @@ APDCharacterBase::APDCharacterBase()
 	ASC=CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("ASC"));
 	AttributeSet=CreateDefaultSubobject<UPDAttributeSet>(TEXT("AttributeSet"));
 
-	// 자극원 컴포넌트: AI perception 이 본 캐릭터를 인지하려면 등록되어 있어야 함.
+	// 자극원 컴포넌트
 	StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("StimuliSource"));
 	if (StimuliSource)
 	{
@@ -135,7 +135,7 @@ bool APDCharacterBase::IsAlive_Implementation() const
 
 void APDCharacterBase::HandleDeath(AActor* Killer)
 {
-	// 사망체가 perception 으로 계속 인지되지 않도록 자극원 해제.
+	// 자극원 해제.
 	if (StimuliSource)
 	{
 		StimuliSource->UnregisterFromPerceptionSystem();

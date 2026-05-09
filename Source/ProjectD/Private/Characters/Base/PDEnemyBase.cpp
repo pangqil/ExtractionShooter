@@ -24,13 +24,6 @@ uint8 APDEnemyBase::GetTeamID_Implementation() const
 	return TeamID;
 }
 
-bool APDEnemyBase::IsAlive_Implementation() const
-{
-	// Senior: Damage 인터페이스 측 IsAlive 와 동일한 진실 원천(GAS Health)을 사용해
-	//         두 인터페이스가 항상 일치하도록.
-	return IPDDamageable::Execute_IsAlive(this);
-}
-
 EPDStaminaStatus APDEnemyBase::GetStaminaStatus_Implementation() const
 {
 	// 비-Biped 디폴트. Biped 자식 클래스가 StatComponent로부터 실제 상태 반환.

@@ -31,11 +31,11 @@
 			"Enabled": true
 		},
 		{
-			"Name": "GameplayStateTree",
+			"Name": "CommonUI",
 			"Enabled": true
 		},
 		{
-			"Name": "CommonUI",
+			"Name": "GameplayStateTree",
 			"Enabled": true
 		}
 	]

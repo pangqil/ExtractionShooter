@@ -34,10 +34,7 @@ bool UPDCombatComponent::HasValidTarget() const
 	AActor* T = CurrentTarget.Get();
 	if (!T) return false;
 
-	if (T->Implements<UPDCombatInterface>())
-	{
-		return IPDCombatInterface::Execute_IsAlive(T);
-	}
+	// 생사 판정은 IPDDamageable 단일 진실 원천 사용
 	if (T->Implements<UPDDamageable>())
 	{
 		return IPDDamageable::Execute_IsAlive(T);
@@ -142,7 +139,8 @@ void UPDCombatComponent::NotifyAlliesInRadius(float Radius, AActor* SharedTarget
 		if (!Other || Other == Owner) continue;
 		if (!Other->Implements<UPDCombatInterface>()) continue;
 		if (IPDCombatInterface::Execute_GetTeamID(Other) != OwnerTeam) continue;
-		if (!IPDCombatInterface::Execute_IsAlive(Other)) continue;
+		// 생사 판정은 IPDDamageable 사용. 비-Damageable 동맹은 살아있다고 간주.
+		if (Other->Implements<UPDDamageable>() && !IPDDamageable::Execute_IsAlive(Other)) continue;
 
 		UPDCombatComponent* AllyCombat = Other->FindComponentByClass<UPDCombatComponent>();
 		if (!AllyCombat) continue;

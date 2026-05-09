@@ -84,7 +84,7 @@ public:
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override { return ASC; }
 
 	// 엔진 perception 의 affiliation 시스템에 TeamID 노출.
-	// AAIController 가 possess 한 폰의 인터페이스로 자동 위임 → controller 측 별도 작업 불필요.
+	// AAIController 가 possess 한 폰의 인터페이스로 자동 위임.
 	virtual FGenericTeamId GetGenericTeamId() const override { return FGenericTeamId(TeamID); }
 
 	UFUNCTION(BlueprintPure, Category = "PD|AI")

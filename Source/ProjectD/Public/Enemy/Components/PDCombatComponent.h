@@ -87,9 +87,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Combat", meta = (ClampMin = "0.0"))
 	float AttackCooldown = 1.0f;
 
-	/** RequestAttack 시 타겟까지의 최대 거리. */
+	/** RequestAttack 시 타겟까지의 최대 거리. SightRadius 보다 짧게 두어 추격 페이즈를 확보. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Combat", meta = (ClampMin = "0.0"))
-	float AttackRange = 1500.f;
+	float AttackRange = 800.f;
 
 private:
 	UPROPERTY(Transient)

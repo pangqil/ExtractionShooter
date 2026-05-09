@@ -24,4 +24,6 @@ namespace PDBTKeys
 
 	// ─── Combat ability cache ───
 	static const FName CanAttack         = TEXT("CanAttack");          // Bool    (Service 가 갱신)
+	static const FName IsTargetInRange   = TEXT("IsTargetInRange");    // Bool    (Service 가 갱신 — 거리 변화 옵저버 트리거용)
+	static const FName HasLOSToTarget    = TEXT("HasLOSToTarget");     // Bool    (Service 가 갱신 — 시야 변화 옵저버 트리거용)
 }

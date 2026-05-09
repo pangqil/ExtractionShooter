@@ -19,7 +19,6 @@ public:
 
 	//~ Begin IPDCombatInterface
 	virtual uint8 GetTeamID_Implementation() const override;
-	virtual bool IsAlive_Implementation() const override;
 	virtual EPDStaminaStatus GetStaminaStatus_Implementation() const override;
 	//~ End IPDCombatInterface
 
