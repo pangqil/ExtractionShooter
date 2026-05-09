@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Type/Types.h"
+#include "GameplayTag/PDGameplayTags.h"
 #include "Animation/AnimMontage.h"
 #include "Interfaces/PDInteractable.h"
 #include "Camera/CameraShakeBase.h"
@@ -22,6 +23,7 @@ UCLASS(Abstract, Blueprintable)
 class PROJECTD_API APDWeaponBase : public AActor, public IPDInteractable
 {
 	GENERATED_BODY()
+	friend class APDPlayerCharacter;
 
 public:
 	APDWeaponBase();
@@ -50,6 +52,17 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Stats")
 	TArray<FWeaponLevelStats> LevelStats;
+
+	//IK&&Layer
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|GAS")
+	FGameplayTag WeaponTypeTag;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Animation")
+	TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Animation")
+	FName LeftHandGripSocket=TEXT("LeftHandGrip");
+	
 
 	// 애니메이션
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Animation")
@@ -205,6 +218,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Weapon")
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
 
+	UFUNCTION(BlueprintPure, Category="PD|Weapon|GAS")
+	FORCEINLINE FGameplayTag GetWeaponTypeTag() const { return WeaponTypeTag; }
+
+	UFUNCTION(BlueprintPure, Category="PD|Weapon|Animation")
+	FORCEINLINE TSubclassOf<UAnimInstance> GetWeaponAnimLayerClass() const { return WeaponAnimLayerClass; }
+
+	UFUNCTION(BlueprintPure, Category="PD|Weapon|Animation")
+	FORCEINLINE FName GetLeftHandGripSocket() const { return LeftHandGripSocket; }
+	
 	void FinishReload();
 
 protected:

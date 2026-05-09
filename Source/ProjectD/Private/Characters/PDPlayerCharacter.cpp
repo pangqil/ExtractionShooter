@@ -43,6 +43,13 @@ APDPlayerCharacter::APDPlayerCharacter()
 void APDPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	 if (ASC)
+        {
+            ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
+            ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Shotgun, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
+            ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Sniper,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
+        }
+	LinkDefaultAnimLayer();
 }
 
 void APDPlayerCharacter::Tick(float DeltaTime)
@@ -126,6 +133,13 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 	CurrentSlot=Slot;
 	APDWeaponBase* NewWeapon=WeaponSlots[Idx];
 	NewWeapon->OnEquip(this);
+	if (ASC)
+	{
+		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Rifle);
+		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Shotgun);
+		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Sniper);
+		ASC->AddLooseGameplayTag(NewWeapon->GetWeaponTypeTag());
+	}
 	NewWeapon->SetActorHiddenInGame(false);
 	AttachActorToWeaponSocket(NewWeapon);
 	OnWeaponSwapped.Broadcast(NewWeapon, Slot);
@@ -140,6 +154,7 @@ void APDPlayerCharacter::DropCurrentWeapon()
 	CurWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	WeaponSlots[static_cast<int32>(CurrentSlot)]=nullptr;
 	CurrentSlot=EWeaponSlot::None;
+	ASC->RemoveLooseGameplayTag(CurWeapon->GetWeaponTypeTag());
 }
 
 APDWeaponBase* APDPlayerCharacter::GetCurrentWeapon() const
@@ -172,4 +187,22 @@ void APDPlayerCharacter::TryInteract()
 	{
 		InteractionComponent->Interact();
 	}
+}
+
+void APDPlayerCharacter::OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	if (NewCount==0) return;
+	APDWeaponBase* CurWeapon=GetCurrentWeapon();
+	if (!IsValid(CurWeapon)) return;
+	TSubclassOf<UAnimInstance> LayerClass=CurWeapon->GetWeaponAnimLayerClass();
+	if (!LayerClass) { LinkDefaultAnimLayer(); return; }
+	if (USkeletalMeshComponent* SkelMesh=GetMesh())
+		SkelMesh->LinkAnimClassLayers(LayerClass);
+}
+
+void APDPlayerCharacter::LinkDefaultAnimLayer()
+{
+	if (!DefaultAnimLayerClass) return;
+	if (USkeletalMeshComponent* SkelMesh=GetMesh())
+		SkelMesh->LinkAnimClassLayers(DefaultAnimLayerClass);
 }
