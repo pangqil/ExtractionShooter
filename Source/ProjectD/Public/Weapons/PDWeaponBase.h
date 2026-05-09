@@ -5,6 +5,7 @@
 #include "Type/Types.h"
 #include "Animation/AnimMontage.h"
 #include "Interfaces/PDInteractable.h"
+#include "Camera/CameraShakeBase.h"
 #include "PDWeaponBase.generated.h"
 
 class APDWeaponBase;
@@ -90,6 +91,34 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon")
 	TWeakObjectPtr<AActor> WeaponOwner;
+
+	// Recoil 설정
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Recoil")
+	TSubclassOf<UCameraShakeBase> FireCameraShakeClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Recoil",
+		meta = (ClampMin = "0.0", ToolTip = "발사마다 추가되는 스프레드 (도)"))
+	float RecoilSpreadPerShot = 1.5f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Recoil",
+		meta = (ClampMin = "0.0", ToolTip = "최대 스프레드 누적량 (도)"))
+	float MaxRecoilSpread = 8.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Recoil",
+		meta = (ClampMin = "0.0", ToolTip = "초당 회복되는 스프레드 (도)"))
+	float RecoilRecoveryRate = 5.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Recoil",
+		meta = (ToolTip = "발사 시 총 메시 회전  (Pitch = 위로 튀는 정도)"))
+	FRotator MeshRecoilKick = FRotator(-4.f, 0.f, 0.f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Recoil",
+		meta = (ClampMin = "1.0", ToolTip = "메시 반동 복구 속도"))
+	float MeshRecoilRecoverySpeed = 12.f;
+
+	// 현재 반동 스프레드
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Recoil")
+	float CurrentRecoilSpread = 0.f;
 
 public:
 
@@ -189,7 +218,23 @@ protected:
 	void StopWeaponMontage(UAnimMontage* Montage);
 	void BindMontageEndedForReload(UAnimMontage* Montage);
 
+	void ApplyRecoil();      // PostFire()에서 호출
+	APlayerController* GetOwnerPlayerController() const;
+
+	FTimerHandle SpreadRecoveryHandle;
+	FTimerHandle MeshRecoilRecoveryHandle;
+	FRotator     OriginalMeshRelRotation;
+
+	UFUNCTION()
+	void TickSpreadRecovery();
+
+	UFUNCTION()
+	void TickMeshRecoilRecovery();
+
 private:
 	UFUNCTION()
 	void OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 };
+
+
+

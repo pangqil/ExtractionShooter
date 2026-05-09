@@ -141,54 +141,56 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
 {
     AActor* WeaponOwnerActor = GetWeaponOwner();
     if (!WeaponOwnerActor) return;
-
-    APlayerController* PC = Cast<APlayerController>(
-        WeaponOwnerActor->GetInstigatorController());
-
-    // 머즐 소켓 있으면 소켓 위치, 없으면 플레이어 위치
+ 
+    APlayerController* PC = Cast<APlayerController>(WeaponOwnerActor->GetInstigatorController());
+ 
     FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
         : WeaponOwnerActor->GetActorLocation();
-
+ 
     FVector Forward = WeaponOwnerActor->GetActorForwardVector();
-
+ 
     if (PC)
     {
-        FHitResult CursorHit;
-        if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
+        // 1순위: 커서가 Pawn 위 → 부위 조준
+        FHitResult PawnHit;
+        if (PC->GetHitResultUnderCursorForObjects(
+            { UEngineTypes::ConvertToObjectType(ECC_Pawn) }, true, PawnHit)
+            && PawnHit.GetActor() && PawnHit.GetActor() != WeaponOwnerActor)
         {
-            FVector Dir = CursorHit.Location - Start;
-            Dir.Z = 0.f;
-            if (!Dir.IsNearlyZero())
-                Forward = Dir.GetSafeNormal();
+            FVector Dir = PawnHit.Location - Start;
+            if (!Dir.IsNearlyZero()) Forward = Dir.GetSafeNormal();
+        }
+        // 2순위: 지면 커서
+        else
+        {
+            FHitResult CursorHit;
+            if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
+            {
+                FVector Dir = CursorHit.Location - Start;
+                if (!Dir.IsNearlyZero()) Forward = Dir.GetSafeNormal();
+            }
         }
     }
-
-    float   Range = GetCurrentStats().Range;
-    int32   Pellets = GetCurrentPelletCount();
-
+ 
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);
     Params.AddIgnoredActor(WeaponOwnerActor);
-
+    Params.bTraceComplex = true;
+ 
+    const float Range   = GetCurrentStats().Range;
+    const int32 Pellets = GetCurrentPelletCount();
+ 
     for (int32 i = 0; i < Pellets; ++i)
     {
         FVector RandDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(SpreadAngle));
-        RandDir.Z = 0.f;
-        RandDir.Normalize();
-
-        FVector End = Start + RandDir * Range;
-
+        FVector End     = Start + RandDir * Range;
         FHitResult Hit;
         if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params))
         {
             OutHits.Add(Hit);
             DrawDebugLine(GetWorld(), Start, Hit.Location, FColor::Red, false, 1.f, 0, 1.f);
-            DrawDebugSphere(GetWorld(), Hit.Location, 10.f, 8, FColor::Red, false, 1.f);
         }
-        else
-        {
-            DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1.f, 0, 1.f);
-        }
+        else DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1.f, 0, 1.f);
     }
 }

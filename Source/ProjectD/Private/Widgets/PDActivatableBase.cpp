@@ -4,6 +4,7 @@
 #include "Widgets/PDActivatableBase.h"
 
 #include "GameFramework/PlayerController.h"
+#include "Subsystems/PDFrontendUISubsystem.h"
 
 void UPDActivatableBase::Activate()
 {
@@ -35,6 +36,23 @@ void UPDActivatableBase::NativeOnActivated()
 
 void UPDActivatableBase::NativeOnDeactivated()
 {
+}
+
+void UPDActivatableBase::NativeOnFocusLost(const FFocusEvent& InFocusEvent)
+{
+	Super::OnFocusLost(InFocusEvent);
+
+	if (bLightDismissable)
+	{
+		if (UPDFrontendUISubsystem* FrontendUISubsystem = GetGameInstance()->GetSubsystem<UPDFrontendUISubsystem>())
+		{
+			// 내가 현재 화면일 경우에만 닫기 로직을 실행
+			if (FrontendUISubsystem->GetCurrentScreen() == this)
+			{
+				FrontendUISubsystem->CloseScreen();
+			}
+		}
+	}
 }
 
 void UPDActivatableBase::ApplyInputMode()
