@@ -226,6 +226,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|Weapon|Animation")
 	FORCEINLINE FName GetLeftHandGripSocket() const { return LeftHandGripSocket; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Weapon|Recoil")
+	FORCEINLINE float GetCurrentRecoilSpread() const { return CurrentRecoilSpread; }
 	
 	void FinishReload();
 
@@ -252,6 +255,8 @@ protected:
 
 	UFUNCTION()
 	void TickMeshRecoilRecovery();
+
+	FVector GetAimDirectionFromOwner(const FVector& StartLocation) const;
 
 private:
 	UFUNCTION()

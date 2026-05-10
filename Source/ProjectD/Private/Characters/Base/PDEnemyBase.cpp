@@ -1,10 +1,14 @@
-#include "Characters/Base/PDEnemyBase.h"
+﻿#include "Characters/Base/PDEnemyBase.h"
 
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+     
 #include "Items/PDItemBase.h"
+#include "Enemy/Components/PDCombatComponent.h"
+#include "Component/PDWeaponComponent.h"
+#include "Weapons/PDWeaponBase.h"  
 
 APDEnemyBase::APDEnemyBase()
 {
@@ -18,6 +22,15 @@ APDEnemyBase::APDEnemyBase()
 	// Hostile 기본값. 자식(예: PDSoldier)에서 재정의 가능.
 	TeamID = 2;
 }
+
+void APDEnemyBase::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UPDCombatComponent* Combat = FindComponentByClass<UPDCombatComponent>())
+		Combat->OnTargetChanged.AddDynamic(this, &APDEnemyBase::OnCombatTargetChanged);
+}
+
 
 uint8 APDEnemyBase::GetTeamID_Implementation() const
 {
@@ -138,4 +151,22 @@ void APDEnemyBase::SpawnCorpseContainer()
 		GetActorLocation(),
 		GetActorRotation(),
 		Params);
+}
+
+void APDEnemyBase::SetAimTarget(AActor* Target)
+{
+	if (WeaponComponent)
+		WeaponComponent->SetAimTarget(Target);
+}
+
+void APDEnemyBase::ClearAimTarget()
+{
+	if (WeaponComponent)
+		WeaponComponent->ClearAimTarget();
+}
+
+void APDEnemyBase::OnCombatTargetChanged(AActor* NewTarget)
+{
+	if (NewTarget) SetAimTarget(NewTarget);
+	else           ClearAimTarget();
 }

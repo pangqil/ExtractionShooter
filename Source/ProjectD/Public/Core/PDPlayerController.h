@@ -16,6 +16,7 @@ class UPDMarketComponent;
 class APDPlayerCharacter;
 class UPDHUDWidget;
 class UPDActivatableBase;
+class UPDCrosshairWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 
@@ -85,6 +86,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "PD|UI")
+	TSubclassOf<UPDCrosshairWidget> CrosshairWidgetClass;
+
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -117,6 +121,12 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDHUDWidget> HUDInstance;
 
+	UPROPERTY()
+	TObjectPtr<UPDCrosshairWidget> CrosshairWidget;
+	
+	void OnFirePressed();
+	void OnFireReleased();
+	void OnReload();
 	void OnInteract();
 	void OnSwitchSlot1();
 	void OnSwitchSlot2();
@@ -125,8 +135,16 @@ private:
 	void OnToggleFireMode();
 	void OnDropWeapon();
 
+<<<<<<< HEAD
 
 
+=======
+	void UpdateCrosshair();
+	
+	UFUNCTION()
+	void OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot);
+	
+>>>>>>> 46138e8 ([Add] Weapon Component 플레이어,에너미 조준 관리 컴포넌트)
 	bool bShowMouseCursor=true;
 
 };

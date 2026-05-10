@@ -123,28 +123,8 @@ FVector APDSniper::GetAimDirection() const
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
         : WeaponOwnerActor->GetActorLocation();
 
-    if (PC)
-    {
-        // 1순위: 커서가 Pawn 위 → 부위 직접 조준
-        FHitResult PawnHit;
-        if (PC->GetHitResultUnderCursorForObjects(
-            { UEngineTypes::ConvertToObjectType(ECC_Pawn) }, true, PawnHit)
-            && PawnHit.GetActor() && PawnHit.GetActor() != WeaponOwnerActor)
-        {
-            FVector Dir = PawnHit.Location - Start;
-            if (!Dir.IsNearlyZero()) return Dir.GetSafeNormal();
-        }
-
-        // 2순위: 지면 커서 → Z 유지
-        FHitResult CursorHit;
-        if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
-        {
-            FVector Dir = CursorHit.Location - Start;
-            if (!Dir.IsNearlyZero()) return Dir.GetSafeNormal();
-        }
-    }
-
-    return WeaponOwnerActor->GetActorForwardVector();
+    // GetAimDirectionFromOwner()로 플레이어/적 공통 처리
+    return GetAimDirectionFromOwner(Start);
 }
 
 bool APDSniper::CanPenetrate() const
