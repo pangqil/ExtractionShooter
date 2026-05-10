@@ -162,12 +162,12 @@ void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void APDPlayerController::CreateAndAddHUDWidget()
 {
 	if (!HUDClass) return;
-	if (HUDInstance) return; // 이중 호출 방지
+	if (HUDInstance) return;
 
 	HUDInstance = CreateWidget<UPDHUDWidget>(this, HUDClass);
 	if (HUDInstance)
 	{
-		HUDInstance->AddToViewport(0); // ZOrder 0 = 가장 아래, 메뉴(10) 밑에 깔림
+		HUDInstance->AddToViewport();
 		HUDInstance->Activate();
 	}
 }
@@ -488,6 +488,14 @@ void APDPlayerController::OnDropWeapon()
 		Ch->DropCurrentWeapon();
 }
 
+void APDPlayerController::HandleQuickSlotSelected(int32 SlotIndex)
+{
+	if (HUDInstance)
+	{
+		HUDInstance->SetQuickSlotSelected(SlotIndex);
+	}
+}
+
 void APDPlayerController::OnInteract()
 {
 	APawn* ControlledPawn = GetPawn();
@@ -518,4 +526,10 @@ void APDPlayerController::OnInteract()
 	if (ClosestInteractable)
 		IPDInteractable::Execute_Interact(ClosestInteractable, ControlledPawn);
 }
+
+
+
+
+
+
 
