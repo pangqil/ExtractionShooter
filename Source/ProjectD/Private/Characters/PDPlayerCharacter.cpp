@@ -34,7 +34,8 @@ APDPlayerCharacter::APDPlayerCharacter()
 
 	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
 	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
-
+	CoverComponent=CreateDefaultSubobject<UPDCoverComponent>(TEXT("CoverComponent"));
+	
 	PrimaryActorTick.bCanEverTick=true;
 	PrimaryActorTick.bStartWithTickEnabled=true;
 	WeaponSlots.SetNum(3);
