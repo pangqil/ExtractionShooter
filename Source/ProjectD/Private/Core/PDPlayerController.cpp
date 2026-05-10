@@ -546,14 +546,6 @@ void APDPlayerController::OnInteract()
 		IPDInteractable::Execute_Interact(ClosestInteractable, ControlledPawn);
 }
 
-<<<<<<< HEAD
-
-
-
-
-
-
-=======
 void APDPlayerController::OnFirePressed()
 {
 	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
@@ -608,4 +600,4 @@ void APDPlayerController::OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot 
 	if (!CrosshairWidget || !NewWeapon) return;
 	CrosshairWidget->SetCrosshairType(NewWeapon->GetWeaponType());
 }
->>>>>>> 46138e8 ([Add] Weapon Component 플레이어,에너미 조준 관리 컴포넌트)
+

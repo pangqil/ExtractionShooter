@@ -134,17 +134,11 @@ private:
 	void OnZoom();
 	void OnToggleFireMode();
 	void OnDropWeapon();
-
-<<<<<<< HEAD
-
-
-=======
 	void UpdateCrosshair();
 	
 	UFUNCTION()
 	void OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot);
 	
->>>>>>> 46138e8 ([Add] Weapon Component 플레이어,에너미 조준 관리 컴포넌트)
 	bool bShowMouseCursor=true;
 
 };
