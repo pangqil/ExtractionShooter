@@ -2,30 +2,35 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "NavigationSystem.h"
+#include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "Cover/PDCoverBase.h"
 #include "Engine/OverlapResult.h"
-#include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "GameplayTag/PDGameplayTags.h"
 
 UPDCoverComponent::UPDCoverComponent()
 {
-    PrimaryComponentTick.bCanEverTick=false;
+	PrimaryComponentTick.bCanEverTick=false;
 }
 
 ACharacter* UPDCoverComponent::GetOwnerCharacter() const
 {
-    return Cast<ACharacter>(GetOwner());
+	return Cast<ACharacter>(GetOwner());
 }
 
 UAbilitySystemComponent* UPDCoverComponent::GetASC() const
 {
-    return UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	return UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
 }
 
 void UPDCoverComponent::TryEnterCover()
 {
-    if (IsInCover()) { ExitCover(); return; }
+    if (IsInCover())
+    {
+	    ExitCover(); 
+    	return;
+    }
 
     ACharacter* Owner=GetOwnerCharacter();
     if (!IsValid(Owner)) return;
@@ -34,114 +39,149 @@ void UPDCoverComponent::TryEnterCover()
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(Owner);
 
+
     GetWorld()->OverlapMultiByObjectType(
-        Overlaps,
-        Owner->GetActorLocation(),
-        FQuat::Identity,
-        FCollisionObjectQueryParams(ECC_WorldStatic),
-        FCollisionShape::MakeSphere(CoverSearchRadius),
-        Params);
+       Overlaps,
+       Owner->GetActorLocation(),
+       FQuat::Identity,
+       FCollisionObjectQueryParams(ECC_WorldStatic), 
+       FCollisionShape::MakeSphere(CoverSearchRadius),
+       Params);
 
     APDCoverBase* BestCover=nullptr;
     FCoverSlot* BestSlot=nullptr;
     float BestDist=FLT_MAX;
 
-    for (const FOverlapResult& Result:Overlaps)
+    for (const FOverlapResult& Result : Overlaps)
     {
-        APDCoverBase* Cover=Cast<APDCoverBase>(Result.GetActor());
-        if (!IsValid(Cover)||!Cover->IsUsable()) continue;
+       APDCoverBase* Cover=Cast<APDCoverBase>(Result.GetActor());
+       if (!IsValid(Cover)||!Cover->IsUsable()) continue;
 
-        FCoverSlot* Slot=Cover->FindBestSlot(Owner);
-        if (!Slot) continue;
+       FCoverSlot* Slot=Cover->FindBestSlot(Owner);
+       if (!Slot) continue;
 
-        const FVector WorldSlotPos=Cover->GetActorTransform().TransformPosition(Slot->LocalOffset);
-        const float Dist=FVector::DistSquared(Owner->GetActorLocation(), WorldSlotPos);
-        if (Dist<BestDist)
-        {
-            BestDist=Dist;
-            BestCover=Cover;
-            BestSlot=Slot;
-        }
+       const FVector WorldSlotPos=Cover->GetActorTransform().TransformPosition(Slot->LocalOffset);
+       const float Dist=FVector::DistSquared(Owner->GetActorLocation(), WorldSlotPos);
+       
+       if (Dist<BestDist)
+       {
+          BestDist=Dist;
+          BestCover=Cover;
+          BestSlot=Slot;
+       }
     }
 
     if (!BestCover||!BestSlot) return;
-
+	
     CurrentCoverActor=BestCover;
-
-    const FVector TargetPos=BestCover->GetActorTransform().TransformPosition(BestSlot->LocalOffset);
-    
-    UAIBlueprintHelperLibrary::SimpleMoveToLocation(Owner->GetController(), TargetPos);
-    GetWorld()->GetTimerManager().SetTimer(CoverArrivalCheckHandle, [this, TargetPos]()
+	
+    SnapLocation=BestCover->GetActorTransform().TransformPosition(BestSlot->LocalOffset);
+    SnapRotation=(BestCover->GetActorRotation().Quaternion()*BestSlot->FacingRotation.Quaternion()).Rotator();
+	
+    if (Owner->GetController())
     {
-        ACharacter* Char=GetOwnerCharacter();
-        if (!IsValid(Char)||!CurrentCoverActor.IsValid())
-        {
-            GetWorld()->GetTimerManager().ClearTimer(CoverArrivalCheckHandle);
-            return;
-        }
-        if (FVector::Dist(Char->GetActorLocation(), TargetPos)<CoverArrivalTolerance)
-        {
-            GetWorld()->GetTimerManager().ClearTimer(CoverArrivalCheckHandle);
-            OnCoverArrived();
-        }
+        UAIBlueprintHelperLibrary::SimpleMoveToLocation(Owner->GetController(), SnapLocation);
+    }
+	
+    TWeakObjectPtr<UPDCoverComponent> WeakThis(this);
+    GetWorld()->GetTimerManager().SetTimer(CoverArrivalCheckHandle, [WeakThis]()
+    {
+       if (!WeakThis.IsValid()) return;
+       
+       UPDCoverComponent* Comp=WeakThis.Get();
+       ACharacter* Char=Comp->GetOwnerCharacter();
+       
+       if (!IsValid(Char)||!Comp->CurrentCoverActor.IsValid())
+       {
+          Comp->GetWorld()->GetTimerManager().ClearTimer(Comp->CoverArrivalCheckHandle);
+          return;
+       }
+    	
+       if (FVector::Dist(Char->GetActorLocation(), Comp->SnapLocation)<Comp->CoverArrivalTolerance)
+       {
+          Comp->GetWorld()->GetTimerManager().ClearTimer(Comp->CoverArrivalCheckHandle);
+          Comp->OnCoverArrived();
+       }
     }, 0.1f, true);
 }
 
 void UPDCoverComponent::OnCoverArrived()
 {
-    if (!CurrentCoverActor.IsValid()) return;
-    CurrentCoverActor->ReleaseSlot(GetOwner());
-    ApplyCoverState();
-    StartCoverProximityCheck();
+	if (!CurrentCoverActor.IsValid()) return;
+
+	ACharacter* Char=GetOwnerCharacter();
+	if (!IsValid(Char)) return;
+
+	Char->SetActorLocation(SnapLocation, false, nullptr, ETeleportType::TeleportPhysics);
+	Char->SetActorRotation(SnapRotation);
+
+	CurrentCoverActor->ReleaseSlot(Char);
+
+	LockMovement();
+	ApplyCoverState();
 }
 
-void UPDCoverComponent::StartCoverProximityCheck()
+void UPDCoverComponent::LockMovement()
 {
-    GetWorld()->GetTimerManager().SetTimer(CoverProximityCheckHandle, [this]()
-    {
-        if (!CurrentCoverActor.IsValid()) { ExitCover(); return; }
+	ACharacter* Char=GetOwnerCharacter();
+	if (!IsValid(Char)) return;
+	Char->GetCharacterMovement()->DisableMovement();
+}
 
-        ACharacter* Char=GetOwnerCharacter();
-        if (!IsValid(Char)) { ExitCover(); return; }
-
-        const float Dist=FVector::Dist(Char->GetActorLocation(), CurrentCoverActor->GetActorLocation());
-        if (Dist>CoverExitDistance)
-            ExitCover();
-
-    }, 0.2f, true);
+void UPDCoverComponent::UnlockMovement()
+{
+	ACharacter* Char=GetOwnerCharacter();
+	if (!IsValid(Char)) return;
+	Char->GetCharacterMovement()->SetDefaultMovementMode();
 }
 
 void UPDCoverComponent::ApplyCoverState()
 {
-    UAbilitySystemComponent* ASC=GetASC();
-    if (!ASC||!CurrentCoverActor.IsValid()) return;
-    ASC->AddLooseGameplayTag(PDGameplayTags::Cover_Active);
-    ASC->AddLooseGameplayTag(CurrentCoverActor->GetCoverTypeTag());
+	UAbilitySystemComponent* ASC=GetASC();
+	if (!ASC||!CurrentCoverActor.IsValid()) return;
+
+	ASC->AddLooseGameplayTag(PDGameplayTags::Cover_Active);
+
+	if (!CoverBuff) return;
+
+	FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
+	FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(CoverBuff, 1.f, Context);
+	if (Spec.IsValid())
+		ActiveCoverBuffHandle=ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 }
 
 void UPDCoverComponent::ExitCover()
 {
-    GetWorld()->GetTimerManager().ClearTimer(CoverArrivalCheckHandle);
-    GetWorld()->GetTimerManager().ClearTimer(CoverProximityCheckHandle);
+	GetWorld()->GetTimerManager().ClearTimer(CoverArrivalCheckHandle);
 
-    ACharacter* Char=GetOwnerCharacter();
-    if (IsValid(Char))
-        Char->GetController()->StopMovement();
+	ACharacter* Char=GetOwnerCharacter();
+	if (IsValid(Char))
+		Char->GetController()->StopMovement();
 
-    CurrentCoverActor=nullptr;
-    RemoveCoverState();
+	UnlockMovement();
+
+	CurrentCoverActor=nullptr;
+	SnapLocation=FVector::ZeroVector;
+	SnapRotation=FRotator::ZeroRotator;
+
+	RemoveCoverState();
 }
 
 void UPDCoverComponent::ForceExitCover()
 {
-    ExitCover();
+	ExitCover();
 }
 
 void UPDCoverComponent::RemoveCoverState()
 {
-    UAbilitySystemComponent* ASC=GetASC();
-    if (!ASC) return;
-    ASC->RemoveLooseGameplayTag(PDGameplayTags::Cover_Active);
-    ASC->RemoveLooseGameplayTag(PDGameplayTags::Cover_Type_High);
-    ASC->RemoveLooseGameplayTag(PDGameplayTags::Cover_Type_Low);
+	UAbilitySystemComponent* ASC=GetASC();
+	if (!ASC) return;
+
+	ASC->RemoveLooseGameplayTag(PDGameplayTags::Cover_Active);
+
+	if (ActiveCoverBuffHandle.IsValid())
+	{
+		ASC->RemoveActiveGameplayEffect(ActiveCoverBuffHandle);
+		ActiveCoverBuffHandle=FActiveGameplayEffectHandle();
+	}
 }

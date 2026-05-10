@@ -1,14 +1,14 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ActiveGameplayEffectHandle.h"
 #include "Components/ActorComponent.h"
 #include "Cover/PDCoverBase.h"
 #include "PDCoverComponent.generated.h"
 
-class APDCoverBase;
+class UGameplayEffect;
 class UAbilitySystemComponent;
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class PROJECTD_API UPDCoverComponent : public UActorComponent
 {
@@ -16,37 +16,41 @@ class PROJECTD_API UPDCoverComponent : public UActorComponent
 
 public:
 	UPDCoverComponent();
-	
+
 	UFUNCTION(BlueprintCallable, Category="PD|Cover")
 	void TryEnterCover();
-	
+
 	UFUNCTION(BlueprintCallable, Category="PD|Cover")
 	void ExitCover();
-	
+
 	UFUNCTION(BlueprintPure, Category="PD|Cover")
 	bool IsInCover() const {return CurrentCoverActor.IsValid();}
-	
+
 	void ForceExitCover();
-	
+
 	UPROPERTY(EditDefaultsOnly, Category="PD|Cover")
 	float CoverSearchRadius=300.f;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category="PD|Cover")
 	float CoverArrivalTolerance=40.f;
 
-	UPROPERTY(EditDefaultsOnly, Category="PD|Cover")
-	float CoverExitDistance=250.f;
-	
+	UPROPERTY(EditDefaultsOnly, Category="PD|Cover|GAS")
+	TSubclassOf<UGameplayEffect> CoverBuff;
+
 private:
 	void OnCoverArrived();
-	void StartCoverProximityCheck();
 	void ApplyCoverState();
 	void RemoveCoverState();
+	void LockMovement();
+	void UnlockMovement();
 
 	UAbilitySystemComponent* GetASC() const;
 	ACharacter* GetOwnerCharacter() const;
 
 	TWeakObjectPtr<APDCoverBase> CurrentCoverActor;
+	FVector SnapLocation=FVector::ZeroVector;
+	FRotator SnapRotation=FRotator::ZeroRotator;
+
 	FTimerHandle CoverArrivalCheckHandle;
-	FTimerHandle CoverProximityCheckHandle;
+	FActiveGameplayEffectHandle ActiveCoverBuffHandle;
 };

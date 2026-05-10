@@ -30,6 +30,7 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Cache.bIsAiming=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Aiming);
 	Cache.AimYaw=0.f;
 	Cache.AimPitch=0.f;
+	Cache.bIsInCover=CachedASC->HasMatchingGameplayTag(PDGameplayTags::Cover_Active);
 
 	if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Rifle))
 		Cache.WeaponType=EWeaponType::Rifle;
@@ -70,4 +71,5 @@ void UPDAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 	WeaponType=Cache.WeaponType;
 	LeftHandIKTarget=Cache.LeftHandIKTarget;
 	LeftHandIKAlpha=Cache.LeftHandIKAlpha;
+	bIsInCover=Cache.bIsInCover;
 }

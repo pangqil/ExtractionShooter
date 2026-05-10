@@ -47,7 +47,5 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_State_Reloading, "Weapon.State.Reloading")
 	
 	UE_DEFINE_GAMEPLAY_TAG(Cover_Active, "Cover.Active")
-	UE_DEFINE_GAMEPLAY_TAG(Cover_Type_High, "Cover.Type.High")
-	UE_DEFINE_GAMEPLAY_TAG(Cover_Type_Low, "Cover.Type.Low")
 
 }
