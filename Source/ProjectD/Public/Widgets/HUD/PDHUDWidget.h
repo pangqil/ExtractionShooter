@@ -9,6 +9,7 @@
 
 class UPDAttributeBarWidget;
 class UPDBodyPartHealthGroupWidget;
+class UPDQuickSlotBarWidget;
 class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 
@@ -36,6 +37,14 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UPDAttributeBarWidget> Bar_Thirst;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDQuickSlotBarWidget> Bar_QuickSlots;
+
+public:
+	// 퀵 슬롯 선택 인덱스를 HUD에서 바 위젯으로 전달
+	UFUNCTION(BlueprintCallable, Category = "PD|HUD")
+	void SetQuickSlotSelected(int32 SlotIndex);
 
 private:
 	struct FBoundHandle

@@ -9,8 +9,8 @@
 #include "GameFramework/Pawn.h"
 #include "Type/Types.h"
 #include "Widgets/HUD/PDAttributeBarWidget.h"
-#include "ProjectD/ProjectD.h"
 #include "Widgets/HUD/PDBodyPartHealthGroupWidget.h"
+#include "Widgets/HUD/PDQuickSlotBarWidget.h"
 
 void UPDHUDWidget::NativeOnActivated()
 {
@@ -127,4 +127,12 @@ void UPDHUDWidget::UnbindAll()
 	}
 	BoundHandles.Reset();
 	CachedASC.Reset();
+}
+
+void UPDHUDWidget::SetQuickSlotSelected(int32 SlotIndex)
+{
+	if (Bar_QuickSlots)
+	{
+		Bar_QuickSlots->SetSelectedIndex(SlotIndex);
+	}
 }

@@ -18,6 +18,7 @@
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
 #include "Widgets/Inventory/PDMarketWidget.h"
+#include "Widgets/Crosshair/PDCrosshairWidget.h"
 #include "Items/PDMarketComponent.h"
 #include "Items/PDInventoryComponent.h"
 #include "Widgets/HUD/PDHUDWidget.h"
@@ -28,6 +29,7 @@ DEFINE_LOG_CATEGORY(LogPDCharacter);
 #include "Interfaces/PDInteractable.h"
 #include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDRifle.h"
+#include "Weapons/PDShotgun.h"
 #include "Weapons/PDSniper.h"
 
 
@@ -56,6 +58,7 @@ void APDPlayerController::PlayerTick(float DeltaTime)
 		LogTimer = 0.f;
 	}
 	UpdateAimRotation();
+	UpdateCrosshair();
 }
 
 void APDPlayerController::SetupInputComponent()
@@ -109,6 +112,12 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindAbilityActions(InputConfig, this, &APDPlayerController::OnAbilityInputPressed,
 		&APDPlayerController::OnAbilityInputReleased);
 
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Fire,
+		ETriggerEvent::Started, this, &APDPlayerController::OnFirePressed);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Fire,
+		ETriggerEvent::Completed, this, &APDPlayerController::OnFireReleased);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Reload,
+		ETriggerEvent::Started, this, &APDPlayerController::OnReload);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
 		ETriggerEvent::Started, this, &APDPlayerController::OnInteract);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot1,
@@ -137,8 +146,18 @@ void APDPlayerController::BeginPlay()
 	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
 
-	bShowMouseCursor = true;
+	bShowMouseCursor = false;
 	DefaultMouseCursor = EMouseCursor::Default;
+
+	if (CrosshairWidgetClass)
+	{
+		CrosshairWidget = CreateWidget<UPDCrosshairWidget>(this, CrosshairWidgetClass);
+		if (CrosshairWidget)
+			CrosshairWidget->AddToViewport(99);
+	}
+	
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		Ch->OnWeaponSwapped.AddDynamic(this, &APDPlayerController::OnWeaponChanged);
 
 	CreateAndAddHUDWidget();
 }
@@ -162,12 +181,12 @@ void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void APDPlayerController::CreateAndAddHUDWidget()
 {
 	if (!HUDClass) return;
-	if (HUDInstance) return; // 이중 호출 방지
+	if (HUDInstance) return;
 
 	HUDInstance = CreateWidget<UPDHUDWidget>(this, HUDClass);
 	if (HUDInstance)
 	{
-		HUDInstance->AddToViewport(0); // ZOrder 0 = 가장 아래, 메뉴(10) 밑에 깔림
+		HUDInstance->AddToViewport();
 		HUDInstance->Activate();
 	}
 }
@@ -488,6 +507,14 @@ void APDPlayerController::OnDropWeapon()
 		Ch->DropCurrentWeapon();
 }
 
+void APDPlayerController::HandleQuickSlotSelected(int32 SlotIndex)
+{
+	if (HUDInstance)
+	{
+		HUDInstance->SetQuickSlotSelected(SlotIndex);
+	}
+}
+
 void APDPlayerController::OnInteract()
 {
 	APawn* ControlledPawn = GetPawn();
@@ -517,5 +544,60 @@ void APDPlayerController::OnInteract()
 
 	if (ClosestInteractable)
 		IPDInteractable::Execute_Interact(ClosestInteractable, ControlledPawn);
+}
+
+void APDPlayerController::OnFirePressed()
+{
+	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
+	if (!Ch) return;
+	APDWeaponBase* Weapon = Ch->GetCurrentWeapon();
+	if (!Weapon) return;
+
+	if (APDRifle* Rifle = Cast<APDRifle>(Weapon))
+		Rifle->StartFire();
+	else if (APDShotgun* Shotgun = Cast<APDShotgun>(Weapon))
+	{
+		if (Shotgun->IsReloading()) Shotgun->InterruptReloadAndFire();
+		else Shotgun->Fire();
+	}
+	else
+		Weapon->Fire();
+}
+
+void APDPlayerController::OnFireReleased()
+{
+	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
+	if (!Ch) return;
+	if (APDRifle* Rifle = Cast<APDRifle>(Ch->GetCurrentWeapon()))
+		Rifle->StopFire();
+}
+
+void APDPlayerController::OnReload()
+{
+	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
+	if (!Ch) return;
+	if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
+		Weapon->Reload();
+}
+
+void APDPlayerController::UpdateCrosshair()
+{
+	if (!CrosshairWidget) return;
+
+	float MouseX, MouseY;
+	GetMousePosition(MouseX, MouseY);
+
+	float Spread = 0.f;
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
+			Spread = Weapon->GetCurrentRecoilSpread();
+
+	CrosshairWidget->UpdateCrosshair(FVector2D(MouseX, MouseY), Spread);
+}
+
+void APDPlayerController::OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot)
+{
+	if (!CrosshairWidget || !NewWeapon) return;
+	CrosshairWidget->SetCrosshairType(NewWeapon->GetWeaponType());
 }
 

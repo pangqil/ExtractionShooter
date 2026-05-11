@@ -16,6 +16,7 @@ class UPDMarketComponent;
 class APDPlayerCharacter;
 class UPDHUDWidget;
 class UPDActivatableBase;
+class UPDCrosshairWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 
@@ -61,14 +62,12 @@ public:
 	virtual void PlayerTick(float DeltaTime) override; 
 
 protected:
-	/** HUD 위젯 클래스. BeginPlay에서 자동 생성되어 viewport ZOrder=0에 깔린다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDHUDWidget> HUDClass;
-
-	/** HUD 위젯 생성 + viewport 추가. BeginPlay에서 호출. 자식 PC가 override 가능. */
+	
 	virtual void CreateAndAddHUDWidget();
 
-	/** 현재 열려 있는 화면을 닫고 싶을 때 BP에서 호출. */
+	// 현재 열려 있는 화면을 닫고 싶을 때 BP에서 호출
 	UFUNCTION(BlueprintCallable, Category = "PD|UI")
 	void RequestCloseCurrentScreen();
 
@@ -87,11 +86,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "PD|UI")
+	TSubclassOf<UPDCrosshairWidget> CrosshairWidgetClass;
+
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 private:
+	UFUNCTION(BlueprintCallable, Category = "PD|QuickSlot")
+	void HandleQuickSlotSelected(int32 SlotIndex);
+	
 	void OnMove(const struct FInputActionValue& Value);
 	void OnJump();
 	void OnAbilityInputPressed(FGameplayTag InputTag);
@@ -116,6 +121,12 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDHUDWidget> HUDInstance;
 
+	UPROPERTY()
+	TObjectPtr<UPDCrosshairWidget> CrosshairWidget;
+	
+	void OnFirePressed();
+	void OnFireReleased();
+	void OnReload();
 	void OnInteract();
 	void OnSwitchSlot1();
 	void OnSwitchSlot2();
@@ -123,7 +134,11 @@ private:
 	void OnZoom();
 	void OnToggleFireMode();
 	void OnDropWeapon();
-
+	void UpdateCrosshair();
+	
+	UFUNCTION()
+	void OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot);
+	
 	bool bShowMouseCursor=true;
 
 };

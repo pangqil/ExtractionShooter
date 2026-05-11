@@ -6,6 +6,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
+#include "Component/PDWeaponComponent.h"
 
 #include "Animation/AnimInstance.h"
 #include "Interfaces/PDDamageable.h"
@@ -26,6 +27,7 @@ APDWeaponBase::APDWeaponBase()
     MagazineMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MagazineMesh"));
     MagazineMesh->SetupAttachment(WeaponMesh, MagazineSocketName);
     MagazineMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
 }
 
 void APDWeaponBase::BeginPlay()
@@ -344,4 +346,18 @@ APlayerController* APDWeaponBase::GetOwnerPlayerController() const
 {
     if (!WeaponOwner.IsValid()) return nullptr;
     return Cast<APlayerController>(WeaponOwner->GetInstigatorController());
+}
+
+FVector APDWeaponBase::GetAimDirectionFromOwner(const FVector& StartLocation) const
+{
+    if (!WeaponOwner.IsValid()) return FVector::ForwardVector;
+
+    // WeaponComponent에 조준 방향 위임 (플레이어/적 구분은 컴포넌트가 처리)
+    if (UPDWeaponComponent* Comp =
+        WeaponOwner->FindComponentByClass<UPDWeaponComponent>())
+    {
+        return Comp->GetAimDirection(StartLocation);
+    }
+
+    return WeaponOwner->GetActorForwardVector();
 }

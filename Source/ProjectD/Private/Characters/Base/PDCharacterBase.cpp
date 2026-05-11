@@ -1,4 +1,4 @@
-#include "Characters/Base/PDCharacterBase.h"
+﻿#include "Characters/Base/PDCharacterBase.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
@@ -28,6 +28,8 @@ APDCharacterBase::APDCharacterBase()
 		StimuliSource->RegisterForSense(UAISense_Hearing::StaticClass());
 		StimuliSource->bAutoRegister = true;
 	}
+	// 무기 컴포넌트
+	WeaponComponent = CreateDefaultSubobject<UPDWeaponComponent>(TEXT("WeaponComponent"));
 }
 
 void APDCharacterBase::BeginPlay()
