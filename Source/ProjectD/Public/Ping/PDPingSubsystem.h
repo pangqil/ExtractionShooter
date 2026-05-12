@@ -31,8 +31,8 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Ping")
 	FOnPingRemoved OnPingRemoved;
 
-	UPROPERTY(EditDefaultsOnly, Category="Ping")
-	TSoftClassPtr<APDPingMarker> DefaultMarkerClass;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ping")
+	TSubclassOf<APDPingMarker> DefaultMarkerClass;
 	
 	//핑 자동 만료 시간(초).
 	UPROPERTY(EditDefaultsOnly, Category="Ping")
