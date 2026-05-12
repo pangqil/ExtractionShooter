@@ -4,6 +4,8 @@
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDStashComponent.h"
 
+#include "GameFramework/Actor.h"
+
 UPDQuickSlotComponent::UPDQuickSlotComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -14,6 +16,95 @@ void UPDQuickSlotComponent::BeginPlay()
 	Super::BeginPlay();
 
 	InitializeQuickSlots();
+
+	if (UPDInventoryComponent* InventoryComponent = FindOwnerInventory())
+	{
+		InventoryComponent->OnInventoryChanged.AddUniqueDynamic(this, &UPDQuickSlotComponent::HandleInventoryChanged);
+		SyncQuickSlotsWithInventory();
+	}
+}
+
+void UPDQuickSlotComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UPDInventoryComponent* InventoryComponent = FindOwnerInventory())
+	{
+		InventoryComponent->OnInventoryChanged.RemoveDynamic(this, &UPDQuickSlotComponent::HandleInventoryChanged);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+UPDInventoryComponent* UPDQuickSlotComponent::FindOwnerInventory() const
+{
+	if (AActor* Owner = GetOwner())
+	{
+		return Owner->FindComponentByClass<UPDInventoryComponent>();
+	}
+
+	return nullptr;
+}
+
+int32 UPDQuickSlotComponent::GetInventoryItemQuantity(FName ItemID) const
+{
+	if (ItemID.IsNone())
+	{
+		return 0;
+	}
+
+	const UPDInventoryComponent* InventoryComponent = FindOwnerInventory();
+	if (!InventoryComponent)
+	{
+		return 0;
+	}
+
+	int32 Quantity = 0;
+	for (const FPDInventorySlot& Slot : InventoryComponent->Items)
+	{
+		if (!Slot.IsEmpty() && Slot.ItemData.ItemID == ItemID)
+		{
+			Quantity += Slot.Quantity;
+		}
+	}
+
+	return Quantity;
+}
+
+bool UPDQuickSlotComponent::SyncQuickSlotsWithInventory()
+{
+	bool bChanged = false;
+
+	for (FPDInventorySlot& Slot : QuickSlotItems)
+	{
+		if (Slot.IsEmpty())
+		{
+			continue;
+		}
+
+		const int32 InventoryQuantity = GetInventoryItemQuantity(Slot.ItemData.ItemID);
+		if (InventoryQuantity <= 0)
+		{
+			Slot.Clear();
+			bChanged = true;
+			continue;
+		}
+
+		if (Slot.Quantity != InventoryQuantity)
+		{
+			Slot.Quantity = InventoryQuantity;
+			Slot.bIsEmpty = false;
+			bChanged = true;
+		}
+	}
+
+	return bChanged;
+}
+
+void UPDQuickSlotComponent::HandleInventoryChanged()
+{
+	if (SyncQuickSlotsWithInventory())
+	{
+		OnQuickSlotsChanged.Broadcast();
+	}
 }
 
 int32 UPDQuickSlotComponent::FindEmptySlot() const
@@ -164,18 +255,20 @@ bool UPDQuickSlotComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 
 		InitializeQuickSlots();
 	}
 
-	if (!QuickSlotItems.IsValidIndex(SourceSlotIndex) || !QuickSlotItems.IsValidIndex(TargetSlotIndex) || SourceSlotIndex == TargetSlotIndex || Quantity <= 0)
+	if (!QuickSlotItems.IsValidIndex(SourceSlotIndex) || !QuickSlotItems.IsValidIndex(TargetSlotIndex) || SourceSlotIndex == TargetSlotIndex)
 	{
 		return false;
 	}
 
-	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(QuickSlotItems[SourceSlotIndex], QuickSlotItems[TargetSlotIndex], Quantity);
-	if (bMoved)
+	if (QuickSlotItems[SourceSlotIndex].IsEmpty())
 	{
-		OnQuickSlotsChanged.Broadcast();
+		return false;
 	}
 
-	return bMoved;
+	Swap(QuickSlotItems[SourceSlotIndex], QuickSlotItems[TargetSlotIndex]);
+	SyncQuickSlotsWithInventory();
+	OnQuickSlotsChanged.Broadcast();
+	return true;
 }
 
 bool UPDQuickSlotComponent::StoreInventorySlotQuantityToSlot(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 TargetQuickSlotIndex, int32 Quantity)
@@ -193,19 +286,46 @@ bool UPDQuickSlotComponent::StoreInventorySlotQuantityToSlot(UPDInventoryCompone
 		InitializeQuickSlots();
 	}
 
-	if (!SourceInventory || !SourceInventory->Items.IsValidIndex(SourceSlotIndex) || !QuickSlotItems.IsValidIndex(TargetQuickSlotIndex) || Quantity <= 0)
+	if (!SourceInventory || !SourceInventory->Items.IsValidIndex(SourceSlotIndex) || !QuickSlotItems.IsValidIndex(TargetQuickSlotIndex))
 	{
 		return false;
 	}
 
-	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(SourceInventory->Items[SourceSlotIndex], QuickSlotItems[TargetQuickSlotIndex], Quantity);
-	if (bMoved)
+	const FPDInventorySlot& SourceSlot = SourceInventory->Items[SourceSlotIndex];
+	if (SourceSlot.IsEmpty())
 	{
-		SourceInventory->OnInventoryChanged.Broadcast();
-		OnQuickSlotsChanged.Broadcast();
+		return false;
 	}
 
-	return bMoved;
+	int32 ExistingSlotIndex = INDEX_NONE;
+	for (int32 Index = 0; Index < QuickSlotItems.Num(); ++Index)
+	{
+		if (Index != TargetQuickSlotIndex && !QuickSlotItems[Index].IsEmpty() && QuickSlotItems[Index].ItemData.ItemID == SourceSlot.ItemData.ItemID)
+		{
+			ExistingSlotIndex = Index;
+			break;
+		}
+	}
+
+	if (ExistingSlotIndex != INDEX_NONE)
+	{
+		Swap(QuickSlotItems[ExistingSlotIndex], QuickSlotItems[TargetQuickSlotIndex]);
+	}
+	else
+	{
+		FPDInventorySlot& TargetSlot = QuickSlotItems[TargetQuickSlotIndex];
+		TargetSlot.ItemData = SourceSlot.ItemData;
+		TargetSlot.Quantity = GetInventoryItemQuantity(SourceSlot.ItemData.ItemID);
+		if (TargetSlot.Quantity <= 0)
+		{
+			TargetSlot.Quantity = SourceSlot.Quantity;
+		}
+		TargetSlot.bIsEmpty = false;
+	}
+
+	SyncQuickSlotsWithInventory();
+	OnQuickSlotsChanged.Broadcast();
+	return true;
 }
 
 bool UPDQuickSlotComponent::StoreStashSlotQuantityToSlot(UPDStashComponent* SourceStash, int32 SourceStashSlotIndex, int32 TargetQuickSlotIndex, int32 Quantity)
@@ -240,87 +360,58 @@ bool UPDQuickSlotComponent::StoreStashSlotQuantityToSlot(UPDStashComponent* Sour
 
 bool UPDQuickSlotComponent::TakeQuickSlotQuantityToInventorySlot(UPDInventoryComponent* TargetInventory, int32 QuickSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity)
 {
-	if (!TargetInventory || TargetInventory->Items.Num() != TargetInventory->GetMaxSlotCount())
-	{
-		if (TargetInventory)
-		{
-			TargetInventory->InitializeInventory();
-		}
-	}
-
-	if (QuickSlotItems.Num() != GetMaxSlotCount())
-	{
-		InitializeQuickSlots();
-	}
-
-	if (!TargetInventory || !QuickSlotItems.IsValidIndex(QuickSlotIndex) || !TargetInventory->Items.IsValidIndex(TargetInventorySlotIndex) || Quantity <= 0)
-	{
-		return false;
-	}
-
-	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(QuickSlotItems[QuickSlotIndex], TargetInventory->Items[TargetInventorySlotIndex], Quantity);
-	if (bMoved)
-	{
-		OnQuickSlotsChanged.Broadcast();
-		TargetInventory->OnInventoryChanged.Broadcast();
-	}
-
-	return bMoved;
+	return RemoveItemFromSlot(QuickSlotIndex, Quantity);
 }
 
 bool UPDQuickSlotComponent::TakeQuickSlotQuantityToStashSlot(UPDStashComponent* TargetStash, int32 QuickSlotIndex, int32 TargetStashSlotIndex, int32 Quantity)
 {
-	if (!TargetStash || TargetStash->StashItems.Num() != TargetStash->GetMaxSlotCount())
+	return RemoveItemFromSlot(QuickSlotIndex, Quantity);
+}
+
+bool UPDQuickSlotComponent::RemoveItemFromSlot(int32 SlotIndex, int32 Quantity)
+{
+	if (!QuickSlotItems.IsValidIndex(SlotIndex))
 	{
-		if (TargetStash)
-		{
-			TargetStash->InitializeStash();
-		}
+		return false;
 	}
 
+	if (QuickSlotItems[SlotIndex].IsEmpty())
+	{
+		return false;
+	}
+
+	QuickSlotItems[SlotIndex].Clear();
+	OnQuickSlotsChanged.Broadcast();
+	return true;
+}
+
+bool UPDQuickSlotComponent::UseQuickSlot(int32 SlotIndex)
+{
 	if (QuickSlotItems.Num() != GetMaxSlotCount())
 	{
 		InitializeQuickSlots();
 	}
 
-	if (!TargetStash || !QuickSlotItems.IsValidIndex(QuickSlotIndex) || !TargetStash->StashItems.IsValidIndex(TargetStashSlotIndex) || Quantity <= 0)
+	if (!QuickSlotItems.IsValidIndex(SlotIndex))
 	{
 		return false;
 	}
 
-	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(QuickSlotItems[QuickSlotIndex], TargetStash->StashItems[TargetStashSlotIndex], Quantity);
-	if (bMoved)
+	const FPDInventorySlot& Slot = QuickSlotItems[SlotIndex];
+	if (Slot.IsEmpty() || Slot.ItemData.ItemType != EPDItemType::Consumable)
 	{
+		return false;
+	}
+
+	UPDInventoryComponent* InventoryComponent = FindOwnerInventory();
+	if (!InventoryComponent || !InventoryComponent->HasItem(Slot.ItemData.ItemID, 1))
+	{
+		SyncQuickSlotsWithInventory();
 		OnQuickSlotsChanged.Broadcast();
-		TargetStash->OnStashChanged.Broadcast();
-	}
-
-	return bMoved;
-}
-
-bool UPDQuickSlotComponent::RemoveItemFromSlot(int32 SlotIndex, int32 Quantity)
-{
-	if (!QuickSlotItems.IsValidIndex(SlotIndex) || Quantity <= 0)
-	{
 		return false;
 	}
 
-	FPDInventorySlot& Slot = QuickSlotItems[SlotIndex];
-	if (Slot.IsEmpty())
-	{
-		return false;
-	}
-
-	const int32 RemoveAmount = FMath::Min(Quantity, Slot.Quantity);
-	Slot.Quantity -= RemoveAmount;
-
-	if (Slot.Quantity <= 0)
-	{
-		Slot.Clear();
-	}
-
-	OnQuickSlotsChanged.Broadcast();
-	return true;
+	return InventoryComponent->RemoveItem(Slot.ItemData.ItemID, 1);
 }
 
 bool UPDQuickSlotComponent::HasItem(FName ItemID, int32 Quantity) const

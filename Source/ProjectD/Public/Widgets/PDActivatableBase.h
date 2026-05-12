@@ -36,6 +36,9 @@ public:
 
 	bool IsActivated() const { return bActivated; }
 
+	/** Subsystem이 효과적 입력 모드 계산을 위해 top 위젯의 선언값을 조회. */
+	EWidgetInputMode GetInputMode() const { return InputMode; }
+
 protected:
 	/** C++에서 위젯 활성화 시, 넣고 싶은 로직 작성*/
 	virtual void NativeOnActivated();
@@ -59,7 +62,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	bool bShowMouseCursor{true};
 
-	/** 포커스를 잃었을 때 위젯을 닫을지 여부입니다. */
+	/** 포커스를 잃었을 때 위젯을 닫을지 여부 */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	bool bLightDismissable{false};
 

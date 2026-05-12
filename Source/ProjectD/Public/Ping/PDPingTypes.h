@@ -9,12 +9,12 @@ class APDPingMarker;
 UENUM(BlueprintType)
 enum class EPDPingType : uint8
 {
-	Default     UMETA(DisplayName="기본"),
-	Enemy       UMETA(DisplayName="적"),
-	MoveHere    UMETA(DisplayName="이동"),
-	Item        UMETA(DisplayName="아이템"),
-	Danger      UMETA(DisplayName="위험"),
-	Request     UMETA(DisplayName="요청"),
+	Default     UMETA(DisplayName="Default"),
+	Enemy       UMETA(DisplayName="Enemy"),
+	MoveHere    UMETA(DisplayName="Move Here"),
+	Item        UMETA(DisplayName="Item"),
+	Danger      UMETA(DisplayName="Danger"),
+	Help     UMETA(DisplayName="Help"),
 };
 
 

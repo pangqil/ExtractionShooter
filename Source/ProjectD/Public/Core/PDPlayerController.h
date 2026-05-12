@@ -22,6 +22,8 @@ class UPDCrosshairWidget;
 class UUserWidget;
 class APDWeaponBase;
 class APDRifle;
+class UPDRootLayout;
+enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 
@@ -63,10 +65,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDHUDWidget> HUDClass;
 
-	virtual void CreateAndAddHUDWidget();
+	/** 레이어드 UI의 루트. BP에서 WBP_RootLayout 지정. 미지정 시 레이어드 API 미작동(legacy 경로는 정상). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDRootLayout> RootLayoutClass;
 
-	UFUNCTION(BlueprintCallable, Category = "PD|UI")
-	void RequestCloseCurrentScreen();
+	virtual void CreateAndAddHUDWidget();
 
 	UPROPERTY(EditAnywhere, Category = "PD|Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -89,10 +92,11 @@ protected:
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnUnPossess() override;
 
 private:
-	UFUNCTION(BlueprintCallable, Category = "PD|QuickSlot")
-	void HandleQuickSlotSelected(int32 SlotIndex);
+	void UseQuickSlot(int32 SlotIndex);
 
 	void OnMove(const struct FInputActionValue& Value);
 	void OnJump();
@@ -121,6 +125,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDHUDWidget> HUDInstance;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UPDRootLayout> RootLayoutInstance;
+
 	UPROPERTY()
 	TObjectPtr<UPDCrosshairWidget> CrosshairWidget;
 
@@ -129,6 +136,9 @@ private:
 	bool bMouseClickEventsEnabledBeforeModalUI = false;
 	bool bMouseOverEventsEnabledBeforeModalUI = false;
 
+	/** Subsystem의 OnEffectiveUIStateChanged 콜백. 입력 모드/시스템 커서/크로스헤어 visibility 일괄 적용. */
+	void ApplyEffectiveUIState(EWidgetInputMode Mode);
+
 	void OnFirePressed();
 	void OnFireReleased();
 	void OnReload();
@@ -136,6 +146,7 @@ private:
 	void OnSwitchSlot1();
 	void OnSwitchSlot2();
 	void OnSwitchSlot3();
+	void OnUseQuickSlot4();
 	void OnZoom();
 	void OnToggleFireMode();
 	void OnDropWeapon();

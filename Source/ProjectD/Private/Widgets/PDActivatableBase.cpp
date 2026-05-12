@@ -5,6 +5,7 @@
 
 #include "GameFramework/PlayerController.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
+#include "Type/Types.h"
 
 void UPDActivatableBase::Activate()
 {
@@ -42,15 +43,19 @@ void UPDActivatableBase::NativeOnFocusLost(const FFocusEvent& InFocusEvent)
 {
 	Super::OnFocusLost(InFocusEvent);
 
-	if (bLightDismissable)
+	if (!bLightDismissable) return;
+
+	UPDFrontendUISubsystem* Subsystem = GetGameInstance()->GetSubsystem<UPDFrontendUISubsystem>();
+	if (!Subsystem) return;
+
+	// 자기 자신이 top인 레이어를 찾아서 pop. 어느 레이어에도 top이 아니면 무시
+	static constexpr EUILayer AllLayers[] = { EUILayer::Frontend, EUILayer::GameMenu, EUILayer::Modal };
+	for (EUILayer Layer : AllLayers)
 	{
-		if (UPDFrontendUISubsystem* FrontendUISubsystem = GetGameInstance()->GetSubsystem<UPDFrontendUISubsystem>())
+		if (Subsystem->GetTopOfLayer(Layer) == this)
 		{
-			// 내가 현재 화면일 경우에만 닫기 로직을 실행
-			if (FrontendUISubsystem->GetCurrentScreen() == this)
-			{
-				FrontendUISubsystem->CloseScreen();
-			}
+			Subsystem->PopFromLayer(Layer);
+			return;
 		}
 	}
 }
@@ -88,7 +93,6 @@ void UPDActivatableBase::ApplyInputMode()
 		}
 	case EWidgetInputMode::Passive:
 		{
-			// 입력/커서 상태를 유지
 			break;
 		}
 	}
