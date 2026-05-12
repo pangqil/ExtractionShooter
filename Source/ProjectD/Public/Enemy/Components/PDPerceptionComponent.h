@@ -45,16 +45,16 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
-	float SightRadius = 1500.f;
+	float SightRadius = 900.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
-	float LoseSightRadius = 1800.f;
+	float LoseSightRadius = SightRadius * 1.3f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0", ClampMax = "180.0"))
-	float PeripheralVisionAngleDegrees = 70.f;
+	float PeripheralVisionAngleDegrees = 55.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
-	float SightMaxAge = 5.f;
+	float SightMaxAge = 4.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Hearing", meta = (ClampMin = "0.0"))
 	float HearingRange = 1500.f;

@@ -1,7 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Type/Types.h"
 #include "PDPlayerController.generated.h"
 
 struct FGameplayTag;
@@ -9,6 +10,7 @@ class UNiagaraSystem;
 class UInputMappingContext;
 class UInputAction;
 class UPathFollowingComponent;
+class UPDInputConfig;
 class UPDInventoryWidget;
 class UPDStashWidget;
 class UPDMarketWidget;
@@ -17,15 +19,11 @@ class APDPlayerCharacter;
 class UPDHUDWidget;
 class UPDActivatableBase;
 class UPDCrosshairWidget;
+class UUserWidget;
+class APDWeaponBase;
+class APDRifle;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
-
-class UInputMappingContext;
-class UPDInputConfig;
-
-class APDPlayerCharacter;
-class APDWeaponBase;       
-class APDRifle;           
 
 UCLASS(abstract)
 class PROJECTD_API APDPlayerController : public APlayerController
@@ -59,15 +57,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	bool SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity = 1);
 
-	virtual void PlayerTick(float DeltaTime) override; 
+	virtual void PlayerTick(float DeltaTime) override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDHUDWidget> HUDClass;
-	
+
 	virtual void CreateAndAddHUDWidget();
 
-	// 현재 열려 있는 화면을 닫고 싶을 때 BP에서 호출
 	UFUNCTION(BlueprintCallable, Category = "PD|UI")
 	void RequestCloseCurrentScreen();
 
@@ -92,11 +89,11 @@ protected:
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	
+
 private:
 	UFUNCTION(BlueprintCallable, Category = "PD|QuickSlot")
 	void HandleQuickSlotSelected(int32 SlotIndex);
-	
+
 	void OnMove(const struct FInputActionValue& Value);
 	void OnJump();
 	void OnAbilityInputPressed(FGameplayTag InputTag);
@@ -105,6 +102,9 @@ private:
 
 	void ToggleInventory();
 	void TryInteract();
+
+	bool IsGameplayInputBlockedByModalUI() const;
+	void SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus = nullptr);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryWidget> InventoryWidgetInstance;
@@ -123,7 +123,12 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UPDCrosshairWidget> CrosshairWidget;
-	
+
+	bool bIsGameplayInputBlockedByModalUI = false;
+	bool bMouseCursorVisibleBeforeModalUI = false;
+	bool bMouseClickEventsEnabledBeforeModalUI = false;
+	bool bMouseOverEventsEnabledBeforeModalUI = false;
+
 	void OnFirePressed();
 	void OnFireReleased();
 	void OnReload();
@@ -135,10 +140,7 @@ private:
 	void OnToggleFireMode();
 	void OnDropWeapon();
 	void UpdateCrosshair();
-	
+
 	UFUNCTION()
 	void OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot);
-	
-	bool bShowMouseCursor=true;
-
 };
