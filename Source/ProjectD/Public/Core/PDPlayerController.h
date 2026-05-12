@@ -91,8 +91,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
-	UFUNCTION(BlueprintCallable, Category = "PD|QuickSlot")
-	void HandleQuickSlotSelected(int32 SlotIndex);
+	void UseQuickSlot(int32 SlotIndex);
 
 	void OnMove(const struct FInputActionValue& Value);
 	void OnJump();
@@ -136,6 +135,7 @@ private:
 	void OnSwitchSlot1();
 	void OnSwitchSlot2();
 	void OnSwitchSlot3();
+	void OnUseQuickSlot4();
 	void OnZoom();
 	void OnToggleFireMode();
 	void OnDropWeapon();

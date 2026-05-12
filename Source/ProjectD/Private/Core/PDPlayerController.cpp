@@ -22,6 +22,7 @@
 #include "Widgets/Crosshair/PDCrosshairWidget.h"
 #include "Items/PDMarketComponent.h"
 #include "Items/PDInventoryComponent.h"
+#include "Items/PDQuickSlotComponent.h"
 #include "Widgets/HUD/PDHUDWidget.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
 #include "Blueprint/UserWidget.h"
@@ -74,6 +75,10 @@ void APDPlayerController::SetupInputComponent()
 	{
 		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &APDPlayerController::ToggleInventory);
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
+		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
+		InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
+		InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
+		InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
 		return;
 	}
 
@@ -128,7 +133,10 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_DropWeapon,
 		ETriggerEvent::Started, this, &APDPlayerController::OnDropWeapon);
 
-	
+	InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
+	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
+	InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
+	InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
 }
 
 void APDPlayerController::BeginPlay()
@@ -537,23 +545,24 @@ void APDPlayerController::UpdateAimRotation()
 	}
 }
 
-// 슬롯 전환
 void APDPlayerController::OnSwitchSlot1()
 {
-	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		Ch->SwitchToSlot(EWeaponSlot::Slot1_Rifle);
+	UseQuickSlot(0);
 }
 
 void APDPlayerController::OnSwitchSlot2()
 {
-	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		Ch->SwitchToSlot(EWeaponSlot::Slot2_Shotgun);
+	UseQuickSlot(1);
 }
 
 void APDPlayerController::OnSwitchSlot3()
 {
-	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		Ch->SwitchToSlot(EWeaponSlot::Slot3_Sniper);
+	UseQuickSlot(2);
+}
+
+void APDPlayerController::OnUseQuickSlot4()
+{
+	UseQuickSlot(3);
 }
 
 void APDPlayerController::OnZoom()
@@ -578,11 +587,25 @@ void APDPlayerController::OnDropWeapon()
 		Ch->DropCurrentWeapon();
 }
 
-void APDPlayerController::HandleQuickSlotSelected(int32 SlotIndex)
+void APDPlayerController::UseQuickSlot(int32 SlotIndex)
 {
-	if (HUDInstance)
+	if (IsGameplayInputBlockedByModalUI())
 	{
-		HUDInstance->SetQuickSlotSelected(SlotIndex);
+		return;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return;
+	}
+
+	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	{
+		if (QuickSlotComponent->UseQuickSlot(SlotIndex) && HUDInstance)
+		{
+			HUDInstance->RefreshNewQuickSlots();
+		}
 	}
 }
 

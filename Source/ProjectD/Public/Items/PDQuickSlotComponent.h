@@ -22,7 +22,7 @@ public:
 	TArray<FPDInventorySlot> QuickSlotItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|QuickSlot")
-	int32 GridColumns = 5;
+	int32 GridColumns = 4;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|QuickSlot")
 	int32 GridRows = 1;
@@ -67,8 +67,20 @@ public:
 	bool RemoveItemFromSlot(int32 SlotIndex, int32 Quantity = 1);
 
 	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	bool UseQuickSlot(int32 SlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
 	bool HasItem(FName ItemID, int32 Quantity = 1) const;
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+private:
+	UFUNCTION()
+	void HandleInventoryChanged();
+
+	UPDInventoryComponent* FindOwnerInventory() const;
+	int32 GetInventoryItemQuantity(FName ItemID) const;
+	bool SyncQuickSlotsWithInventory();
 };

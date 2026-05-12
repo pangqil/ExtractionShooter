@@ -10,12 +10,14 @@
 #include "Type/Types.h"
 #include "Widgets/HUD/PDAttributeBarWidget.h"
 #include "Widgets/HUD/PDBodyPartHealthGroupWidget.h"
-#include "Widgets/HUD/PDQuickSlotBarWidget.h"
+#include "Widgets/HUD/PDNewQuickSlotBarWidget.h"
+#include "Items/PDQuickSlotComponent.h"
 
 void UPDHUDWidget::NativeOnActivated()
 {
 	Super::NativeOnActivated();
 	TryBindToOwningPawnASC();
+	RefreshNewQuickSlots();
 }
 
 void UPDHUDWidget::NativeOnDeactivated()
@@ -129,10 +131,18 @@ void UPDHUDWidget::UnbindAll()
 	CachedASC.Reset();
 }
 
-void UPDHUDWidget::SetQuickSlotSelected(int32 SlotIndex)
+void UPDHUDWidget::RefreshNewQuickSlots()
 {
-	if (Bar_QuickSlots)
+	if (!Bar_NewQuickSlots)
 	{
-		Bar_QuickSlots->SetSelectedIndex(SlotIndex);
+		return;
 	}
+
+	UPDQuickSlotComponent* QuickSlotComponent = nullptr;
+	if (APawn* Pawn = GetOwningPlayerPawn())
+	{
+		QuickSlotComponent = Pawn->FindComponentByClass<UPDQuickSlotComponent>();
+	}
+
+	Bar_NewQuickSlots->BindQuickSlotComponent(QuickSlotComponent);
 }
