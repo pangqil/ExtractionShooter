@@ -36,6 +36,8 @@ DEFINE_LOG_CATEGORY(LogPDCharacter);
 #include "Weapons/PDShotgun.h"
 #include "Weapons/PDSniper.h"
 
+#include "Ping/PDPingSubsystem.h"
+
 
 APDPlayerController::APDPlayerController()
 {
@@ -718,7 +720,12 @@ void APDPlayerController::OnInteract()
 }
 
 void APDPlayerController::OnFirePressed()
-{
+{	
+	if (UPDPingSubsystem* PingSys = GetWorld()->GetSubsystem<UPDPingSubsystem>())
+	{
+		if (PingSys->IsPingActive()) return;
+	}
+	
 	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
 	if (!Ch) return;
 	APDWeaponBase* Weapon = Ch->GetCurrentWeapon();
