@@ -7,36 +7,56 @@
 #include "AbilitySystemComponent.h"
 #include "AttributeSet/PDAttributeSet.h"
 #include "GameFramework/Pawn.h"
+#include "GameplayTag/PDGameplayTags.h"
 #include "Type/Types.h"
 #include "Widgets/HUD/PDAttributeBarWidget.h"
 #include "Widgets/HUD/PDBodyPartHealthGroupWidget.h"
 #include "Widgets/HUD/PDNewQuickSlotBarWidget.h"
+#include "Widgets/HUD/PDDebuffIconBarWidget.h"
 #include "Items/PDQuickSlotComponent.h"
+
+UPDHUDWidget::UPDHUDWidget(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	// HUD는 입력 모드를 절대 건드리면 안 됨. 베이스 기본값 Menu가 FInputModeUIOnly를 강제하는 사고 방지.
+	InputMode = EWidgetInputMode::Passive;
+}
 
 void UPDHUDWidget::NativeOnActivated()
 {
 	Super::NativeOnActivated();
-	TryBindToOwningPawnASC();
+
+	APawn* Pawn = GetOwningPlayerPawn();
+	UAbilitySystemComponent* ASC = Pawn
+		? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Pawn)
+		: nullptr;
+	RebindToASC(ASC);
+
 	RefreshNewQuickSlots();
 }
 
 void UPDHUDWidget::NativeOnDeactivated()
 {
-	UnbindAll();
+	RebindToASC(nullptr);
 	Super::NativeOnDeactivated();
 }
 
-void UPDHUDWidget::TryBindToOwningPawnASC()
+void UPDHUDWidget::RebindToASC(UAbilitySystemComponent* NewASC)
 {
-	APawn* Pawn = GetOwningPlayerPawn();
-	if (!Pawn) return;
+	if (CachedASC.Get() == NewASC) return;
 
-	UAbilitySystemComponent* ASC =
-		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Pawn);
-	if (!ASC) return;
+	UnbindAllAttributes();
+	UnbindAllTags();
 
-	CachedASC = ASC;
+	CachedASC = NewASC;
+	if (!NewASC) return;
 
+	BindAllAttributes();
+	BindAllDebuffTags();
+}
+
+void UPDHUDWidget::BindAllAttributes()
+{
 	BindAttributeToBar(Bar_Stamina,
 		UPDAttributeSet::GetStaminaAttribute(),
 		UPDAttributeSet::GetMaxStaminaAttribute());
@@ -96,10 +116,10 @@ void UPDHUDWidget::BindAttributeToBar(UPDAttributeBarWidget* Bar,
 			WeakSelf->RefreshBar(WeakBar.Get(), CurrentAttr, MaxAttr);
 		};
 
-	BoundHandles.Add({ CurrentAttr,
+	BoundAttributeHandles.Add({ CurrentAttr,
 		ASC->GetGameplayAttributeValueChangeDelegate(CurrentAttr).AddLambda(OnChanged) });
 
-	BoundHandles.Add({ MaxAttr,
+	BoundAttributeHandles.Add({ MaxAttr,
 		ASC->GetGameplayAttributeValueChangeDelegate(MaxAttr).AddLambda(OnChanged) });
 }
 
@@ -113,22 +133,111 @@ void UPDHUDWidget::RefreshBar(UPDAttributeBarWidget* Bar,
 	Bar->SetValues(
 		ASC->GetNumericAttribute(CurrentAttr),
 		ASC->GetNumericAttribute(MaxAttr));
-	
-	UE_LOG(LogTemp, Warning, TEXT("RefreshBar for '%s': Current=%.1f, Max=%.1f"), *CurrentAttr.AttributeName, ASC->GetNumericAttribute(CurrentAttr), ASC->GetNumericAttribute(MaxAttr));
 }
 
-void UPDHUDWidget::UnbindAll()
+void UPDHUDWidget::UnbindAllAttributes()
 {
 	if (CachedASC.IsValid())
 	{
 		UAbilitySystemComponent* ASC = CachedASC.Get();
-		for (const FBoundHandle& BH : BoundHandles)
+		for (const FBoundAttributeHandle& BH : BoundAttributeHandles)
 		{
 			ASC->GetGameplayAttributeValueChangeDelegate(BH.Attribute).Remove(BH.Handle);
 		}
 	}
-	BoundHandles.Reset();
-	CachedASC.Reset();
+	BoundAttributeHandles.Reset();
+}
+
+void UPDHUDWidget::BindAllDebuffTags()
+{
+	BindTagEvent(PDGameplayTags::State_Debuff_Bleeding,
+		[this](const FGameplayTag& Tag, int32 NewCount) { HandleBleeding(Tag, NewCount); });
+
+	BindTagEvent(PDGameplayTags::State_Debuff_LegDamaged,
+		[this](const FGameplayTag& Tag, int32 NewCount) { HandleLegDamaged(Tag, NewCount); });
+
+	BindTagEvent(PDGameplayTags::State_Debuff_ArmDamaged,
+		[this](const FGameplayTag& Tag, int32 NewCount) { HandleArmDamaged(Tag, NewCount); });
+
+	BindTagEvent(PDGameplayTags::State_Debuff_Starving,
+		[this](const FGameplayTag& Tag, int32 NewCount) { HandleStarving(Tag, NewCount); });
+
+	BindTagEvent(PDGameplayTags::State_Debuff_Dehydrated,
+		[this](const FGameplayTag& Tag, int32 NewCount) { HandleDehydrated(Tag, NewCount); });
+}
+
+void UPDHUDWidget::BindTagEvent(const FGameplayTag& Tag,
+	TFunction<void(const FGameplayTag&, int32)> OnChanged)
+{
+	if (!CachedASC.IsValid()) return;
+	UAbilitySystemComponent* ASC = CachedASC.Get();
+
+	// 초기 상태 동기화 — 바인딩 시점의 현재 태그 카운트로 핸들러 1회 호출.
+	// RegisterGameplayTagEvent(NewOrRemoved)는 전이만 trigger하므로, 이미 1+ 상태인 태그를 놓치지 않기 위해 필요.
+	OnChanged(Tag, ASC->GetGameplayTagCount(Tag));
+
+	TWeakObjectPtr<UPDHUDWidget> WeakSelf = this;
+	FDelegateHandle Handle = ASC->RegisterGameplayTagEvent(Tag, EGameplayTagEventType::NewOrRemoved)
+		.AddLambda([WeakSelf, OnChanged](const FGameplayTag CallbackTag, int32 NewCount)
+		{
+			if (!WeakSelf.IsValid()) return;
+			OnChanged(CallbackTag, NewCount);
+		});
+
+	BoundTagHandles.Add({ Tag, Handle });
+}
+
+void UPDHUDWidget::UnbindAllTags()
+{
+	if (CachedASC.IsValid())
+	{
+		UAbilitySystemComponent* ASC = CachedASC.Get();
+		for (const FBoundTagHandle& BH : BoundTagHandles)
+		{
+			ASC->RegisterGameplayTagEvent(BH.Tag, EGameplayTagEventType::NewOrRemoved).Remove(BH.Handle);
+		}
+	}
+	BoundTagHandles.Reset();
+}
+
+void UPDHUDWidget::HandleBleeding(const FGameplayTag& Tag, int32 NewCount)
+{
+	if (Bar_Debuffs)
+	{
+		Bar_Debuffs->SetDebuffActive(Tag, NewCount > 0);
+	}
+}
+
+void UPDHUDWidget::HandleLegDamaged(const FGameplayTag& Tag, int32 NewCount)
+{
+	if (Bar_Debuffs)
+	{
+		Bar_Debuffs->SetDebuffActive(Tag, NewCount > 0);
+	}
+}
+
+void UPDHUDWidget::HandleArmDamaged(const FGameplayTag& Tag, int32 NewCount)
+{
+	if (Bar_Debuffs)
+	{
+		Bar_Debuffs->SetDebuffActive(Tag, NewCount > 0);
+	}
+}
+
+void UPDHUDWidget::HandleStarving(const FGameplayTag& Tag, int32 NewCount)
+{
+	if (Bar_Debuffs)
+	{
+		Bar_Debuffs->SetDebuffActive(Tag, NewCount > 0);
+	}
+}
+
+void UPDHUDWidget::HandleDehydrated(const FGameplayTag& Tag, int32 NewCount)
+{
+	if (Bar_Debuffs)
+	{
+		Bar_Debuffs->SetDebuffActive(Tag, NewCount > 0);
+	}
 }
 
 void UPDHUDWidget::RefreshNewQuickSlots()
