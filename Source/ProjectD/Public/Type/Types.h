@@ -185,3 +185,12 @@ struct FWeaponLevelStats
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	float Accuracy = 0.95f;
 };
+
+
+UENUM(BlueprintType)
+enum class EUILayer : uint8
+{
+	Frontend UMETA(DisplayName = "Frontend"), 
+	GameMenu UMETA(DisplayName = "Game Menu"),
+	Modal    UMETA(DisplayName = "Modal"),
+};

@@ -24,6 +24,8 @@
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDQuickSlotComponent.h"
 #include "Widgets/HUD/PDHUDWidget.h"
+#include "Widgets/PDActivatableBase.h"
+#include "Widgets/PDRootLayout.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
 #include "Blueprint/UserWidget.h"
 
@@ -59,7 +61,7 @@ void APDPlayerController::PlayerTick(float DeltaTime)
 void APDPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	
+
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
 		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
@@ -165,22 +167,66 @@ void APDPlayerController::BeginPlay()
 		Ch->OnWeaponSwapped.AddDynamic(this, &APDPlayerController::OnWeaponChanged);
 
 	CreateAndAddHUDWidget();
+	
+	if (RootLayoutClass)
+	{
+		RootLayoutInstance = CreateWidget<UPDRootLayout>(this, RootLayoutClass);
+		if (RootLayoutInstance)
+		{
+			RootLayoutInstance->AddToViewport(5);
+			if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
+			{
+				UISubsystem->OnEffectiveUIStateChanged.AddUObject(this, &APDPlayerController::ApplyEffectiveUIState);
+				UISubsystem->RegisterRootLayout(RootLayoutInstance);
+			}
+		}
+	}
 }
 
 void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (HUDInstance)
 	{
+		HUDInstance->Deactivate();
 		HUDInstance->RemoveFromParent();
 		HUDInstance = nullptr;
 	}
 
 	if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
 	{
-		UISubsystem->CloseScreen();
+		UISubsystem->OnEffectiveUIStateChanged.RemoveAll(this);
+		UISubsystem->UnregisterRootLayout();
+	}
+
+	if (RootLayoutInstance)
+	{
+		RootLayoutInstance->RemoveFromParent();
+		RootLayoutInstance = nullptr;
 	}
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void APDPlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+
+	if (HUDInstance)
+	{
+		UAbilitySystemComponent* ASC = InPawn
+			? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InPawn)
+			: nullptr;
+		HUDInstance->RebindToASC(ASC);
+	}
+}
+
+void APDPlayerController::OnUnPossess()
+{
+	if (HUDInstance)
+	{
+		HUDInstance->RebindToASC(nullptr);
+	}
+	Super::OnUnPossess();
 }
 
 void APDPlayerController::CreateAndAddHUDWidget()
@@ -196,11 +242,50 @@ void APDPlayerController::CreateAndAddHUDWidget()
 	}
 }
 
-void APDPlayerController::RequestCloseCurrentScreen()
+void APDPlayerController::ApplyEffectiveUIState(EWidgetInputMode Mode)
 {
-	if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
+	switch (Mode)
 	{
-		UISubsystem->CloseScreen();
+	case EWidgetInputMode::Game:
+		{
+			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			InputMode.SetHideCursorDuringCapture(false);
+			SetInputMode(InputMode);
+			bShowMouseCursor = false;
+			if (CrosshairWidget)
+			{
+				CrosshairWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
+			break;
+		}
+	case EWidgetInputMode::GameAndMenu:
+		{
+			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			InputMode.SetHideCursorDuringCapture(false);
+			SetInputMode(InputMode);
+			bShowMouseCursor = true;
+			if (CrosshairWidget)
+			{
+				CrosshairWidget->SetVisibility(ESlateVisibility::Collapsed);
+			}
+			break;
+		}
+	case EWidgetInputMode::Menu:
+		{
+			FInputModeUIOnly InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			SetInputMode(InputMode);
+			bShowMouseCursor = true;
+			if (CrosshairWidget)
+			{
+				CrosshairWidget->SetVisibility(ESlateVisibility::Collapsed);
+			}
+			break;
+		}
+	case EWidgetInputMode::Passive:
+		break;
 	}
 }
 

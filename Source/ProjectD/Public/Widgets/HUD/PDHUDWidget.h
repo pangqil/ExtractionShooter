@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Widgets/PDActivatableBase.h"
 #include "AttributeSet.h"
 #include "PDHUDWidget.generated.h"
@@ -10,17 +11,24 @@
 class UPDAttributeBarWidget;
 class UPDBodyPartHealthGroupWidget;
 class UPDNewQuickSlotBarWidget;
+class UPDDebuffIconBarWidget;
 class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 
 /**
  * 플레이어 HUD 위젯
- * Activate 시점에 Pawn의 ASC를 잡아 attribute 변경 델리게이트를 구독하고, Deactivate 시점에 구독을 해제
+ * Activate 시점에 Pawn의 ASC를 잡아 attribute/tag 변경 델리게이트를 구독하고, Deactivate 시점에 구독을 해제.
+ * PC가 possession 변경 시 RebindToASC로 재바인딩.
  */
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
 class PROJECTD_API UPDHUDWidget : public UPDActivatableBase
 {
 	GENERATED_BODY()
+
+public:
+	UPDHUDWidget(const FObjectInitializer& ObjectInitializer);
+	
+	void RebindToASC(UAbilitySystemComponent* NewASC);
 
 protected:
 	virtual void NativeOnActivated() override;
@@ -42,29 +50,47 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDNewQuickSlotBarWidget> Bar_NewQuickSlots;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDDebuffIconBarWidget> Bar_Debuffs;
+
 public:
 	UFUNCTION(BlueprintCallable, Category = "PD|HUD")
 	void RefreshNewQuickSlots();
 
 private:
-	struct FBoundHandle
+	struct FBoundAttributeHandle
 	{
 		FGameplayAttribute Attribute;
 		FDelegateHandle Handle;
 	};
 
-	void TryBindToOwningPawnASC();
+	struct FBoundTagHandle
+	{
+		FGameplayTag Tag;
+		FDelegateHandle Handle;
+	};
 
+	void BindAllAttributes();
 	void BindAttributeToBar(UPDAttributeBarWidget* Bar,
 		const FGameplayAttribute& CurrentAttr,
 		const FGameplayAttribute& MaxAttr);
-
 	void RefreshBar(UPDAttributeBarWidget* Bar,
 		const FGameplayAttribute& CurrentAttr,
 		const FGameplayAttribute& MaxAttr) const;
+	void UnbindAllAttributes();
 
-	void UnbindAll();
+	void BindAllDebuffTags();
+	void BindTagEvent(const FGameplayTag& Tag,
+		TFunction<void(const FGameplayTag&, int32)> OnChanged);
+	void UnbindAllTags();
+	
+	void HandleBleeding(const FGameplayTag& Tag, int32 NewCount);
+	void HandleLegDamaged(const FGameplayTag& Tag, int32 NewCount);
+	void HandleArmDamaged(const FGameplayTag& Tag, int32 NewCount);
+	void HandleStarving(const FGameplayTag& Tag, int32 NewCount);
+	void HandleDehydrated(const FGameplayTag& Tag, int32 NewCount);
 
 	TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
-	TArray<FBoundHandle> BoundHandles;
+	TArray<FBoundAttributeHandle> BoundAttributeHandles;
+	TArray<FBoundTagHandle> BoundTagHandles;
 };
