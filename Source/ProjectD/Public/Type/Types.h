@@ -3,7 +3,10 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
+#include "Templates/SubclassOf.h"
 #include "Types.generated.h"
+
+class APDWeaponBase;
 
 USTRUCT(BlueprintType)
 struct FPDPlayerData
@@ -23,6 +26,15 @@ enum class EPDItemType : uint8
 	Equipment  UMETA(DisplayName = "Equipment"),
 	Consumable UMETA(DisplayName = "Consumable"),
 	Misc       UMETA(DisplayName = "Misc"),
+};
+
+UENUM(BlueprintType)
+enum class EWeaponType : uint8
+{
+	None    UMETA(DisplayName = "None"),
+	Rifle   UMETA(DisplayName = "Rifle"),
+	Shotgun UMETA(DisplayName = "Shotgun"),
+	Sniper  UMETA(DisplayName = "Sniper"),
 };
 
 USTRUCT(BlueprintType)
@@ -50,6 +62,14 @@ struct FPDItemData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText Description;
+
+	// 무기 아이템일 때만 설정. nullptr이면 비-무기 아이템(소비/잡템).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<APDWeaponBase> WeaponClass;
+
+	// 무기 아이템일 때 어떤 슬롯에 들어가는지 결정. 비-무기는 None.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EWeaponType WeaponType = EWeaponType::None;
 };
 
 USTRUCT(BlueprintType)
@@ -134,15 +154,7 @@ enum class ERaidState : uint8
 };
 
 // ─── 무기 시스템 ────────────────────────────────────────────────
-
-UENUM(BlueprintType)
-enum class EWeaponType : uint8
-{
-	None    UMETA(DisplayName = "None"),
-	Rifle   UMETA(DisplayName = "Rifle"),
-	Shotgun UMETA(DisplayName = "Shotgun"),
-	Sniper  UMETA(DisplayName = "Sniper"),
-};
+// EWeaponType은 FPDItemData보다 위에 정의됨(FPDItemData::WeaponType 기본값에서 사용).
 
 // 슬롯 인덱스: Slot1_Rifle=0, Slot2_Shotgun=1, Slot3_Sniper=2 (배열 인덱스로 직접 사용)
 // None=3 은 "선택 없음" 센티넬. 인덱스로 쓰기 전에 None 체크 필수.

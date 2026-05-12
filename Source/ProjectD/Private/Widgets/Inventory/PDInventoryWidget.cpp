@@ -165,12 +165,13 @@ UPDInventoryComponent* UPDInventoryWidget::FindInventoryComponent() const
 
 UPDStashComponent* UPDInventoryWidget::FindStashComponent() const
 {
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
-	{
-		return OwningPawn->FindComponentByClass<UPDStashComponent>();
-	}
+	// stash 인터페이스가 열렸을 때만 유효. 단독 인벤토리 모드에선 nullptr.
+	return ActiveStashComponent;
+}
 
-	return nullptr;
+void UPDInventoryWidget::SetActiveStashComponent(UPDStashComponent* InStashComponent)
+{
+	ActiveStashComponent = InStashComponent;
 }
 
 UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const

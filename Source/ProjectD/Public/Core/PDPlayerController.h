@@ -13,6 +13,7 @@ class UPathFollowingComponent;
 class UPDInputConfig;
 class UPDInventoryWidget;
 class UPDStashWidget;
+class UPDStashComponent;
 class UPDMarketWidget;
 class UPDMarketComponent;
 class APDPlayerCharacter;
@@ -38,13 +39,17 @@ public:
 	void RequestExtraction();
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
-	void OpenStashInterface();
+	void OpenStashInterface(UPDStashComponent* StashSource);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void CloseStashInterface();
 
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	bool IsStashInterfaceOpen() const;
+
+	// 현재 열린 박스의 컴포넌트. stash 인터페이스가 닫혀있으면 nullptr.
+	UFUNCTION(BlueprintPure, Category = "PD|Stash")
+	FORCEINLINE UPDStashComponent* GetActiveStashComponent() const { return ActiveStashComponent.Get(); }
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void OpenMarketInterface(UPDMarketComponent* MarketComponent);
@@ -123,6 +128,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDRootLayout> RootLayoutInstance;
+
+	// OpenStashInterface 시 캐시. 박스가 파괴되어도 TWeakObjectPtr가 자동 무효화.
+	TWeakObjectPtr<UPDStashComponent> ActiveStashComponent;
 
 	bool bIsGameplayInputBlockedByModalUI = false;
 	bool bMouseCursorVisibleBeforeModalUI = false;

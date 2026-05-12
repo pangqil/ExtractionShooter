@@ -2,6 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
+#include "Characters/PDPlayerCharacter.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "GameFramework/Pawn.h"
@@ -9,6 +10,7 @@
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDQuickSlotComponent.h"
 #include "Items/PDStashComponent.h"
+#include "Weapons/PDWeaponBase.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
 
@@ -116,14 +118,22 @@ void UPDStashWidget::ResolveStashGridPanel()
 	}
 }
 
-UPDStashComponent* UPDStashWidget::FindStashComponent() const
+void UPDStashWidget::InitializeStash(UPDStashComponent* InStashComponent)
 {
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	if (TargetStashComponent == InStashComponent)
 	{
-		return OwningPawn->FindComponentByClass<UPDStashComponent>();
+		return;
 	}
 
-	return nullptr;
+	UnbindStashChanged();
+	TargetStashComponent = InStashComponent;
+	BindStashChanged();
+	RefreshStashGrid();
+}
+
+UPDStashComponent* UPDStashWidget::FindStashComponent() const
+{
+	return TargetStashComponent;
 }
 
 UPDInventoryComponent* UPDStashWidget::FindInventoryComponent() const
@@ -225,6 +235,27 @@ void UPDStashWidget::TakeStashSlotQuantity(int32 SlotIndex, int32 Quantity)
 	if (!InventoryComponent || !StashComponent || Quantity <= 0)
 	{
 		return;
+	}
+
+	// 무기 아이템이고 해당 슬롯이 비어있으면 인벤토리 우회하여 즉시 장착.
+	if (const FPDInventorySlot* SourceSlot = FindStashSlot(SlotIndex))
+	{
+		if (SourceSlot->ItemData.WeaponClass)
+		{
+			if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwningPlayerPawn()))
+			{
+				if (PlayerCharacter->TryAutoEquipWeaponItem(SourceSlot->ItemData))
+				{
+					StashComponent->StashItems[SlotIndex].Quantity -= 1;
+					if (StashComponent->StashItems[SlotIndex].Quantity <= 0)
+					{
+						StashComponent->StashItems[SlotIndex].Clear();
+					}
+					StashComponent->OnStashChanged.Broadcast();
+					return;
+				}
+			}
+		}
 	}
 
 	StashComponent->TakeStashSlotQuantity(InventoryComponent, SlotIndex, Quantity);

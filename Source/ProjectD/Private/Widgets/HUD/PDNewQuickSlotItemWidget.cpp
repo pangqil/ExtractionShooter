@@ -11,6 +11,7 @@
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
+#include "Core/PDPlayerController.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDQuickSlotComponent.h"
 #include "Items/PDStashComponent.h"
@@ -210,9 +211,10 @@ UPDInventoryComponent* UPDNewQuickSlotItemWidget::FindInventoryComponent() const
 
 UPDStashComponent* UPDNewQuickSlotItemWidget::FindStashComponent() const
 {
-	if (APawn* Pawn = GetOwningPlayerPawn())
+	// stash 인터페이스가 열려있을 때만 유효. PC가 ActiveStashComponent를 캐시.
+	if (APDPlayerController* PC = Cast<APDPlayerController>(GetOwningPlayer()))
 	{
-		return Pawn->FindComponentByClass<UPDStashComponent>();
+		return PC->GetActiveStashComponent();
 	}
 	return nullptr;
 }

@@ -83,6 +83,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	void PickupWeapon(APDWeaponBase* Weapon);
 
+	// 인벤토리/박스의 무기 아이템 데이터를 받아서 빈 슬롯이 있으면 spawn 후 자동 장착.
+	// 슬롯이 차 있거나 WeaponClass가 없으면 false 반환(호출자가 인벤토리로 보내야 함).
+	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
+	bool TryAutoEquipWeaponItem(const FPDItemData& ItemData);
+
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	void SwitchToSlot(EWeaponSlot Slot);
 

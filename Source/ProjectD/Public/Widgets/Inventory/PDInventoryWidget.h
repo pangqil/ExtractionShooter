@@ -27,6 +27,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void RefreshInventoryGrid();
 
+	// Stash 인터페이스가 함께 열릴 때 어느 박스를 대상으로 할지 PC가 주입.
+	// nullptr이면 stash 동작 비활성(단독 인벤토리 모드).
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
+	void SetActiveStashComponent(UPDStashComponent* InStashComponent);
+
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
@@ -117,6 +122,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryComponent> BoundInventoryComponent;
+
+	// PC가 stash 인터페이스 열 때 주입하는 박스 컴포넌트.
+	UPROPERTY(Transient)
+	TObjectPtr<UPDStashComponent> ActiveStashComponent;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> GoldTextWidget;

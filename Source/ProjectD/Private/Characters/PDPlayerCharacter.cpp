@@ -187,6 +187,32 @@ EWeaponSlot APDPlayerCharacter::GetSlotForWeaponType(EWeaponType Type) const
 	}
 }
 
+bool APDPlayerCharacter::TryAutoEquipWeaponItem(const FPDItemData& ItemData)
+{
+	if (!ItemData.WeaponClass) return false;
+
+	const EWeaponSlot TargetSlot = GetSlotForWeaponType(ItemData.WeaponType);
+	if (TargetSlot == EWeaponSlot::None) return false;
+
+	// 이미 해당 슬롯에 무기가 있으면 자동 장착 안 함(호출자가 인벤토리로 보내야 함).
+	if (GetWeaponInSlot(TargetSlot)) return false;
+
+	UWorld* World = GetWorld();
+	if (!World) return false;
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = this;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	APDWeaponBase* SpawnedWeapon = World->SpawnActor<APDWeaponBase>(
+		ItemData.WeaponClass, GetActorTransform(), SpawnParams);
+	if (!SpawnedWeapon) return false;
+
+	PickupWeapon(SpawnedWeapon);
+	return true;
+}
+
 void APDPlayerCharacter::TryInteract()
 {
 	if (InteractionComponent)

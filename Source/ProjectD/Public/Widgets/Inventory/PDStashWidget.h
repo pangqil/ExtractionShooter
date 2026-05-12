@@ -19,6 +19,10 @@ class PROJECTD_API UPDStashWidget : public UPDActivatableBase
 	GENERATED_BODY()
 
 public:
+	// PC가 박스 열 때 한 번 호출. 어떤 박스의 데이터를 보여줄지 지정.
+	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
+	void InitializeStash(UPDStashComponent* InStashComponent);
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void RefreshStashGrid();
 
@@ -71,6 +75,10 @@ private:
 	void ClearQuantityRequest();
 	void BindStashChanged();
 	void UnbindStashChanged();
+
+	// InitializeStash로 주입받은 박스 컴포넌트. 위젯이 살아있는 동안의 대상 박스.
+	UPROPERTY(Transient)
+	TObjectPtr<UPDStashComponent> TargetStashComponent;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDStashComponent> BoundStashComponent;

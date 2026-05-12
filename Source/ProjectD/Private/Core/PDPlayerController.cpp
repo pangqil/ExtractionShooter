@@ -22,6 +22,7 @@
 #include "Items/PDMarketComponent.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDQuickSlotComponent.h"
+#include "Items/PDStashComponent.h"
 #include "Widgets/HUD/PDHUDWidget.h"
 #include "Widgets/PDActivatableBase.h"
 #include "Widgets/PDRootLayout.h"
@@ -403,7 +404,7 @@ bool APDPlayerController::IsMarketInterfaceOpen() const
 	return MarketWidgetInstance && MarketWidgetInstance->IsInViewport();
 }
 
-void APDPlayerController::OpenStashInterface()
+void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
 {
 	if (!InventoryWidgetClass)
 	{
@@ -417,18 +418,31 @@ void APDPlayerController::OpenStashInterface()
 		return;
 	}
 
+	if (!StashSource)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("OpenStashInterface called with null StashSource."));
+		return;
+	}
+
 	if (IsMarketInterfaceOpen())
 	{
 		CloseMarketInterface();
 	}
+
+	ActiveStashComponent = StashSource;
 
 	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
 	{
 		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
 		if (InventoryWidgetInstance)
 		{
+			InventoryWidgetInstance->SetActiveStashComponent(StashSource);
 			InventoryWidgetInstance->AddToViewport();
 		}
+	}
+	else
+	{
+		InventoryWidgetInstance->SetActiveStashComponent(StashSource);
 	}
 
 	if (!StashWidgetInstance || !StashWidgetInstance->IsInViewport())
@@ -436,8 +450,14 @@ void APDPlayerController::OpenStashInterface()
 		StashWidgetInstance = CreateWidget<UPDStashWidget>(this, StashWidgetClass);
 		if (StashWidgetInstance)
 		{
+			StashWidgetInstance->InitializeStash(StashSource);
 			StashWidgetInstance->AddToViewport();
 		}
+	}
+	else
+	{
+		// 다른 박스로 열기를 다시 누른 경우: 위젯은 유지하고 데이터만 교체.
+		StashWidgetInstance->InitializeStash(StashSource);
 	}
 
 	SetGameplayInputBlockedByModalUI(true, StashWidgetInstance);
@@ -456,6 +476,8 @@ void APDPlayerController::CloseStashInterface()
 		InventoryWidgetInstance->RemoveFromParent();
 	}
 	InventoryWidgetInstance = nullptr;
+
+	ActiveStashComponent.Reset();
 
 	if (!IsMarketInterfaceOpen())
 	{
