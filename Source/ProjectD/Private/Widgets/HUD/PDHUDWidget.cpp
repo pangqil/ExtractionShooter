@@ -13,6 +13,7 @@
 #include "Widgets/HUD/PDBodyPartHealthGroupWidget.h"
 #include "Widgets/HUD/PDNewQuickSlotBarWidget.h"
 #include "Widgets/HUD/PDDebuffIconBarWidget.h"
+#include "Widgets/Crosshair/PDCrosshairWidget.h"
 #include "Items/PDQuickSlotComponent.h"
 
 UPDHUDWidget::UPDHUDWidget(const FObjectInitializer& ObjectInitializer)
@@ -238,6 +239,23 @@ void UPDHUDWidget::HandleDehydrated(const FGameplayTag& Tag, int32 NewCount)
 	{
 		Bar_Debuffs->SetDebuffActive(Tag, NewCount > 0);
 	}
+}
+
+void UPDHUDWidget::UpdateCrosshair(FVector2D MousePos, float Spread)
+{
+	if (WBP_Crosshair) WBP_Crosshair->UpdateCrosshair(MousePos, Spread);
+}
+
+void UPDHUDWidget::SetCrosshairType(EWeaponType NewType)
+{
+	if (WBP_Crosshair) WBP_Crosshair->SetCrosshairType(NewType);
+}
+
+void UPDHUDWidget::SetCrosshairVisible(bool bVisible)
+{
+	if (!WBP_Crosshair) return;
+	WBP_Crosshair->SetVisibility(
+		bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 }
 
 void UPDHUDWidget::RefreshNewQuickSlots()

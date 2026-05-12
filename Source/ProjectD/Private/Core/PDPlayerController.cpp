@@ -19,7 +19,6 @@
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
 #include "Widgets/Inventory/PDMarketWidget.h"
-#include "Widgets/Crosshair/PDCrosshairWidget.h"
 #include "Items/PDMarketComponent.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDQuickSlotComponent.h"
@@ -156,13 +155,6 @@ void APDPlayerController::BeginPlay()
 	DefaultMouseCursor = EMouseCursor::Default;
 	CurrentMouseCursor = EMouseCursor::Default;
 
-	if (CrosshairWidgetClass)
-	{
-		CrosshairWidget = CreateWidget<UPDCrosshairWidget>(this, CrosshairWidgetClass);
-		if (CrosshairWidget)
-			CrosshairWidget->AddToViewport(99);
-	}
-	
 	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
 		Ch->OnWeaponSwapped.AddDynamic(this, &APDPlayerController::OnWeaponChanged);
 
@@ -253,9 +245,9 @@ void APDPlayerController::ApplyEffectiveUIState(EWidgetInputMode Mode)
 			InputMode.SetHideCursorDuringCapture(false);
 			SetInputMode(InputMode);
 			bShowMouseCursor = false;
-			if (CrosshairWidget)
+			if (HUDInstance)
 			{
-				CrosshairWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+				HUDInstance->SetCrosshairVisible(true);
 			}
 			break;
 		}
@@ -266,9 +258,9 @@ void APDPlayerController::ApplyEffectiveUIState(EWidgetInputMode Mode)
 			InputMode.SetHideCursorDuringCapture(false);
 			SetInputMode(InputMode);
 			bShowMouseCursor = true;
-			if (CrosshairWidget)
+			if (HUDInstance)
 			{
-				CrosshairWidget->SetVisibility(ESlateVisibility::Collapsed);
+				HUDInstance->SetCrosshairVisible(false);
 			}
 			break;
 		}
@@ -278,9 +270,9 @@ void APDPlayerController::ApplyEffectiveUIState(EWidgetInputMode Mode)
 			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 			SetInputMode(InputMode);
 			bShowMouseCursor = true;
-			if (CrosshairWidget)
+			if (HUDInstance)
 			{
-				CrosshairWidget->SetVisibility(ESlateVisibility::Collapsed);
+				HUDInstance->SetCrosshairVisible(false);
 			}
 			break;
 		}
@@ -761,7 +753,7 @@ void APDPlayerController::OnReload()
 
 void APDPlayerController::UpdateCrosshair()
 {
-	if (!CrosshairWidget) return;
+	if (!HUDInstance) return;
 
 	float MouseX, MouseY;
 	GetMousePosition(MouseX, MouseY);
@@ -771,12 +763,12 @@ void APDPlayerController::UpdateCrosshair()
 		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
 			Spread = Weapon->GetCurrentRecoilSpread();
 
-	CrosshairWidget->UpdateCrosshair(FVector2D(MouseX, MouseY), Spread);
+	HUDInstance->UpdateCrosshair(FVector2D(MouseX, MouseY), Spread);
 }
 
 void APDPlayerController::OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot)
 {
-	if (!CrosshairWidget || !NewWeapon) return;
-	CrosshairWidget->SetCrosshairType(NewWeapon->GetWeaponType());
+	if (!HUDInstance || !NewWeapon) return;
+	HUDInstance->SetCrosshairType(NewWeapon->GetWeaponType());
 }
 

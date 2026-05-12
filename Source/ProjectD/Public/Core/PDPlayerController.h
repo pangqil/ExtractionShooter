@@ -18,7 +18,6 @@ class UPDMarketComponent;
 class APDPlayerCharacter;
 class UPDHUDWidget;
 class UPDActivatableBase;
-class UPDCrosshairWidget;
 class UUserWidget;
 class APDWeaponBase;
 class APDRifle;
@@ -86,9 +85,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
 
-	UPROPERTY(EditDefaultsOnly, Category = "PD|UI")
-	TSubclassOf<UPDCrosshairWidget> CrosshairWidgetClass;
-
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -127,9 +123,6 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDRootLayout> RootLayoutInstance;
-
-	UPROPERTY()
-	TObjectPtr<UPDCrosshairWidget> CrosshairWidget;
 
 	bool bIsGameplayInputBlockedByModalUI = false;
 	bool bMouseCursorVisibleBeforeModalUI = false;

@@ -12,8 +12,10 @@ class UPDAttributeBarWidget;
 class UPDBodyPartHealthGroupWidget;
 class UPDNewQuickSlotBarWidget;
 class UPDDebuffIconBarWidget;
+class UPDCrosshairWidget;
 class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
+enum class EWeaponType : uint8;
 
 /**
  * 플레이어 HUD 위젯
@@ -53,9 +55,23 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDDebuffIconBarWidget> Bar_Debuffs;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDCrosshairWidget> WBP_Crosshair;
+
 public:
 	UFUNCTION(BlueprintCallable, Category = "PD|HUD")
 	void RefreshNewQuickSlots();
+
+	// PC가 매 틱 호출. 내부 크로스헤어로 위임.
+	void UpdateCrosshair(FVector2D MousePos, float Spread);
+
+	// 무기 교체 시 호출.
+	void SetCrosshairType(EWeaponType NewType);
+
+	// 입력 모드 전환 시 표시/숨김.
+	void SetCrosshairVisible(bool bVisible);
+
+	FORCEINLINE UPDCrosshairWidget* GetCrosshair() const { return WBP_Crosshair; }
 
 private:
 	struct FBoundAttributeHandle
