@@ -1,5 +1,7 @@
 #include "Items/PDInventoryComponent.h"
 
+#include "Items/PDItemSlotTransfer.h"
+
 UPDInventoryComponent::UPDInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -45,6 +47,53 @@ bool UPDInventoryComponent::RemoveItem(FName ItemID, int32 Quantity)
 
 	OnInventoryChanged.Broadcast();
 	return true;
+}
+
+bool UPDInventoryComponent::RemoveItemFromSlot(int32 SlotIndex, int32 Quantity)
+{
+	if (!Items.IsValidIndex(SlotIndex) || Quantity <= 0)
+	{
+		return false;
+	}
+
+	FPDInventorySlot& Slot = Items[SlotIndex];
+	if (Slot.IsEmpty())
+	{
+		return false;
+	}
+
+	const int32 RemoveAmount = FMath::Min(Quantity, Slot.Quantity);
+	Slot.Quantity -= RemoveAmount;
+
+	if (Slot.Quantity <= 0)
+	{
+		Slot.Clear();
+	}
+
+	OnInventoryChanged.Broadcast();
+	return true;
+}
+
+bool UPDInventoryComponent::DropItemFromSlot(int32 SlotIndex, int32 Quantity)
+{
+	return RemoveItemFromSlot(SlotIndex, Quantity);
+}
+
+bool UPDInventoryComponent::UseItemFromSlot(int32 SlotIndex)
+{
+	if (!Items.IsValidIndex(SlotIndex))
+	{
+		return false;
+	}
+
+	const FPDInventorySlot& Slot = Items[SlotIndex];
+	if (Slot.IsEmpty() || Slot.ItemData.ItemType != EPDItemType::Consumable)
+	{
+		return false;
+	}
+
+	// TODO: Apply the item's GameplayEffectClass here when consumable effects are added to FPDItemData.
+	return RemoveItemFromSlot(SlotIndex, 1);
 }
 
 bool UPDInventoryComponent::HasItem(FName ItemID, int32 Quantity) const
@@ -109,6 +158,49 @@ int32 UPDInventoryComponent::FindEmptySlot() const
 	}
 
 	return INDEX_NONE;
+}
+
+
+int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex)
+{
+	if (Items.Num() != GetMaxSlotCount())
+	{
+		InitializeInventory();
+	}
+
+	if (!Items.IsValidIndex(TargetSlotIndex))
+	{
+		return 0;
+	}
+
+	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(Items[TargetSlotIndex], ItemData, Quantity);
+	if (AddedQuantity > 0)
+	{
+		OnInventoryChanged.Broadcast();
+	}
+
+	return AddedQuantity;
+}
+
+bool UPDInventoryComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	if (Items.Num() != GetMaxSlotCount())
+	{
+		InitializeInventory();
+	}
+
+	if (!Items.IsValidIndex(SourceSlotIndex) || !Items.IsValidIndex(TargetSlotIndex) || SourceSlotIndex == TargetSlotIndex || Quantity <= 0)
+	{
+		return false;
+	}
+
+	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(Items[SourceSlotIndex], Items[TargetSlotIndex], Quantity);
+	if (bMoved)
+	{
+		OnInventoryChanged.Broadcast();
+	}
+
+	return bMoved;
 }
 
 int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quantity)
