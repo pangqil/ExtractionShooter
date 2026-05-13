@@ -604,6 +604,14 @@ void APDPlayerController::SetGameplayInputBlockedByModalUI(bool bBlocked, UUserW
 		bEnableMouseOverEvents = true;
 		DefaultMouseCursor = EMouseCursor::Default;
 		CurrentMouseCursor = EMouseCursor::Default;
+
+		// 인벤토리/창고/마켓 같은 모달 UI가 열려 있는 동안에는
+		// 게임 조준 크로스헤어를 숨기고, 시스템 마우스 커서만 보이게 한다.
+		if (HUDInstance)
+		{
+			HUDInstance->SetCrosshairVisible(false);
+		}
+
 		return;
 	}
 
@@ -621,6 +629,12 @@ void APDPlayerController::SetGameplayInputBlockedByModalUI(bool bBlocked, UUserW
 	bShowMouseCursor = bMouseCursorVisibleBeforeModalUI;
 	bEnableClickEvents = bMouseClickEventsEnabledBeforeModalUI;
 	bEnableMouseOverEvents = bMouseOverEventsEnabledBeforeModalUI;
+
+	// 모달 UI가 닫히면 게임 조준 크로스헤어를 다시 표시한다.
+	if (HUDInstance)
+	{
+		HUDInstance->SetCrosshairVisible(true);
+	}
 }
 
 void APDPlayerController::UpdateAimRotation()

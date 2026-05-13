@@ -12,6 +12,7 @@ class UPDQuickSlotComponent;
 class UPDInventorySlotWidget;
 class UUserWidget;
 class UPDQuantityPopupWidget;
+class UButton;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDStashWidget : public UPDActivatableBase
@@ -25,6 +26,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void RefreshStashGrid();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
+	void SetStashFilterTab(EPDItemFilterTab NewFilterTab);
 
 protected:
 	virtual void NativeConstruct() override;
@@ -48,6 +52,15 @@ protected:
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "PD|Stash")
 	TObjectPtr<UUniformGridPanel> StashGridPanel;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Tabs")
+	TObjectPtr<UButton> Button_Equipment;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Tabs")
+	TObjectPtr<UButton> Button_Consumable;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Tabs")
+	TObjectPtr<UButton> Button_Misc;
+
 	UFUNCTION()
 	void HandleStashSlotLeftClicked(UPDInventorySlotWidget* SlotWidget, int32 ClickedSlotIndex);
 
@@ -60,8 +73,22 @@ protected:
 	UFUNCTION()
 	void HandleQuantityCancelled();
 
+	UFUNCTION()
+	void HandleEquipmentTabClicked();
+
+	UFUNCTION()
+	void HandleConsumableTabClicked();
+
+	UFUNCTION()
+	void HandleMiscTabClicked();
+
 private:
 	void ResolveStashGridPanel();
+	void BindTabButtons();
+	void UpdateTabButtonStyle();
+	bool DoesSlotMatchCurrentFilter(const FPDInventorySlot& StashSlotData) const;
+	bool DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const;
+	bool CanAcceptDropForCurrentFilter(const UPDInventoryDragDropOperation* DragOperation) const;
 	UPDStashComponent* FindStashComponent() const;
 	UPDInventoryComponent* FindInventoryComponent() const;
 	UPDQuickSlotComponent* FindQuickSlotComponent() const;
@@ -90,6 +117,8 @@ private:
 	EPDItemContainerType PendingTransferSourceContainerType = EPDItemContainerType::None;
 	int32 PendingTransferSourceSlotIndex = INDEX_NONE;
 	int32 PendingTransferTargetSlotIndex = INDEX_NONE;
+
+	EPDItemFilterTab CurrentFilterTab = EPDItemFilterTab::Equipment;
 
 	int32 PendingSlotIndex = INDEX_NONE;
 };

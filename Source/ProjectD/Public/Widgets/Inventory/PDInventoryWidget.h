@@ -17,6 +17,7 @@ class UTextBlock;
 class UPDQuantityPopupWidget;
 class UPDInventoryItemContextMenuWidget;
 class UPanelWidget;
+class UButton;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase
@@ -26,6 +27,9 @@ class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase
 public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void RefreshInventoryGrid();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
+	void SetInventoryFilterTab(EPDItemFilterTab NewFilterTab);
 
 	// Stash 인터페이스가 함께 열릴 때 어느 박스를 대상으로 할지 PC가 주입.
 	// nullptr이면 stash 동작 비활성(단독 인벤토리 모드).
@@ -66,6 +70,15 @@ protected:
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "PD|Inventory")
 	TObjectPtr<UUniformGridPanel> InventoryGridPanel;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Tabs")
+	TObjectPtr<UButton> Button_Equipment;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Tabs")
+	TObjectPtr<UButton> Button_Consumable;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Tabs")
+	TObjectPtr<UButton> Button_Misc;
 	
 	UFUNCTION()
 	void HandleInventorySlotLeftClicked(UPDInventorySlotWidget* SlotWidget, int32 ClickedSlotIndex);
@@ -97,8 +110,22 @@ protected:
 	UFUNCTION()
 	void HandleQuantityCancelled();
 
+	UFUNCTION()
+	void HandleEquipmentTabClicked();
+
+	UFUNCTION()
+	void HandleConsumableTabClicked();
+
+	UFUNCTION()
+	void HandleMiscTabClicked();
+
 private:
 	void ResolveInventoryGridPanel();
+	void BindTabButtons();
+	void UpdateTabButtonStyle();
+	bool DoesSlotMatchCurrentFilter(const FPDInventorySlot& InventorySlotData) const;
+	bool DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const;
+	bool CanAcceptDropForCurrentFilter(const UPDInventoryDragDropOperation* DragOperation) const;
 	void RefreshGoldText();
 	void ExecuteInventoryQuickAction(int32 SlotIndex, int32 Quantity);
 	void ExecuteInventorySlotTransfer(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
@@ -148,6 +175,8 @@ private:
 	EPDItemContainerType PendingTransferSourceContainerType = EPDItemContainerType::None;
 	int32 PendingTransferSourceSlotIndex = INDEX_NONE;
 	int32 PendingTransferTargetSlotIndex = INDEX_NONE;
+
+	EPDItemFilterTab CurrentFilterTab = EPDItemFilterTab::Equipment;
 
 	int32 PendingSlotIndex = INDEX_NONE;
 };
