@@ -11,7 +11,7 @@ void UPDPingSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	if (!DefaultMarkerClass)
 	{
 		DefaultMarkerClass = LoadClass<APDPingMarker>(nullptr,
-			TEXT("/Game/Developers/dbals/Ping/BP_PD_PingMarker.BP_PD_PingMarker_C"));
+			TEXT("/Game/Developers/dbals/UI/Ping/BP_PD_PingMarker.BP_PD_PingMarker_C"));
 	}
 
 	if (UWorld* World = GetWorld())

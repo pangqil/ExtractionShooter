@@ -9,7 +9,7 @@
 
 class UPanelWidget;
 class UPDDebuffIconWidget;
-class UTexture2D;
+class UMaterialInterface;
 
 USTRUCT(BlueprintType)
 struct FPDDebuffIconData
@@ -17,10 +17,7 @@ struct FPDDebuffIconData
 	GENERATED_BODY()
 
 	UPROPERTY(EditDefaultsOnly)
-	TObjectPtr<UTexture2D> IconTexture;
-
-	UPROPERTY(EditDefaultsOnly)
-	FVector2D IconSize = FVector2D(24.f, 24.f);
+	TObjectPtr<UMaterialInterface> IconMaterial;
 };
 
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
