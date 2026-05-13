@@ -1,6 +1,7 @@
 ﻿#include "Weapons/PDRifle.h"
 #include "Core/PDPlayerController.h"
 #include "DrawDebugHelpers.h"
+#include "Interfaces/PDDamageable.h"
 
 APDRifle::APDRifle()
 {
@@ -19,7 +20,16 @@ void APDRifle::Fire_Implementation()
     if (!CanFire()) return;
 
     FHitResult Hit;
-    if (PerformLineTrace(Hit))
+    const bool bHit = PerformLineTrace(Hit);
+
+    // 진단: 트레이스 hit 여부 + 맞은 액터 + Damageable 구현 여부
+    UE_LOG(LogTemp, Warning, TEXT("[PDRifle] bHit=%d, HitActor=%s, ImplementsDamageable=%d, Damage=%.1f"),
+        bHit,
+        *GetNameSafe(Hit.GetActor()),
+        (Hit.GetActor() && Hit.GetActor()->Implements<UPDDamageable>()) ? 1 : 0,
+        GetCurrentStats().Damage);
+
+    if (bHit)
         ApplyDamage(Hit.GetActor(), GetCurrentStats().Damage);
 
     PostFire();
