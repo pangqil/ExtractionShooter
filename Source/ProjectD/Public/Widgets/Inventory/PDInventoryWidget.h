@@ -17,6 +17,8 @@ class UTextBlock;
 class UPDQuantityPopupWidget;
 class UPDInventoryItemContextMenuWidget;
 class UPanelWidget;
+class UPDEquipmentComponent;
+class UPDEquipmentSlotWidget;
 class UButton;
 
 UCLASS(BlueprintType, Blueprintable)
@@ -79,6 +81,18 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Tabs")
 	TObjectPtr<UButton> Button_Misc;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Equipment")
+	FName EquipmentSlotWeaponWidgetName = TEXT("EquipmentSlot_Weapon");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Equipment")
+	FName EquipmentSlotHeadWidgetName = TEXT("EquipmentSlot_Head");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Equipment")
+	FName EquipmentSlotArmorWidgetName = TEXT("EquipmentSlot_Armor");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Equipment")
+	FName EquipmentSlotBagWidgetName = TEXT("EquipmentSlot_Bag");
 	
 	UFUNCTION()
 	void HandleInventorySlotLeftClicked(UPDInventorySlotWidget* SlotWidget, int32 ClickedSlotIndex);
@@ -119,10 +133,18 @@ protected:
 	UFUNCTION()
 	void HandleMiscTabClicked();
 
+	UFUNCTION()
+	void HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType);
+
 private:
 	void ResolveInventoryGridPanel();
 	void BindTabButtons();
 	void UpdateTabButtonStyle();
+	void ResolveEquipmentSlotWidgets();
+	void BindEquipmentChanged();
+	void UnbindEquipmentChanged();
+	void RefreshEquipmentSlots();
+	void RegisterEquipmentSlotWidget(EPDEquipmentSlotType SlotType, FName WidgetName);
 	int32 CountOccupiedInventorySlotsByType(EPDItemType ItemType) const;
 	int32 GetInventoryDisplaySlotCount() const;
 	void SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const;
@@ -147,11 +169,20 @@ private:
 	UPDInventoryComponent* FindInventoryComponent() const;
 	UPDStashComponent* FindStashComponent() const;
 	UPDQuickSlotComponent* FindQuickSlotComponent() const;
+	UPDEquipmentComponent* FindEquipmentComponent() const;
+
+	UFUNCTION()
+	void HandleEquipmentChanged();
 	void BindInventoryChanged();
 	void UnbindInventoryChanged();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryComponent> BoundInventoryComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDEquipmentComponent> BoundEquipmentComponent;
+
+	TMap<EPDEquipmentSlotType, TWeakObjectPtr<UPDEquipmentSlotWidget>> EquipmentSlotWidgets;
 
 	// PC가 stash 인터페이스 열 때 주입하는 박스 컴포넌트.
 	UPROPERTY(Transient)

@@ -11,6 +11,7 @@ class APDWeaponBase;
 class UPDVisionComponent;
 class UPDInteractionComponent;
 class UPDQuickSlotComponent;
+class UPDEquipmentComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -50,6 +51,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDQuickSlotComponent> QuickSlotComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDEquipmentComponent> EquipmentComponent;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
@@ -91,6 +95,9 @@ public:
 	bool TryAutoEquipWeaponItem(const FPDItemData& ItemData);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
+	bool RemoveEquippedWeaponItem(const FPDItemData& ItemData, bool bDestroyWeaponActor = true);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	void SwitchToSlot(EWeaponSlot Slot);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
@@ -107,6 +114,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
 	UPDQuickSlotComponent* GetQuickSlotComponent() const { return QuickSlotComponent; }
+
+	UFUNCTION(BlueprintPure, Category="PD|Equipment")
+	UPDEquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent; }
 
 	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
 	void TryInteract();

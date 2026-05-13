@@ -1,4 +1,4 @@
-﻿#include "Weapons/PDWeaponBase.h"
+#include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDShellActor.h"
 #include "Weapons/PDMagazineActor.h"
 #include "Characters/PDPlayerCharacter.h"
@@ -62,21 +62,13 @@ void APDWeaponBase::LoadItemData()
 
 void APDWeaponBase::Interact_Implementation(AActor* Interactor)
 {
+    // 월드 무기는 상호작용 시 즉시 캐릭터에 장착하지 않고, 항상 인벤토리에 먼저 들어간다.
+    // 실제 장착/메시 부착은 인벤토리 우클릭 > 장착하기에서 EquipmentComponent를 통해 처리한다.
     if (WeaponOwner.IsValid()) return;
 
     APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(Interactor);
     if (!Player) return;
 
-    // 슬롯 비어있으면 곧바로 장착
-    const EWeaponSlot TargetSlot = Player->GetSlotForWeaponType(WeaponType);
-    if (TargetSlot != EWeaponSlot::None && !Player->GetWeaponInSlot(TargetSlot))
-    {
-        Player->PickupWeapon(this);
-        SetDropped(false);
-        return;
-    }
-
-    // 슬롯이 차있음 → 인벤토리로 우회
     if (CachedItemData.ItemID.IsNone())
     {
         OnPickupFailed();

@@ -15,6 +15,9 @@
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDQuickSlotComponent.h"
+#include "Widgets/Inventory/PDEquipmentSlotWidget.h"
+#include "Characters/PDPlayerCharacter.h"
+#include "Items/PDEquipmentComponent.h"
 #include "Items/PDStashComponent.h"
 #include "Widgets/Inventory/PDInventoryItemContextMenuWidget.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
@@ -29,7 +32,10 @@ void UPDInventoryWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	BindInventoryChanged();
+	BindEquipmentChanged();
 	BindTabButtons();
+	ResolveEquipmentSlotWidgets();
+	RefreshEquipmentSlots();
 	RefreshInventoryGrid();
 	UpdateTabButtonStyle();
 }
@@ -43,6 +49,7 @@ void UPDInventoryWidget::NativeDestruct()
 		ActiveQuantityPopup->RemoveFromParent();
 	}
 	ClearQuantityRequest();
+	UnbindEquipmentChanged();
 	UnbindInventoryChanged();
 	Super::NativeDestruct();
 }
@@ -141,6 +148,7 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 		}
 	}
 
+	RefreshEquipmentSlots();
 	UpdateTabButtonStyle();
 }
 
@@ -297,6 +305,100 @@ void UPDInventoryWidget::HandleMiscTabClicked()
 	SetInventoryFilterTab(EPDItemFilterTab::Misc);
 }
 
+
+void UPDInventoryWidget::ResolveEquipmentSlotWidgets()
+{
+	EquipmentSlotWidgets.Reset();
+	RegisterEquipmentSlotWidget(EPDEquipmentSlotType::Weapon, EquipmentSlotWeaponWidgetName);
+	RegisterEquipmentSlotWidget(EPDEquipmentSlotType::Head, EquipmentSlotHeadWidgetName);
+	RegisterEquipmentSlotWidget(EPDEquipmentSlotType::Armor, EquipmentSlotArmorWidgetName);
+	RegisterEquipmentSlotWidget(EPDEquipmentSlotType::Bag, EquipmentSlotBagWidgetName);
+}
+
+void UPDInventoryWidget::RegisterEquipmentSlotWidget(EPDEquipmentSlotType SlotType, FName WidgetName)
+{
+	if (!WidgetTree || WidgetName.IsNone())
+	{
+		return;
+	}
+
+	UPDEquipmentSlotWidget* EquipmentSlotWidget = Cast<UPDEquipmentSlotWidget>(WidgetTree->FindWidget(WidgetName));
+	if (!EquipmentSlotWidget)
+	{
+		return;
+	}
+
+	EquipmentSlotWidget->InitializeEquipmentSlot(SlotType);
+	EquipmentSlotWidget->OnEquipmentSlotRightClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotRightClicked);
+	EquipmentSlotWidgets.Add(SlotType, EquipmentSlotWidget);
+}
+
+void UPDInventoryWidget::BindEquipmentChanged()
+{
+	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
+	if (BoundEquipmentComponent == EquipmentComponent)
+	{
+		return;
+	}
+
+	UnbindEquipmentChanged();
+	BoundEquipmentComponent = EquipmentComponent;
+	if (BoundEquipmentComponent)
+	{
+		BoundEquipmentComponent->OnEquipmentChanged.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentChanged);
+	}
+}
+
+void UPDInventoryWidget::UnbindEquipmentChanged()
+{
+	if (BoundEquipmentComponent)
+	{
+		BoundEquipmentComponent->OnEquipmentChanged.RemoveDynamic(this, &UPDInventoryWidget::HandleEquipmentChanged);
+		BoundEquipmentComponent = nullptr;
+	}
+}
+
+void UPDInventoryWidget::RefreshEquipmentSlots()
+{
+	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
+	for (const TPair<EPDEquipmentSlotType, TWeakObjectPtr<UPDEquipmentSlotWidget>>& Pair : EquipmentSlotWidgets)
+	{
+		UPDEquipmentSlotWidget* EquipmentSlotWidget = Pair.Value.Get();
+		if (!EquipmentSlotWidget)
+		{
+			continue;
+		}
+
+		if (EquipmentComponent)
+		{
+			const FPDInventorySlot EquippedSlot = EquipmentComponent->GetEquippedSlot(Pair.Key);
+			if (!EquippedSlot.IsEmpty())
+			{
+				EquipmentSlotWidget->SetEquippedItem(EquippedSlot);
+				continue;
+			}
+		}
+
+		EquipmentSlotWidget->ClearEquippedItem();
+	}
+}
+
+void UPDInventoryWidget::HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType)
+{
+	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
+	if (!SlotWidget || !InventoryComponent || !EquipmentComponent)
+	{
+		return;
+	}
+
+	if (EquipmentComponent->UnequipItemToInventory(InventoryComponent, SlotType))
+	{
+		RefreshEquipmentSlots();
+		RefreshInventoryGrid();
+	}
+}
+
 void UPDInventoryWidget::ResolveInventoryGridPanel()
 {
 	if (InventoryGridPanel)
@@ -372,6 +474,22 @@ UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 	}
 
 	return nullptr;
+}
+
+UPDEquipmentComponent* UPDInventoryWidget::FindEquipmentComponent() const
+{
+	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	{
+		return OwningPawn->FindComponentByClass<UPDEquipmentComponent>();
+	}
+
+	return nullptr;
+}
+
+void UPDInventoryWidget::HandleEquipmentChanged()
+{
+	RefreshEquipmentSlots();
+	RefreshInventoryGrid();
 }
 
 const FPDInventorySlot* UPDInventoryWidget::FindInventorySlot(int32 SlotIndex) const
@@ -668,6 +786,19 @@ void UPDInventoryWidget::HandleContextMenuEquipClicked(UPDInventoryItemContextMe
 {
 	CloseContextMenu();
 	CloseItemHoverTooltip();
+
+	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
+	if (!InventoryComponent || !EquipmentComponent)
+	{
+		return;
+	}
+
+	if (EquipmentComponent->EquipItemFromInventory(InventoryComponent, SlotIndex))
+	{
+		RefreshEquipmentSlots();
+		RefreshInventoryGrid();
+	}
 }
 
 void UPDInventoryWidget::ExecuteInventoryQuickAction(int32 SlotIndex, int32 Quantity)
