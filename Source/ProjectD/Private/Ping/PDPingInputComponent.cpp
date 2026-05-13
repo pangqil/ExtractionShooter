@@ -9,6 +9,7 @@
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
+#include "Ping/PDPingMarker.h"
 
 UPDPingInputComponent::UPDPingInputComponent()
 {
@@ -18,6 +19,14 @@ UPDPingInputComponent::UPDPingInputComponent()
 void UPDPingInputComponent::BindInputs(UPDInputComponent* PDIC, const UPDInputConfig* InputConfig)
 {
     if (!PDIC || !InputConfig) return;
+    
+    if (PingMarkerClass)
+    {
+        if (UPDPingSubsystem* Sub = GetPingSubsystem())
+        {
+            Sub->DefaultMarkerClass = PingMarkerClass;
+        }
+    }
 
     PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Ping,
         ETriggerEvent::Started, this, &UPDPingInputComponent::OnPingStarted);
@@ -31,6 +40,7 @@ void UPDPingInputComponent::BindInputs(UPDInputComponent* PDIC, const UPDInputCo
     PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_PingConfirm,
         ETriggerEvent::Completed, this, &UPDPingInputComponent::OnPingConfirmCompleted);
 }
+
 
 void UPDPingInputComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {

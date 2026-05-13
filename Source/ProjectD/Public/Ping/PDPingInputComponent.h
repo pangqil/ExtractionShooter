@@ -8,6 +8,7 @@ class UPDInputComponent;
 class UPDInputConfig;
 class UPDPingSubsystem;
 class UPDPingWheelBase;
+class APDPingMarker;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class PROJECTD_API UPDPingInputComponent : public UActorComponent
@@ -22,6 +23,9 @@ public:
 	
 	UPROPERTY(EditDefaultsOnly, Category="Ping")
 	TSubclassOf<UPDPingWheelBase> PingWheelClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Ping")
+	TSubclassOf<APDPingMarker> PingMarkerClass;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Ping", meta=(ClampMin="0.0"))
 	float WheelActivationDelay = 0.15f;
