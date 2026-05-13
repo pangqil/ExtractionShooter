@@ -1,4 +1,4 @@
-﻿#include "Characters/Base/PDEnemyBase.h"
+#include "Characters/Base/PDEnemyBase.h"
 
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -8,6 +8,8 @@
 #include "Items/PDItemBase.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "Component/PDWeaponComponent.h"
+#include "Data/PDQuestComponent.h"
+#include "GameFramework/Controller.h"
 #include "Weapons/PDWeaponBase.h"  
 
 APDEnemyBase::APDEnemyBase()
@@ -84,6 +86,26 @@ void APDEnemyBase::OnEnterState_Dead()
 void APDEnemyBase::HandleDeath(AActor* Killer)
 {
 	SetEnemyState(EPDEnemyState::Dead);
+
+	AActor* QuestOwner = Killer;
+	if (AController* KillerController = Cast<AController>(Killer))
+	{
+		QuestOwner = KillerController->GetPawn();
+	}
+
+	if (QuestOwner)
+	{
+		if (UPDQuestComponent* QuestComponent = QuestOwner->FindComponentByClass<UPDQuestComponent>())
+		{
+			const FName EnemyID = !QuestEnemyID.IsNone() ? QuestEnemyID : GetFName();
+			QuestComponent->ReportEnemyKilled(EnemyID, 1);
+			if (bIsQuestEnemy)
+			{
+				QuestComponent->ReportQuestEnemyKilled(EnemyID, 1);
+			}
+		}
+	}
+
 	Super::HandleDeath(Killer);
 }
 

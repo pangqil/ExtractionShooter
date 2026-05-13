@@ -19,9 +19,11 @@
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
 #include "Widgets/Inventory/PDMarketWidget.h"
+#include "Widgets/Quest/PDQuestWindowWidget.h"
 #include "Items/PDMarketComponent.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDQuickSlotComponent.h"
+#include "Data/PDQuestComponent.h"
 #include "Items/PDStashComponent.h"
 #include "Widgets/HUD/PDHUDWidget.h"
 #include "Widgets/PDActivatableBase.h"
@@ -78,6 +80,7 @@ void APDPlayerController::SetupInputComponent()
 	if (!InputConfig)
 	{
 		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &APDPlayerController::ToggleInventory);
+		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
 		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
 		InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
@@ -99,6 +102,16 @@ void APDPlayerController::SetupInputComponent()
 	else
 	{
 		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &APDPlayerController::ToggleInventory);
+	}
+
+	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Quest))
+	{
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quest,
+			ETriggerEvent::Started, this, &APDPlayerController::ToggleQuest);
+	}
+	else
+	{
+		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
 	}
 
 	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Interact))
@@ -180,6 +193,12 @@ void APDPlayerController::BeginPlay()
 
 void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (QuestWindowWidgetInstance)
+	{
+		QuestWindowWidgetInstance->RemoveFromParent();
+		QuestWindowWidgetInstance = nullptr;
+	}
+
 	if (HUDInstance)
 	{
 		HUDInstance->Deactivate();
@@ -393,7 +412,7 @@ void APDPlayerController::CloseMarketInterface()
 	}
 	InventoryWidgetInstance = nullptr;
 
-	if (!IsStashInterfaceOpen())
+	if (!IsStashInterfaceOpen() && !IsQuestInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
 	}
@@ -479,7 +498,7 @@ void APDPlayerController::CloseStashInterface()
 
 	ActiveStashComponent.Reset();
 
-	if (!IsMarketInterfaceOpen())
+	if (!IsMarketInterfaceOpen() && !IsQuestInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
 	}
@@ -513,8 +532,92 @@ bool APDPlayerController::SellInventorySlotToActiveMarket(int32 SlotIndex, int32
 	return ActiveMarketComponent->SellInventorySlot(InventoryComponent, SlotIndex, Quantity);
 }
 
+
+void APDPlayerController::OpenQuestInterface()
+{
+	if (IsQuestInterfaceOpen())
+	{
+		return;
+	}
+
+	if (IsStashInterfaceOpen())
+	{
+		CloseStashInterface();
+	}
+
+	if (IsMarketInterfaceOpen())
+	{
+		CloseMarketInterface();
+	}
+
+	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance->RemoveFromParent();
+		InventoryWidgetInstance = nullptr;
+	}
+
+	if (!QuestWindowWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("QuestWindowWidgetClass is not set."));
+		SetGameplayInputBlockedByModalUI(false);
+		return;
+	}
+
+	QuestWindowWidgetInstance = CreateWidget<UPDQuestWindowWidget>(this, QuestWindowWidgetClass);
+	if (!QuestWindowWidgetInstance)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Failed to create quest window widget."));
+		SetGameplayInputBlockedByModalUI(false);
+		return;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	UPDQuestComponent* QuestComponent = ControlledPawn ? ControlledPawn->FindComponentByClass<UPDQuestComponent>() : nullptr;
+	UPDInventoryComponent* InventoryComponent = ControlledPawn ? ControlledPawn->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+	QuestWindowWidgetInstance->InitializeQuestWindow(QuestComponent, InventoryComponent);
+	QuestWindowWidgetInstance->AddToViewport();
+
+	SetGameplayInputBlockedByModalUI(true, QuestWindowWidgetInstance);
+}
+
+void APDPlayerController::CloseQuestInterface()
+{
+	if (QuestWindowWidgetInstance && QuestWindowWidgetInstance->IsInViewport())
+	{
+		QuestWindowWidgetInstance->RemoveFromParent();
+	}
+	QuestWindowWidgetInstance = nullptr;
+
+	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen())
+	{
+		SetGameplayInputBlockedByModalUI(false);
+	}
+}
+
+bool APDPlayerController::IsQuestInterfaceOpen() const
+{
+	return QuestWindowWidgetInstance && QuestWindowWidgetInstance->IsInViewport();
+}
+
+void APDPlayerController::ToggleQuest()
+{
+	if (IsQuestInterfaceOpen())
+	{
+		CloseQuestInterface();
+		return;
+	}
+
+	OpenQuestInterface();
+}
+
 void APDPlayerController::ToggleInventory()
 {
+	if (IsQuestInterfaceOpen())
+	{
+		CloseQuestInterface();
+		return;
+	}
+
 	if (IsStashInterfaceOpen())
 	{
 		CloseStashInterface();
