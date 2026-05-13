@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/Base/PDCharacterBase.h"
@@ -42,6 +42,12 @@ protected:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|AI")
 	EPDEnemyState CurrentState = EPDEnemyState::Idle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Quest")
+	FName QuestEnemyID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Quest")
+	bool bIsQuestEnemy = false;
 
 	/** 디자이너 확장 hook. 상태 전환 직후 호출. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|AI")

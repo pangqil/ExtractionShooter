@@ -80,14 +80,6 @@ void APDCharacterBase::InitializeAttributes()
 		AttributeSet->SetHunger(AttributeSet->GetMaxHunger());
 		AttributeSet->SetThirst(AttributeSet->GetMaxThirst());
 		AttributeSet->bIsInitialized=true;
-
-		// 진단: 초기화 직후 실제 attribute 값. Max* 가 0이면 DefaultAttributes GE 설정 누락.
-		UE_LOG(LogTemp, Warning, TEXT("[InitAttr] %s | Torso=%.1f/%.1f, Head=%.1f/%.1f, ArmL=%.1f ArmR=%.1f LegL=%.1f LegR=%.1f"),
-			*GetNameSafe(this),
-			AttributeSet->GetTorsoHP(), AttributeSet->GetMaxTorsoHP(),
-			AttributeSet->GetHeadHP(),  AttributeSet->GetMaxHeadHP(),
-			AttributeSet->GetArmLHP(),  AttributeSet->GetArmRHP(),
-			AttributeSet->GetLegLHP(),  AttributeSet->GetLegRHP());
 	}
 }
 
@@ -113,34 +105,17 @@ void APDCharacterBase::GiveActiveAbilities()
 
 void APDCharacterBase::ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo)
 {
-	// 진단: 어느 단계에서 데미지 GE 가 막히는지 확인
-	if (!ASC)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[PDChar::ApplyDamage] %s reject: ASC=null"), *GetNameSafe(this));
-		return;
-	}
-	if (!DamageEffectClass)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[PDChar::ApplyDamage] %s reject: DamageEffectClass not set in BP"), *GetNameSafe(this));
-		return;
-	}
+	if (!ASC) return;
 
 	FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
 	Context.AddHitResult(DamageInfo.HitResult);
 	Context.AddInstigator(DamageInfo.Instigator.Get(), DamageInfo.Instigator.Get());
 
 	FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
-	if (!Spec.IsValid())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[PDChar::ApplyDamage] %s reject: Spec invalid"), *GetNameSafe(this));
-		return;
-	}
+	if (!Spec.IsValid()) return;
 
 	Spec.Data->SetSetByCallerMagnitude(PDGameplayTags::Data_Damage, DamageInfo.BaseDamage);
-	const FActiveGameplayEffectHandle Active = ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
-
-	UE_LOG(LogTemp, Warning, TEXT("[PDChar::ApplyDamage] %s applied %.1f, GE handle valid=%d"),
-		*GetNameSafe(this), DamageInfo.BaseDamage, Active.IsValid() ? 1 : 0);
+	ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 }
 
 float APDCharacterBase::GetCurrentHealth_Implementation() const

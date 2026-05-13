@@ -71,6 +71,9 @@ struct FPDItemData : public FTableRowBase
 	EPDItemType ItemType = EPDItemType::Misc;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bIsQuestItem = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<UTexture2D> Icon = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

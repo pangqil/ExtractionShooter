@@ -223,26 +223,9 @@ bool APDWeaponBase::CanFire() const
 
 void APDWeaponBase::ApplyDamage(AActor* HitActor, float DamageAmount)
 {
-    // 진단: 어느 단계에서 reject 되는지 확인
-    if (!HitActor)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[PDWeapon::ApplyDamage] reject: HitActor=null"));
-        return;
-    }
-    if (!HitActor->Implements<UPDDamageable>())
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[PDWeapon::ApplyDamage] reject: %s does not implement PDDamageable"), *GetNameSafe(HitActor));
-        return;
-    }
-    const float CurHP = IPDDamageable::Execute_GetCurrentHealth(HitActor);
-    if (CurHP <= 0.f)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[PDWeapon::ApplyDamage] reject: %s already dead (HP=%.1f)"), *GetNameSafe(HitActor), CurHP);
-        return;
-    }
-
-    UE_LOG(LogTemp, Warning, TEXT("[PDWeapon::ApplyDamage] dispatching %.1f to %s (HP=%.1f)"),
-        DamageAmount, *GetNameSafe(HitActor), CurHP);
+    if (!HitActor) return;
+    if (!HitActor->Implements<UPDDamageable>()) return;
+    if (IPDDamageable::Execute_GetCurrentHealth(HitActor) <= 0.f) return;
 
     FPDDamageInfo DamageInfo;
     DamageInfo.BaseDamage = DamageAmount;
