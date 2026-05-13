@@ -40,11 +40,12 @@ DEFINE_LOG_CATEGORY(LogPDCharacter);
 #include "Weapons/PDSniper.h"
 
 #include "Ping/PDPingSubsystem.h"
-
+#include "Ping/PDPingInputComponent.h"
 
 APDPlayerController::APDPlayerController()
 {
 	PrimaryActorTick.bCanEverTick=true;
+	PingInputComp = CreateDefaultSubobject<UPDPingInputComponent>(TEXT("PingInputComp"));
 }
 
 void APDPlayerController::RequestExtraction()
@@ -154,6 +155,11 @@ void APDPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
 	InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
 	InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
+	
+	if (PingInputComp && InputConfig)
+	{
+		PingInputComp->BindInputs(PDIC, InputConfig);
+	}
 }
 
 void APDPlayerController::BeginPlay()

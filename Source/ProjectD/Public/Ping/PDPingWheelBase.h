@@ -12,11 +12,11 @@ class PROJECTD_API UPDPingWheelBase : public UUserWidget
 	
 	public:
 	UFUNCTION(BlueprintImplementableEvent, Category="Ping")
-	void UpdateSelection(const FVector2D& MouseOffset);
+	void UpdateSelection(FVector2D MouseOffset);
 	
 	UFUNCTION(BlueprintImplementableEvent, Category="Ping")
-	EPDPingType GetSelectedPingType() const;
+	EPDPingType GetSelectedPingType();
 	
 	UFUNCTION(BlueprintImplementableEvent, Category="Ping")
-	void SetWheelScreenPosition(const FVector2D& ScreenPos);
+	void SetWheelScreenPosition(FVector2D ScreenPos);
 };
