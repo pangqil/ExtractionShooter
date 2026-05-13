@@ -179,19 +179,73 @@ void UPDInventoryWidget::UpdateTabButtonStyle()
 	const FLinearColor SelectedColor(0.15f, 0.85f, 0.15f, 1.0f);
 	const FLinearColor NormalColor(0.02f, 0.02f, 0.02f, 0.85f);
 
+	const int32 MaxSlots = GetInventoryDisplaySlotCount();
+	const int32 EquipmentUsedSlots = CountOccupiedInventorySlotsByType(EPDItemType::Equipment);
+	const int32 ConsumableUsedSlots = CountOccupiedInventorySlotsByType(EPDItemType::Consumable);
+	const int32 MiscUsedSlots = CountOccupiedInventorySlotsByType(EPDItemType::Misc);
+
 	if (Button_Equipment)
 	{
 		Button_Equipment->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Equipment ? SelectedColor : NormalColor);
+		SetTabButtonLabel(Button_Equipment, FText::FromString(TEXT("장비")), EquipmentUsedSlots, MaxSlots);
 	}
 
 	if (Button_Consumable)
 	{
 		Button_Consumable->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Consumable ? SelectedColor : NormalColor);
+		SetTabButtonLabel(Button_Consumable, FText::FromString(TEXT("소모")), ConsumableUsedSlots, MaxSlots);
 	}
 
 	if (Button_Misc)
 	{
 		Button_Misc->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Misc ? SelectedColor : NormalColor);
+		SetTabButtonLabel(Button_Misc, FText::FromString(TEXT("기타")), MiscUsedSlots, MaxSlots);
+	}
+}
+
+int32 UPDInventoryWidget::CountOccupiedInventorySlotsByType(EPDItemType ItemType) const
+{
+	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	if (!InventoryComponent)
+	{
+		return 0;
+	}
+
+	int32 UsedSlotCount = 0;
+	for (const FPDInventorySlot& InventorySlotData : InventoryComponent->Items)
+	{
+		if (!InventorySlotData.IsEmpty() && InventorySlotData.ItemData.ItemType == ItemType)
+		{
+			++UsedSlotCount;
+		}
+	}
+
+	return UsedSlotCount;
+}
+
+int32 UPDInventoryWidget::GetInventoryDisplaySlotCount() const
+{
+	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	if (InventoryComponent)
+	{
+		return FMath::Max(1, InventoryComponent->GetMaxSlotCount());
+	}
+
+	const int32 Columns = FMath::Max(1, FallbackGridColumns);
+	const int32 Rows = FMath::Max(1, FallbackGridRows);
+	return Columns * Rows;
+}
+
+void UPDInventoryWidget::SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const
+{
+	if (!TargetButton)
+	{
+		return;
+	}
+
+	if (UTextBlock* ButtonText = Cast<UTextBlock>(TargetButton->GetContent()))
+	{
+		ButtonText->SetText(FText::FromString(FString::Printf(TEXT("%s (%d/%d)"), *BaseLabel.ToString(), UsedSlots, FMath::Max(1, MaxSlots))));
 	}
 }
 

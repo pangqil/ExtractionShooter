@@ -86,6 +86,9 @@ private:
 	void ResolveStashGridPanel();
 	void BindTabButtons();
 	void UpdateTabButtonStyle();
+	int32 CountOccupiedStashSlotsByType(EPDItemType ItemType) const;
+	int32 GetStashDisplaySlotCount() const;
+	void SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const;
 	bool DoesSlotMatchCurrentFilter(const FPDInventorySlot& StashSlotData) const;
 	bool DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const;
 	bool CanAcceptDropForCurrentFilter(const UPDInventoryDragDropOperation* DragOperation) const;

@@ -123,6 +123,9 @@ private:
 	void ResolveInventoryGridPanel();
 	void BindTabButtons();
 	void UpdateTabButtonStyle();
+	int32 CountOccupiedInventorySlotsByType(EPDItemType ItemType) const;
+	int32 GetInventoryDisplaySlotCount() const;
+	void SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const;
 	bool DoesSlotMatchCurrentFilter(const FPDInventorySlot& InventorySlotData) const;
 	bool DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const;
 	bool CanAcceptDropForCurrentFilter(const UPDInventoryDragDropOperation* DragOperation) const;
