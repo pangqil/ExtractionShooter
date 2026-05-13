@@ -10,6 +10,8 @@
 
 #include "Animation/AnimInstance.h"
 #include "Interfaces/PDDamageable.h"
+#include "Items/PDInventoryComponent.h"
+#include "Engine/DataTable.h"
 
 APDWeaponBase::APDWeaponBase()
 {
@@ -21,8 +23,13 @@ APDWeaponBase::APDWeaponBase()
     PickupCollision = CreateDefaultSubobject<USphereComponent>(TEXT("PickupCollision"));
     PickupCollision->SetupAttachment(RootComponent);
     PickupCollision->SetSphereRadius(80.f);
-    PickupCollision->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
-    PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // Interact 트레이스(ECC_Visibility)만 Block — PDItemBase와 동일 패턴
+    PickupCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    PickupCollision->SetCollisionObjectType(ECC_WorldDynamic);
+    PickupCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+    PickupCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+    PickupCollision->SetGenerateOverlapEvents(false);
 
     MagazineMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MagazineMesh"));
     MagazineMesh->SetupAttachment(WeaponMesh, MagazineSocketName);
@@ -36,9 +43,20 @@ void APDWeaponBase::BeginPlay()
     if (LevelStats.IsValidIndex(0))
         CurrentAmmo = LevelStats[0].MaxAmmo;
 
-    if (bIsDropped)
+    LoadItemData();
+}
+
+void APDWeaponBase::LoadItemData()
+{
+    if (!ItemDataTable || ItemRowName.IsNone()) return;
+
+    const FPDItemData* Row = ItemDataTable->FindRow<FPDItemData>(ItemRowName, TEXT("PDWeaponBase"));
+    if (!Row) return;
+
+    CachedItemData = *Row;
+    if (CachedItemData.ItemID.IsNone())
     {
-        PickupCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        CachedItemData.ItemID = ItemRowName;
     }
 }
 
@@ -49,8 +67,30 @@ void APDWeaponBase::Interact_Implementation(AActor* Interactor)
     APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(Interactor);
     if (!Player) return;
 
-    Player->PickupWeapon(this);
-    SetDropped(false);
+    // 슬롯 비어있으면 곧바로 장착
+    const EWeaponSlot TargetSlot = Player->GetSlotForWeaponType(WeaponType);
+    if (TargetSlot != EWeaponSlot::None && !Player->GetWeaponInSlot(TargetSlot))
+    {
+        Player->PickupWeapon(this);
+        SetDropped(false);
+        return;
+    }
+
+    // 슬롯이 차있음 → 인벤토리로 우회
+    if (CachedItemData.ItemID.IsNone())
+    {
+        OnPickupFailed();
+        return;
+    }
+
+    UPDInventoryComponent* Inventory = Player->FindComponentByClass<UPDInventoryComponent>();
+    if (!Inventory || !Inventory->AddItem(CachedItemData, 1))
+    {
+        OnPickupFailed();
+        return;
+    }
+
+    Destroy();
 }
 
 void APDWeaponBase::Fire_Implementation() {}

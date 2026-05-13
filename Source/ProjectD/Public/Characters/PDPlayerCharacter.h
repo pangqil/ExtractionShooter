@@ -71,9 +71,11 @@ protected:
 	EWeaponSlot CurrentSlot=EWeaponSlot::None;
 
 	void OnStaminaChanged(const FOnAttributeChangeData& Data);
-	EWeaponSlot GetSlotForWeaponType(EWeaponType Type) const;
 
 public:
+	UFUNCTION(BlueprintPure, Category="PD|Player|Weapon")
+	EWeaponSlot GetSlotForWeaponType(EWeaponType Type) const;
+
 	UPROPERTY(BlueprintAssignable, Category="PD|Player|Events")
 	FOnWeaponSwapped OnWeaponSwapped;
 

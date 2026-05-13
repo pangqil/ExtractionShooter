@@ -110,8 +110,8 @@ void APDPlayerCharacter::PickupWeapon(APDWeaponBase* Weapon)
 	if (TargetSlot==EWeaponSlot::None) return;
 
 	int32 Idx=static_cast<int32>(TargetSlot);
-	if (WeaponSlots[Idx])
-		WeaponSlots[Idx]->OnUnequip();
+	// 슬롯이 차있을 때는 호출자(Interact/AutoEquip)에서 인벤토리 경로로 우회해야 한다.
+	if (WeaponSlots[Idx]) return;
 
 	WeaponSlots[Idx]=Weapon;
 	Weapon->OnEquip(this);           
