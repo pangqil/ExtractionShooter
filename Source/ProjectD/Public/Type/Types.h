@@ -29,6 +29,14 @@ enum class EPDItemType : uint8
 };
 
 UENUM(BlueprintType)
+enum class EPDItemFilterTab : uint8
+{
+	Equipment  UMETA(DisplayName = "Equipment"),
+	Consumable UMETA(DisplayName = "Consumable"),
+	Misc       UMETA(DisplayName = "Misc"),
+};
+
+UENUM(BlueprintType)
 enum class EWeaponType : uint8
 {
 	None    UMETA(DisplayName = "None"),

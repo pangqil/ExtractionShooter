@@ -111,8 +111,8 @@ bool UPDNewQuickSlotItemWidget::NativeOnDrop(const FGeometry& InGeometry, const 
 		bMoved = QuickSlotComponent->StoreInventorySlotQuantityToSlot(FindInventoryComponent(), DragOperation->SourceSlotIndex, SlotIndex, Quantity);
 		break;
 	case EPDItemContainerType::Stash:
-		bMoved = QuickSlotComponent->StoreStashSlotQuantityToSlot(FindStashComponent(), DragOperation->SourceSlotIndex, SlotIndex, Quantity);
-		break;
+		// Stash is storage only. Do not allow items stored in stash to be registered to quick slots.
+		return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 	case EPDItemContainerType::QuickSlot:
 		bMoved = QuickSlotComponent->MoveSlotQuantityToSlot(DragOperation->SourceSlotIndex, SlotIndex, Quantity);
 		break;

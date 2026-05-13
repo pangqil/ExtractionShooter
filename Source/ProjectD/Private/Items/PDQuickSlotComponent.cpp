@@ -165,7 +165,7 @@ void UPDQuickSlotComponent::ResetQuickSlots()
 
 int32 UPDQuickSlotComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quantity)
 {
-	if (ItemData.ItemID.IsNone() || Quantity <= 0)
+	if (ItemData.ItemID.IsNone() || Quantity <= 0 || ItemData.ItemType != EPDItemType::Consumable)
 	{
 		return 0;
 	}
@@ -229,6 +229,11 @@ int32 UPDQuickSlotComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 int32 UPDQuickSlotComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex)
 {
+	if (ItemData.ItemID.IsNone() || Quantity <= 0 || ItemData.ItemType != EPDItemType::Consumable)
+	{
+		return 0;
+	}
+
 	if (QuickSlotItems.Num() != GetMaxSlotCount())
 	{
 		InitializeQuickSlots();
@@ -292,7 +297,7 @@ bool UPDQuickSlotComponent::StoreInventorySlotQuantityToSlot(UPDInventoryCompone
 	}
 
 	const FPDInventorySlot& SourceSlot = SourceInventory->Items[SourceSlotIndex];
-	if (SourceSlot.IsEmpty())
+	if (SourceSlot.IsEmpty() || SourceSlot.ItemData.ItemType != EPDItemType::Consumable)
 	{
 		return false;
 	}
@@ -344,6 +349,12 @@ bool UPDQuickSlotComponent::StoreStashSlotQuantityToSlot(UPDStashComponent* Sour
 	}
 
 	if (!SourceStash || !SourceStash->StashItems.IsValidIndex(SourceStashSlotIndex) || !QuickSlotItems.IsValidIndex(TargetQuickSlotIndex) || Quantity <= 0)
+	{
+		return false;
+	}
+
+	const FPDInventorySlot& SourceSlot = SourceStash->StashItems[SourceStashSlotIndex];
+	if (SourceSlot.IsEmpty() || SourceSlot.ItemData.ItemType != EPDItemType::Consumable)
 	{
 		return false;
 	}

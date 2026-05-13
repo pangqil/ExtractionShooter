@@ -9,6 +9,7 @@
 #include "Components/UniformGridSlot.h"
 #include "Components/TextBlock.h"
 #include "Components/PanelWidget.h"
+#include "Components/Button.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDInventoryComponent.h"
@@ -28,7 +29,9 @@ void UPDInventoryWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	BindInventoryChanged();
+	BindTabButtons();
 	RefreshInventoryGrid();
+	UpdateTabButtonStyle();
 }
 
 void UPDInventoryWidget::NativeDestruct()
@@ -71,7 +74,31 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 	const int32 Rows = InventoryComponent ? FMath::Max(1, InventoryComponent->GridRows) : FMath::Max(1, FallbackGridRows);
 	const int32 SlotCount = InventoryComponent ? InventoryComponent->GetMaxSlotCount() : Columns * Rows;
 
-	for (int32 Index = 0; Index < SlotCount; ++Index)
+	TArray<int32> DisplaySlotIndices;
+	if (InventoryComponent)
+	{
+		// 현재 탭 아이템을 먼저 모아 보여주고, 남는 칸은 실제 빈 슬롯 인덱스로 매핑한다.
+		// 그래야 빈 칸에 드롭해도 INDEX_NONE이 아니라 실제 인벤토리 슬롯으로 이동된다.
+		for (int32 RealSlotIndex = 0; RealSlotIndex < InventoryComponent->Items.Num(); ++RealSlotIndex)
+		{
+			const FPDInventorySlot& InventorySlotData = InventoryComponent->Items[RealSlotIndex];
+			if (!InventorySlotData.IsEmpty() && DoesSlotMatchCurrentFilter(InventorySlotData))
+			{
+				DisplaySlotIndices.Add(RealSlotIndex);
+			}
+		}
+
+		for (int32 RealSlotIndex = 0; RealSlotIndex < InventoryComponent->Items.Num(); ++RealSlotIndex)
+		{
+			const FPDInventorySlot& InventorySlotData = InventoryComponent->Items[RealSlotIndex];
+			if (InventorySlotData.IsEmpty())
+			{
+				DisplaySlotIndices.Add(RealSlotIndex);
+			}
+		}
+	}
+
+	for (int32 DisplayIndex = 0; DisplayIndex < SlotCount; ++DisplayIndex)
 	{
 		UUserWidget* CreatedSlotWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), InventorySlotWidgetClass);
 		if (!CreatedSlotWidget)
@@ -88,23 +115,186 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 			InventorySlotWidget->OnSlotUnhovered.AddUniqueDynamic(this, &UPDInventoryWidget::HandleInventorySlotUnhovered);
 			InventorySlotWidget->OnSlotItemDropped.AddUniqueDynamic(this, &UPDInventoryWidget::HandleInventorySlotItemDropped);
 
-			if (InventoryComponent && InventoryComponent->Items.IsValidIndex(Index))
+			if (InventoryComponent && DisplaySlotIndices.IsValidIndex(DisplayIndex))
 			{
-				InventorySlotWidget->SetSlotData(InventoryComponent->Items[Index], Index);
+				const int32 RealSlotIndex = DisplaySlotIndices[DisplayIndex];
+				if (InventoryComponent->Items.IsValidIndex(RealSlotIndex) && !InventoryComponent->Items[RealSlotIndex].IsEmpty())
+				{
+					InventorySlotWidget->SetSlotData(InventoryComponent->Items[RealSlotIndex], RealSlotIndex);
+				}
+				else
+				{
+					InventorySlotWidget->ClearSlotData(RealSlotIndex);
+				}
 			}
 			else
 			{
-				InventorySlotWidget->ClearSlotData(Index);
+				InventorySlotWidget->ClearSlotData(INDEX_NONE);
 			}
 		}
 
-		UUniformGridSlot* GridSlot = InventoryGridPanel->AddChildToUniformGrid(CreatedSlotWidget, Index / Columns, Index % Columns);
+		UUniformGridSlot* GridSlot = InventoryGridPanel->AddChildToUniformGrid(CreatedSlotWidget, DisplayIndex / Columns, DisplayIndex % Columns);
 		if (GridSlot)
 		{
 			GridSlot->SetHorizontalAlignment(HAlign_Center);
 			GridSlot->SetVerticalAlignment(VAlign_Center);
 		}
 	}
+
+	UpdateTabButtonStyle();
+}
+
+void UPDInventoryWidget::SetInventoryFilterTab(EPDItemFilterTab NewFilterTab)
+{
+	if (CurrentFilterTab == NewFilterTab)
+	{
+		UpdateTabButtonStyle();
+		return;
+	}
+
+	CurrentFilterTab = NewFilterTab;
+	RefreshInventoryGrid();
+}
+
+void UPDInventoryWidget::BindTabButtons()
+{
+	if (Button_Equipment)
+	{
+		Button_Equipment->OnClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentTabClicked);
+	}
+
+	if (Button_Consumable)
+	{
+		Button_Consumable->OnClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleConsumableTabClicked);
+	}
+
+	if (Button_Misc)
+	{
+		Button_Misc->OnClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleMiscTabClicked);
+	}
+}
+
+void UPDInventoryWidget::UpdateTabButtonStyle()
+{
+	const FLinearColor SelectedColor(0.15f, 0.85f, 0.15f, 1.0f);
+	const FLinearColor NormalColor(0.02f, 0.02f, 0.02f, 0.85f);
+
+	const int32 MaxSlots = GetInventoryDisplaySlotCount();
+	const int32 EquipmentUsedSlots = CountOccupiedInventorySlotsByType(EPDItemType::Equipment);
+	const int32 ConsumableUsedSlots = CountOccupiedInventorySlotsByType(EPDItemType::Consumable);
+	const int32 MiscUsedSlots = CountOccupiedInventorySlotsByType(EPDItemType::Misc);
+
+	if (Button_Equipment)
+	{
+		Button_Equipment->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Equipment ? SelectedColor : NormalColor);
+		SetTabButtonLabel(Button_Equipment, FText::FromString(TEXT("장비")), EquipmentUsedSlots, MaxSlots);
+	}
+
+	if (Button_Consumable)
+	{
+		Button_Consumable->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Consumable ? SelectedColor : NormalColor);
+		SetTabButtonLabel(Button_Consumable, FText::FromString(TEXT("소모")), ConsumableUsedSlots, MaxSlots);
+	}
+
+	if (Button_Misc)
+	{
+		Button_Misc->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Misc ? SelectedColor : NormalColor);
+		SetTabButtonLabel(Button_Misc, FText::FromString(TEXT("기타")), MiscUsedSlots, MaxSlots);
+	}
+}
+
+int32 UPDInventoryWidget::CountOccupiedInventorySlotsByType(EPDItemType ItemType) const
+{
+	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	if (!InventoryComponent)
+	{
+		return 0;
+	}
+
+	int32 UsedSlotCount = 0;
+	for (const FPDInventorySlot& InventorySlotData : InventoryComponent->Items)
+	{
+		if (!InventorySlotData.IsEmpty() && InventorySlotData.ItemData.ItemType == ItemType)
+		{
+			++UsedSlotCount;
+		}
+	}
+
+	return UsedSlotCount;
+}
+
+int32 UPDInventoryWidget::GetInventoryDisplaySlotCount() const
+{
+	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	if (InventoryComponent)
+	{
+		return FMath::Max(1, InventoryComponent->GetMaxSlotCount());
+	}
+
+	const int32 Columns = FMath::Max(1, FallbackGridColumns);
+	const int32 Rows = FMath::Max(1, FallbackGridRows);
+	return Columns * Rows;
+}
+
+void UPDInventoryWidget::SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const
+{
+	if (!TargetButton)
+	{
+		return;
+	}
+
+	if (UTextBlock* ButtonText = Cast<UTextBlock>(TargetButton->GetContent()))
+	{
+		ButtonText->SetText(FText::FromString(FString::Printf(TEXT("%s (%d/%d)"), *BaseLabel.ToString(), UsedSlots, FMath::Max(1, MaxSlots))));
+	}
+}
+
+bool UPDInventoryWidget::DoesSlotMatchCurrentFilter(const FPDInventorySlot& InventorySlotData) const
+{
+	return !InventorySlotData.IsEmpty() && DoesItemTypeMatchCurrentFilter(InventorySlotData.ItemData.ItemType);
+}
+
+bool UPDInventoryWidget::DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const
+{
+	if (CurrentFilterTab == EPDItemFilterTab::Equipment)
+	{
+		return ItemType == EPDItemType::Equipment;
+	}
+
+	if (CurrentFilterTab == EPDItemFilterTab::Consumable)
+	{
+		return ItemType == EPDItemType::Consumable;
+	}
+
+	if (CurrentFilterTab == EPDItemFilterTab::Misc)
+	{
+		return ItemType == EPDItemType::Misc;
+	}
+
+	return false;
+}
+
+bool UPDInventoryWidget::CanAcceptDropForCurrentFilter(const UPDInventoryDragDropOperation* DragOperation) const
+{
+	return DragOperation
+		&& DragOperation->IsValidPayload()
+		&& !DragOperation->SlotData.IsEmpty()
+		&& DoesItemTypeMatchCurrentFilter(DragOperation->SlotData.ItemData.ItemType);
+}
+
+void UPDInventoryWidget::HandleEquipmentTabClicked()
+{
+	SetInventoryFilterTab(EPDItemFilterTab::Equipment);
+}
+
+void UPDInventoryWidget::HandleConsumableTabClicked()
+{
+	SetInventoryFilterTab(EPDItemFilterTab::Consumable);
+}
+
+void UPDInventoryWidget::HandleMiscTabClicked()
+{
+	SetInventoryFilterTab(EPDItemFilterTab::Misc);
 }
 
 void UPDInventoryWidget::ResolveInventoryGridPanel()
@@ -239,7 +429,7 @@ void UPDInventoryWidget::HandleInventorySlotLeftClicked(UPDInventorySlotWidget* 
 
 void UPDInventoryWidget::HandleInventorySlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 TargetSlotIndex, UPDInventoryDragDropOperation* DragOperation)
 {
-	if (!SlotWidget || !DragOperation || !DragOperation->IsValidPayload())
+	if (!SlotWidget || !CanAcceptDropForCurrentFilter(DragOperation) || TargetSlotIndex == INDEX_NONE)
 	{
 		return;
 	}
