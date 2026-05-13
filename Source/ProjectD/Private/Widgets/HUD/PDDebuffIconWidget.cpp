@@ -4,12 +4,11 @@
 #include "Widgets/HUD/PDDebuffIconWidget.h"
 
 #include "Components/Image.h"
-#include "Engine/Texture2D.h"
+#include "Materials/MaterialInterface.h"
 
-void UPDDebuffIconWidget::SetIconData(UTexture2D* IconTexture, FVector2D IconSize)
+void UPDDebuffIconWidget::SetIconData(UMaterialInterface* IconMaterial)
 {
-	if (!Image_Icon || !IconTexture) return;
+	if (!Image_Icon || !IconMaterial) return;
 
-	Image_Icon->SetBrushFromTexture(IconTexture);
-	Image_Icon->SetDesiredSizeOverride(IconSize);
+	Image_Icon->SetBrushFromMaterial(IconMaterial);
 }

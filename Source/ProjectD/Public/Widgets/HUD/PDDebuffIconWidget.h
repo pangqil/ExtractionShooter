@@ -7,7 +7,7 @@
 #include "PDDebuffIconWidget.generated.h"
 
 class UImage;
-class UTexture2D;
+class UMaterialInterface;
 
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
 class PROJECTD_API UPDDebuffIconWidget : public UUserWidget
@@ -15,7 +15,7 @@ class PROJECTD_API UPDDebuffIconWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	void SetIconData(UTexture2D* IconTexture, FVector2D IconSize);
+	void SetIconData(UMaterialInterface* IconMaterial);
 
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))

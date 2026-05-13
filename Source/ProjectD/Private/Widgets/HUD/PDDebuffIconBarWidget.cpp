@@ -34,7 +34,7 @@ void UPDDebuffIconBarWidget::SetDebuffActive(const FGameplayTag& DebuffTag, bool
 		UPDDebuffIconWidget* NewIcon = CreateWidget<UPDDebuffIconWidget>(this, IconWidgetClass);
 		if (!NewIcon) return;
 
-		NewIcon->SetIconData(Data->IconTexture, Data->IconSize);
+		NewIcon->SetIconData(Data->IconMaterial);
 
 		// AddChild = 박스 끝에 추가. VerticalBox면 맨 아래, HorizontalBox면 맨 오른쪽.
 		// 결과: 먼저 걸린 디버프가 상단/앞 유지, 새 디버프가 그 뒤로 누적.
