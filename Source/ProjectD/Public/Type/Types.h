@@ -54,6 +54,7 @@ enum class EWeaponType : uint8
 	Rifle   UMETA(DisplayName = "Rifle"),
 	Shotgun UMETA(DisplayName = "Shotgun"),
 	Sniper  UMETA(DisplayName = "Sniper"),
+	Pistol  UMETA(DisplayName = "Pistol"),
 };
 
 USTRUCT(BlueprintType)
@@ -206,14 +207,15 @@ enum class ERaidState : uint8
 // ─── 무기 시스템 ────────────────────────────────────────────────
 // EWeaponType은 FPDItemData보다 위에 정의됨(FPDItemData::WeaponType 기본값에서 사용).
 
-// 슬롯 인덱스: Slot1_Rifle=0, Slot2_Shotgun=1, Slot3_Sniper=2 (배열 인덱스로 직접 사용)
-// None=3 은 "선택 없음" 센티넬. 인덱스로 쓰기 전에 None 체크 필수.
+// 슬롯 인덱스: Slot1_Rifle=0, Slot2_Shotgun=1, Slot3_Sniper=2, Slot4_Pistol=3 (배열 인덱스로 직접 사용)
+// None=4 은 "선택 없음" 센티넬. 인덱스로 쓰기 전에 None 체크 필수.
 UENUM(BlueprintType)
 enum class EWeaponSlot : uint8
 {
 	Slot1_Rifle   UMETA(DisplayName = "Rifle"),
 	Slot2_Shotgun UMETA(DisplayName = "Shotgun"),
 	Slot3_Sniper  UMETA(DisplayName = "Sniper"),
+	Slot4_Pistol  UMETA(DisplayName = "Pistol"),
 	None          UMETA(DisplayName = "None"),
 };
 

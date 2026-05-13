@@ -23,6 +23,9 @@ public:
 	virtual EPDStaminaStatus GetStaminaStatus_Implementation() const override;
 	//~ End IPDCombatInterface
 
+	// Combat이 아닐 때 피격되면 공격자 위치를 NoiseHint로 등록해 BT가 그 방향으로 추적하게 한다.
+	virtual void ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo) override;
+
 	UFUNCTION(BlueprintCallable, Category = "PD|AI")
 	void SetEnemyState(EPDEnemyState NewState);
 

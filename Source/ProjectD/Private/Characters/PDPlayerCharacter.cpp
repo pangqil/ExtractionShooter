@@ -41,7 +41,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 
 	PrimaryActorTick.bCanEverTick=true;
 	PrimaryActorTick.bStartWithTickEnabled=true;
-	WeaponSlots.SetNum(3);
+	WeaponSlots.SetNum(4);
 
 	// Player 팀. AI 의 GetTeamAttitudeTowards 에서 적대 판정의 기준이 됨.
 	TeamID = 1;
@@ -55,6 +55,7 @@ void APDPlayerCharacter::BeginPlay()
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Shotgun, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Sniper,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
+            ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Pistol,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
         }
 	LinkDefaultAnimLayer();
 
@@ -146,6 +147,7 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Rifle);
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Shotgun);
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Sniper);
+		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Pistol);
 		ASC->AddLooseGameplayTag(NewWeapon->GetWeaponTypeTag());
 	}
 	NewWeapon->SetActorHiddenInGame(false);
@@ -185,6 +187,7 @@ EWeaponSlot APDPlayerCharacter::GetSlotForWeaponType(EWeaponType Type) const
 	case EWeaponType::Rifle:   return EWeaponSlot::Slot1_Rifle;
 	case EWeaponType::Shotgun: return EWeaponSlot::Slot2_Shotgun;
 	case EWeaponType::Sniper:  return EWeaponSlot::Slot3_Sniper;
+	case EWeaponType::Pistol:  return EWeaponSlot::Slot4_Pistol;
 	default:                   return EWeaponSlot::None;
 	}
 }
