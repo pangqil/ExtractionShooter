@@ -7,6 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Items/PDQuickSlotComponent.h"
+#include "Items/PDEquipmentComponent.h"
 #include "Weapons/PDWeaponBase.h"
 
 APDPlayerCharacter::APDPlayerCharacter()
@@ -36,6 +37,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
 	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
 	QuickSlotComponent=CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
+	EquipmentComponent=CreateDefaultSubobject<UPDEquipmentComponent>(TEXT("EquipmentComponent"));
 
 	PrimaryActorTick.bCanEverTick=true;
 	PrimaryActorTick.bStartWithTickEnabled=true;
@@ -210,6 +212,45 @@ bool APDPlayerCharacter::TryAutoEquipWeaponItem(const FPDItemData& ItemData)
 	if (!SpawnedWeapon) return false;
 
 	PickupWeapon(SpawnedWeapon);
+	return true;
+}
+
+
+bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, bool bDestroyWeaponActor)
+{
+	const EWeaponSlot TargetSlot = GetSlotForWeaponType(ItemData.WeaponType);
+	if (TargetSlot == EWeaponSlot::None)
+	{
+		return false;
+	}
+
+	const int32 SlotIndex = static_cast<int32>(TargetSlot);
+	if (!WeaponSlots.IsValidIndex(SlotIndex) || !WeaponSlots[SlotIndex])
+	{
+		return false;
+	}
+
+	APDWeaponBase* WeaponToRemove = WeaponSlots[SlotIndex];
+	WeaponToRemove->OnUnequip();
+	WeaponToRemove->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	WeaponToRemove->SetActorHiddenInGame(true);
+
+	if (ASC)
+	{
+		ASC->RemoveLooseGameplayTag(WeaponToRemove->GetWeaponTypeTag());
+	}
+
+	WeaponSlots[SlotIndex] = nullptr;
+	if (CurrentSlot == TargetSlot)
+	{
+		CurrentSlot = EWeaponSlot::None;
+	}
+
+	if (bDestroyWeaponActor)
+	{
+		WeaponToRemove->Destroy();
+	}
+
 	return true;
 }
 

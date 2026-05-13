@@ -36,6 +36,17 @@ enum class EPDItemFilterTab : uint8
 	Misc       UMETA(DisplayName = "Misc"),
 };
 
+
+UENUM(BlueprintType)
+enum class EPDEquipmentSlotType : uint8
+{
+	None   UMETA(DisplayName = "None"),
+	Weapon UMETA(DisplayName = "Weapon"),
+	Head   UMETA(DisplayName = "Head"),
+	Armor  UMETA(DisplayName = "Armor"),
+	Bag    UMETA(DisplayName = "Bag"),
+};
+
 UENUM(BlueprintType)
 enum class EWeaponType : uint8
 {
@@ -71,11 +82,15 @@ struct FPDItemData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText Description;
 
+	// 장비 아이템일 때 어느 장비 슬롯에 들어갈지 지정. WeaponType은 전투 타입 구분용으로만 사용.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDEquipmentSlotType EquipmentSlotType = EPDEquipmentSlotType::None;
+
 	// 무기 아이템일 때만 설정. nullptr이면 비-무기 아이템(소비/잡템).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<APDWeaponBase> WeaponClass;
 
-	// 무기 아이템일 때 어떤 슬롯에 들어가는지 결정. 비-무기는 None.
+	// 무기 아이템일 때 전투 타입을 지정. 장착 위치는 EquipmentSlotType으로 결정한다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EWeaponType WeaponType = EWeaponType::None;
 };
@@ -104,6 +119,30 @@ struct FPDInventorySlot
 		ItemData = FPDItemData();
 		Quantity = 0;
 		bIsEmpty = true;
+	}
+};
+
+
+USTRUCT(BlueprintType)
+struct FPDEquippedItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDEquipmentSlotType SlotType = EPDEquipmentSlotType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPDInventorySlot ItemSlot;
+
+	bool IsEmpty() const
+	{
+		return SlotType == EPDEquipmentSlotType::None || ItemSlot.IsEmpty();
+	}
+
+	void Clear()
+	{
+		SlotType = EPDEquipmentSlotType::None;
+		ItemSlot.Clear();
 	}
 };
 
