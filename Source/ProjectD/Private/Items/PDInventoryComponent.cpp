@@ -1,5 +1,6 @@
 #include "Items/PDInventoryComponent.h"
 
+#include "Data/PDQuestComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 
 UPDInventoryComponent::UPDInventoryComponent()
@@ -76,7 +77,30 @@ bool UPDInventoryComponent::RemoveItemFromSlot(int32 SlotIndex, int32 Quantity)
 
 bool UPDInventoryComponent::DropItemFromSlot(int32 SlotIndex, int32 Quantity)
 {
-	return RemoveItemFromSlot(SlotIndex, Quantity);
+	if (!Items.IsValidIndex(SlotIndex) || Quantity <= 0)
+	{
+		return false;
+	}
+
+	const FPDInventorySlot& Slot = Items[SlotIndex];
+	if (Slot.IsEmpty())
+	{
+		return false;
+	}
+
+	const FName ItemID = Slot.ItemData.ItemID;
+	const int32 DropAmount = FMath::Min(Quantity, Slot.Quantity);
+	const bool bDropped = RemoveItemFromSlot(SlotIndex, Quantity);
+
+	if (bDropped)
+	{
+		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
+		{
+			QuestComponent->ReportItemDropped(ItemID, DropAmount);
+		}
+	}
+
+	return bDropped;
 }
 
 bool UPDInventoryComponent::UseItemFromSlot(int32 SlotIndex)
@@ -177,6 +201,15 @@ int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 	if (AddedQuantity > 0)
 	{
 		OnInventoryChanged.Broadcast();
+
+		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
+		{
+			QuestComponent->ReportItemAcquired(ItemData.ItemID, AddedQuantity);
+			if (ItemData.bIsQuestItem)
+			{
+				QuestComponent->ReportQuestItemAcquired(ItemData.ItemID, AddedQuantity);
+			}
+		}
 	}
 
 	return AddedQuantity;
@@ -232,6 +265,16 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 				if (RemainingQuantity <= 0)
 				{
 					OnInventoryChanged.Broadcast();
+
+					if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
+					{
+						QuestComponent->ReportItemAcquired(ItemData.ItemID, AddedQuantity);
+						if (ItemData.bIsQuestItem)
+						{
+							QuestComponent->ReportQuestItemAcquired(ItemData.ItemID, AddedQuantity);
+						}
+					}
+
 					return AddedQuantity;
 				}
 			}
@@ -260,6 +303,15 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 	if (AddedQuantity > 0)
 	{
 		OnInventoryChanged.Broadcast();
+
+		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
+		{
+			QuestComponent->ReportItemAcquired(ItemData.ItemID, AddedQuantity);
+			if (ItemData.bIsQuestItem)
+			{
+				QuestComponent->ReportQuestItemAcquired(ItemData.ItemID, AddedQuantity);
+			}
+		}
 	}
 
 	return AddedQuantity;

@@ -16,6 +16,7 @@ class UPDStashWidget;
 class UPDStashComponent;
 class UPDMarketWidget;
 class UPDMarketComponent;
+class UPDQuestWindowWidget;
 class APDPlayerCharacter;
 class UPDHUDWidget;
 class UPDActivatableBase;
@@ -63,6 +64,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	bool SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity = 1);
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Quest")
+	void OpenQuestInterface();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Quest")
+	void CloseQuestInterface();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Quest")
+	bool IsQuestInterfaceOpen() const;
+
 	virtual void PlayerTick(float DeltaTime) override;
 
 protected:
@@ -90,6 +100,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
+
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -106,6 +119,7 @@ private:
 	void UpdateAimRotation();
 
 	void ToggleInventory();
+	void ToggleQuest();
 	void TryInteract();
 
 	bool IsGameplayInputBlockedByModalUI() const;
@@ -119,6 +133,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketWidget> MarketWidgetInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDQuestWindowWidget> QuestWindowWidgetInstance;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketComponent> ActiveMarketComponent;
