@@ -1,4 +1,4 @@
-#include "Weapons/PDWeaponBase.h"
+﻿#include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDShellActor.h"
 #include "Weapons/PDMagazineActor.h"
 #include "Characters/PDPlayerCharacter.h"
@@ -12,6 +12,7 @@
 #include "Interfaces/PDDamageable.h"
 #include "Items/PDInventoryComponent.h"
 #include "Engine/DataTable.h"
+#include "Kismet/GameplayStatics.h"
 
 namespace
 {
@@ -424,4 +425,27 @@ FVector APDWeaponBase::GetAimDirectionFromOwner(const FVector& StartLocation) co
     }
 
     return WeaponOwner->GetActorForwardVector();
+}
+
+void APDWeaponBase::PlayFireEffects()
+{
+    if (MuzzleFlashEffect)
+    {
+        UGameplayStatics::SpawnEmitterAttached(
+            MuzzleFlashEffect,
+            WeaponMesh,
+            MuzzleSocketName,
+            FVector::ZeroVector,
+            FRotator::ZeroRotator,
+            EAttachLocation::SnapToTarget,
+            true);
+    }
+
+    if (FireSound)
+    {
+        UGameplayStatics::SpawnSoundAttached(
+            FireSound,
+            WeaponMesh,
+            MuzzleSocketName);
+    }
 }

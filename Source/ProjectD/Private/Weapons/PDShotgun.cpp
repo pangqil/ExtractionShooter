@@ -27,7 +27,9 @@ void APDShotgun::Fire_Implementation()
             ApplyDamage(HitActor, GetCurrentStats().Damage);
         }
     }
-
+   
+    PlayFireEffects();
+    PlayWeaponMontage(FireMontage);
     PostFire();
 
     // 발사 직후 탄피 배출

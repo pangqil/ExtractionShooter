@@ -7,6 +7,7 @@
 #include "Animation/AnimMontage.h"
 #include "Interfaces/PDInteractable.h"
 #include "Camera/CameraShakeBase.h"
+#include "NiagaraFunctionLibrary.h"
 #include "PDWeaponBase.generated.h"
 
 class APDWeaponBase;
@@ -67,6 +68,9 @@ protected:
 
 	// 애니메이션
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Animation")
+	TObjectPtr<UAnimMontage> FireMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Animation")
 	TObjectPtr<UAnimMontage> ReloadMontage;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Animation")
@@ -89,6 +93,12 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Animation")
 	float ShellEjectSpeed = 200.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Effects")
+	TObjectPtr<UParticleSystem> MuzzleFlashEffect;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Effects")
+	TObjectPtr<USoundBase> FireSound;
 
 	// 상태
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|State")
@@ -258,7 +268,8 @@ protected:
 	bool IsPlayingMontage(UAnimMontage* Montage) const;
 	void StopWeaponMontage(UAnimMontage* Montage);
 	void BindMontageEndedForReload(UAnimMontage* Montage);
-
+	void PlayFireEffects();
+	
 	void ApplyRecoil();      // PostFire()에서 호출
 	APlayerController* GetOwnerPlayerController() const;
 
