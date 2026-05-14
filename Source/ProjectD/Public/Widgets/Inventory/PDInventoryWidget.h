@@ -20,6 +20,7 @@ class UPanelWidget;
 class UPDEquipmentComponent;
 class UPDEquipmentSlotWidget;
 class UButton;
+class UWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase
@@ -32,6 +33,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void SetInventoryFilterTab(EPDItemFilterTab NewFilterTab);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
+	void SetInventorySortMode(EPDItemSortMode NewSortMode);
 
 	// Stash 인터페이스가 함께 열릴 때 어느 박스를 대상으로 할지 PC가 주입.
 	// nullptr이면 stash 동작 비활성(단독 인벤토리 모드).
@@ -81,6 +85,27 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Tabs")
 	TObjectPtr<UButton> Button_Misc;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Sort")
+	TObjectPtr<UButton> Button_Sort;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Sort")
+	TObjectPtr<UButton> Button_SortByName;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Sort")
+	TObjectPtr<UButton> Button_SortByType;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Sort")
+	TObjectPtr<UButton> Button_SortTab_Name;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Sort")
+	TObjectPtr<UButton> Button_SortTab_Type;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Sort")
+	TObjectPtr<UWidget> Panel_SortOptions;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Sort")
+	TObjectPtr<UWidget> Panel_SortTabs;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Equipment")
 	FName EquipmentSlotWeaponWidgetName = TEXT("EquipmentSlot_Weapon");
@@ -134,11 +159,21 @@ protected:
 	void HandleMiscTabClicked();
 
 	UFUNCTION()
+	void HandleSortButtonClicked();
+
+	UFUNCTION()
+	void HandleSortByNameClicked();
+
+	UFUNCTION()
+	void HandleSortByTypeClicked();
+
+	UFUNCTION()
 	void HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType);
 
 private:
 	void ResolveInventoryGridPanel();
 	void BindTabButtons();
+	void BindSortButtons();
 	void UpdateTabButtonStyle();
 	void ResolveEquipmentSlotWidgets();
 	void BindEquipmentChanged();
@@ -151,6 +186,9 @@ private:
 	bool DoesSlotMatchCurrentFilter(const FPDInventorySlot& InventorySlotData) const;
 	bool DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const;
 	bool CanAcceptDropForCurrentFilter(const UPDInventoryDragDropOperation* DragOperation) const;
+	void SortDisplaySlotIndices(TArray<int32>& DisplaySlotIndices, const UPDInventoryComponent* InventoryComponent) const;
+	void SetSortOptionsVisible(bool bVisible);
+	void ToggleSortOptions();
 	void RefreshGoldText();
 	void ExecuteInventoryQuickAction(int32 SlotIndex, int32 Quantity);
 	void ExecuteInventorySlotTransfer(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
@@ -211,6 +249,7 @@ private:
 	int32 PendingTransferTargetSlotIndex = INDEX_NONE;
 
 	EPDItemFilterTab CurrentFilterTab = EPDItemFilterTab::Equipment;
+	EPDItemSortMode CurrentSortMode = EPDItemSortMode::None;
 
 	int32 PendingSlotIndex = INDEX_NONE;
 };

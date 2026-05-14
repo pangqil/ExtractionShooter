@@ -13,6 +13,30 @@
 #include "Items/PDInventoryComponent.h"
 #include "Engine/DataTable.h"
 
+namespace
+{
+	const FPDItemData* FindPDWeaponItemDataByID(const UDataTable* DataTable, const FName& ItemID)
+	{
+		if (!DataTable || ItemID.IsNone())
+		{
+			return nullptr;
+		}
+
+		TArray<FPDItemData*> Rows;
+		DataTable->GetAllRows<FPDItemData>(TEXT("FindPDWeaponItemDataByID"), Rows);
+
+		for (const FPDItemData* Row : Rows)
+		{
+			if (Row && Row->ItemID == ItemID)
+			{
+				return Row;
+			}
+		}
+
+		return nullptr;
+	}
+}
+
 APDWeaponBase::APDWeaponBase()
 {
     PrimaryActorTick.bCanEverTick = false;
@@ -55,15 +79,16 @@ void APDWeaponBase::BeginPlay()
 
 void APDWeaponBase::LoadItemData()
 {
-    if (!ItemDataTable || ItemRowName.IsNone()) return;
+    if (!ItemDataTable || ItemID.IsNone()) return;
 
-    const FPDItemData* Row = ItemDataTable->FindRow<FPDItemData>(ItemRowName, TEXT("PDWeaponBase"));
+    const FPDItemData* Row = FindPDWeaponItemDataByID(ItemDataTable, ItemID);
     if (!Row) return;
 
     CachedItemData = *Row;
+    // DT 행의 ItemID 컬럼이 비어있을 때만 멤버 ItemID로 보정.
     if (CachedItemData.ItemID.IsNone())
     {
-        CachedItemData.ItemID = ItemRowName;
+        CachedItemData.ItemID = ItemID;
     }
 }
 
