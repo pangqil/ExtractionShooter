@@ -25,30 +25,14 @@ void APDSoldier::BeginPlay()
 
 void APDSoldier::OnEnterState_Dead()
 {
-	// Super 안의 SpawnCorpseContainer → HarvestEquippedWeaponSlots 가 EquippedWeapon 살아있을 때 슬롯을 추출한다.
 	Super::OnEnterState_Dead();
 
-	// 데이터 추출이 끝났으므로 무기 액터는 정리. Enemy 본체도 곧 SetLifeSpan으로 소멸되므로 부착 상태로 남기지 않는다.
+	// 사망 시 무기 떨굼 — Drop 처리는 무기 측 IsDropped 플래그가 있어 BP 디자이너가 후속 정책 결정.
 	if (EquippedWeapon)
 	{
 		EquippedWeapon->OnUnequip();
-		EquippedWeapon->Destroy();
-		EquippedWeapon = nullptr;
+		EquippedWeapon->SetDropped(true);
 	}
-}
-
-void APDSoldier::HarvestEquippedWeaponSlots(TArray<FPDInventorySlot>& OutSlots) const
-{
-	if (!EquippedWeapon) return;
-
-	const FPDItemData& Data = EquippedWeapon->GetCachedItemData();
-	if (Data.ItemID.IsNone()) return;
-
-	FPDInventorySlot Slot;
-	Slot.ItemData = Data;
-	Slot.Quantity = 1;
-	Slot.bIsEmpty = false;
-	OutSlots.Add(Slot);
 }
 
 void APDSoldier::SpawnAndEquipDefaultWeapon()

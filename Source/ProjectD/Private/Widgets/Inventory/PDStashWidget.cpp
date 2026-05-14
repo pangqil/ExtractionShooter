@@ -1,10 +1,13 @@
 #include "Widgets/Inventory/PDStashWidget.h"
 
+#include "Algo/Sort.h"
+
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Characters/PDPlayerCharacter.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Components/Widget.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "GameFramework/Pawn.h"
@@ -21,6 +24,8 @@ void UPDStashWidget::NativeConstruct()
 	Super::NativeConstruct();
 	BindStashChanged();
 	BindTabButtons();
+	BindSortButtons();
+	SetSortOptionsVisible(false);
 	RefreshStashGrid();
 	UpdateTabButtonStyle();
 }
@@ -75,6 +80,8 @@ void UPDStashWidget::RefreshStashGrid()
 				DisplaySlotIndices.Add(RealSlotIndex);
 			}
 		}
+
+		SortDisplaySlotIndices(DisplaySlotIndices, StashComponent);
 
 		for (int32 RealSlotIndex = 0; RealSlotIndex < StashComponent->StashItems.Num(); ++RealSlotIndex)
 		{
@@ -138,6 +145,21 @@ void UPDStashWidget::SetStashFilterTab(EPDItemFilterTab NewFilterTab)
 	}
 
 	CurrentFilterTab = NewFilterTab;
+	CurrentSortMode = EPDItemSortMode::None;
+	SetSortOptionsVisible(false);
+	RefreshStashGrid();
+}
+
+void UPDStashWidget::SetStashSortMode(EPDItemSortMode NewSortMode)
+{
+	if (CurrentSortMode == NewSortMode)
+	{
+		SetSortOptionsVisible(false);
+		return;
+	}
+
+	CurrentSortMode = NewSortMode;
+	SetSortOptionsVisible(false);
 	RefreshStashGrid();
 }
 
@@ -156,6 +178,34 @@ void UPDStashWidget::BindTabButtons()
 	if (Button_Misc)
 	{
 		Button_Misc->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleMiscTabClicked);
+	}
+}
+
+void UPDStashWidget::BindSortButtons()
+{
+	if (Button_Sort)
+	{
+		Button_Sort->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleSortButtonClicked);
+	}
+
+	if (Button_SortByName)
+	{
+		Button_SortByName->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleSortByNameClicked);
+	}
+
+	if (Button_SortByType)
+	{
+		Button_SortByType->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleSortByTypeClicked);
+	}
+
+	if (Button_SortTab_Name)
+	{
+		Button_SortTab_Name->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleSortByNameClicked);
+	}
+
+	if (Button_SortTab_Type)
+	{
+		Button_SortTab_Type->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleSortByTypeClicked);
 	}
 }
 
@@ -261,6 +311,58 @@ bool UPDStashWidget::CanAcceptDropForCurrentFilter(const UPDInventoryDragDropOpe
 		&& DoesItemTypeMatchCurrentFilter(DragOperation->SlotData.ItemData.ItemType);
 }
 
+void UPDStashWidget::SortDisplaySlotIndices(TArray<int32>& DisplaySlotIndices, const UPDStashComponent* StashComponent) const
+{
+	if (!StashComponent || CurrentSortMode == EPDItemSortMode::None)
+	{
+		return;
+	}
+
+	Algo::Sort(DisplaySlotIndices, [this, StashComponent](int32 LeftIndex, int32 RightIndex)
+	{
+		const FPDInventorySlot& LeftSlot = StashComponent->StashItems[LeftIndex];
+		const FPDInventorySlot& RightSlot = StashComponent->StashItems[RightIndex];
+
+		if (CurrentSortMode == EPDItemSortMode::Type)
+		{
+			const uint8 LeftType = static_cast<uint8>(LeftSlot.ItemData.ItemType);
+			const uint8 RightType = static_cast<uint8>(RightSlot.ItemData.ItemType);
+			if (LeftType != RightType)
+			{
+				return LeftType < RightType;
+			}
+		}
+
+		const FString LeftName = LeftSlot.ItemData.DisplayName.IsEmpty() ? LeftSlot.ItemData.ItemID.ToString() : LeftSlot.ItemData.DisplayName.ToString();
+		const FString RightName = RightSlot.ItemData.DisplayName.IsEmpty() ? RightSlot.ItemData.ItemID.ToString() : RightSlot.ItemData.DisplayName.ToString();
+		const int32 NameCompare = LeftName.Compare(RightName, ESearchCase::IgnoreCase);
+		if (NameCompare != 0)
+		{
+			return NameCompare < 0;
+		}
+
+		return LeftIndex < RightIndex;
+	});
+}
+
+void UPDStashWidget::SetSortOptionsVisible(bool bVisible)
+{
+	UWidget* SortPanel = Panel_SortTabs ? Panel_SortTabs.Get() : Panel_SortOptions.Get();
+	if (SortPanel)
+	{
+		SortPanel->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+}
+
+void UPDStashWidget::ToggleSortOptions()
+{
+	UWidget* SortPanel = Panel_SortTabs ? Panel_SortTabs.Get() : Panel_SortOptions.Get();
+	if (SortPanel)
+	{
+		SetSortOptionsVisible(SortPanel->GetVisibility() != ESlateVisibility::Visible);
+	}
+}
+
 void UPDStashWidget::HandleEquipmentTabClicked()
 {
 	SetStashFilterTab(EPDItemFilterTab::Equipment);
@@ -274,6 +376,21 @@ void UPDStashWidget::HandleConsumableTabClicked()
 void UPDStashWidget::HandleMiscTabClicked()
 {
 	SetStashFilterTab(EPDItemFilterTab::Misc);
+}
+
+void UPDStashWidget::HandleSortButtonClicked()
+{
+	ToggleSortOptions();
+}
+
+void UPDStashWidget::HandleSortByNameClicked()
+{
+	SetStashSortMode(EPDItemSortMode::Name);
+}
+
+void UPDStashWidget::HandleSortByTypeClicked()
+{
+	SetStashSortMode(EPDItemSortMode::Type);
 }
 
 void UPDStashWidget::ResolveStashGridPanel()

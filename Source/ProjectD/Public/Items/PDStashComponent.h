@@ -39,10 +39,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	void ResetStash();
 
-	// Loot box 컨테이너 초기 채움: 그리드 초기화 후 슬롯 배열을 순서대로 AddItemPartial.
-	UFUNCTION(BlueprintCallable, Category="PD|Stash")
-	void InitializeFromLoot(const TArray<FPDInventorySlot>& InitialSlots);
-
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	void LoadFromGameInstance();
 
