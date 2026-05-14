@@ -54,4 +54,9 @@ namespace PDGameplayTags
 	
 	UE_DEFINE_GAMEPLAY_TAG(Cover_Active, "Cover.Active")
 
+	UE_DEFINE_GAMEPLAY_TAG(State_Rolling, "State.Rolling")
+	UE_DEFINE_GAMEPLAY_TAG(Input_Roll,    "Input.Roll")
+
+	UE_DEFINE_GAMEPLAY_TAG(Input_Cover,   "Input.Cover")
+
 }

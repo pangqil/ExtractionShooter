@@ -48,14 +48,14 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		return;
 	}
 
-	// const FName GripSocket=Weapon->GetLeftHandGripSocket();
-	// if (Weapon->GetWeaponMesh()->DoesSocketExist(GripSocket))
-	// {
-	// 	Cache.LeftHandIKTarget=Weapon->GetWeaponMesh()->GetSocketLocation(GripSocket);
-	// 	Cache.LeftHandIKAlpha=1.f;
-	// }
-	// else
-	// 	Cache.LeftHandIKAlpha=0.f;
+	const FName GripSocket=Weapon->GetLeftHandGripSocket();
+	if (Weapon->GetWeaponMesh()->DoesSocketExist(GripSocket))
+	{
+		Cache.LeftHandIKTarget=Weapon->GetWeaponMesh()->GetSocketLocation(GripSocket);
+		Cache.LeftHandIKAlpha=1.f;
+	}
+	else
+		Cache.LeftHandIKAlpha=0.f;
 }
 
 void UPDAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)

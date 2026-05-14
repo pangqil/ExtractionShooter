@@ -165,6 +165,7 @@ private:
 	void OnFireReleased();
 	void OnReload();
 	void OnInteract();
+	void OnCoverToggle();
 	void OnSwitchSlot1();
 	void OnSwitchSlot2();
 	void OnSwitchSlot3();
