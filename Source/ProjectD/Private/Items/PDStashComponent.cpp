@@ -1,5 +1,6 @@
 #include "Items/PDStashComponent.h"
 
+#include "Core/PDGameInstance.h"
 #include "Items/PDItemSlotTransfer.h"
 
 UPDStashComponent::UPDStashComponent()
@@ -11,7 +12,29 @@ void UPDStashComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	LoadFromGameInstance();
+}
+
+void UPDStashComponent::LoadFromGameInstance()
+{
+	const UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr;
+	if (GI)
+	{
+		StashItems = GI->GetStashItems();
+	}
+
 	InitializeStash();
+}
+
+void UPDStashComponent::SaveToGameInstance()
+{
+	UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr;
+	if (!GI)
+	{
+		return;
+	}
+
+	GI->SetStashItems(StashItems);
 }
 
 int32 UPDStashComponent::FindEmptySlot() const
@@ -79,6 +102,7 @@ void UPDStashComponent::ResetStash()
 		Slot.Clear();
 	}
 
+	SaveToGameInstance();
 	OnStashChanged.Broadcast();
 }
 
@@ -112,6 +136,7 @@ int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quant
 
 				if (RemainingQuantity <= 0)
 				{
+					SaveToGameInstance();
 					OnStashChanged.Broadcast();
 					return AddedQuantity;
 				}
@@ -140,6 +165,7 @@ int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quant
 
 	if (AddedQuantity > 0)
 	{
+		SaveToGameInstance();
 		OnStashChanged.Broadcast();
 	}
 
@@ -162,6 +188,7 @@ int32 UPDStashComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32
 	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(StashItems[TargetSlotIndex], ItemData, Quantity);
 	if (AddedQuantity > 0)
 	{
+		SaveToGameInstance();
 		OnStashChanged.Broadcast();
 	}
 
@@ -183,6 +210,7 @@ bool UPDStashComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 Targ
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(StashItems[SourceSlotIndex], StashItems[TargetSlotIndex], Quantity);
 	if (bMoved)
 	{
+		SaveToGameInstance();
 		OnStashChanged.Broadcast();
 	}
 
@@ -215,6 +243,7 @@ bool UPDStashComponent::RemoveItem(FName ItemID, int32 Quantity)
 		}
 	}
 
+	SaveToGameInstance();
 	OnStashChanged.Broadcast();
 	return true;
 }
@@ -288,6 +317,7 @@ bool UPDStashComponent::StoreInventorySlotQuantityToSlot(UPDInventoryComponent* 
 	if (bMoved)
 	{
 		SourceInventory->OnInventoryChanged.Broadcast();
+		SaveToGameInstance();
 		OnStashChanged.Broadcast();
 	}
 
@@ -334,6 +364,7 @@ bool UPDStashComponent::TakeStashSlotQuantity(UPDInventoryComponent* TargetInven
 		SourceSlot.Clear();
 	}
 
+	SaveToGameInstance();
 	OnStashChanged.Broadcast();
 	return true;
 }
@@ -362,6 +393,7 @@ bool UPDStashComponent::TakeStashSlotQuantityToInventorySlot(UPDInventoryCompone
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(StashItems[StashSlotIndex], TargetInventory->Items[TargetInventorySlotIndex], Quantity);
 	if (bMoved)
 	{
+		SaveToGameInstance();
 		OnStashChanged.Broadcast();
 		TargetInventory->OnInventoryChanged.Broadcast();
 	}

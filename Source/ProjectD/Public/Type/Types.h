@@ -8,18 +8,6 @@
 
 class APDWeaponBase;
 
-USTRUCT(BlueprintType)
-struct FPDPlayerData
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Gold = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Experience = 0;
-};
-
 UENUM(BlueprintType)
 enum class EPDItemType : uint8
 {
@@ -78,6 +66,12 @@ struct FPDItemData : public FTableRowBase
 	TObjectPtr<UTexture2D> Icon = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 BuyPrice = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 SellPrice = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Price = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -126,6 +120,21 @@ struct FPDInventorySlot
 	}
 };
 
+
+USTRUCT(BlueprintType)
+struct FPDPlayerData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Gold = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Experience = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FPDInventorySlot> StashItems;
+};
 
 USTRUCT(BlueprintType)
 struct FPDEquippedItem

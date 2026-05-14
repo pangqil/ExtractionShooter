@@ -3,6 +3,31 @@
 #include "Components/StaticMeshComponent.h"
 
 #include "Items/PDInventoryComponent.h"
+#include "Engine/DataTable.h"
+
+namespace
+{
+	const FPDItemData* FindPDItemBaseItemDataByID(const UDataTable* DataTable, const FName& ItemID)
+	{
+		if (!DataTable || ItemID.IsNone())
+		{
+			return nullptr;
+		}
+
+		TArray<FPDItemData*> Rows;
+		DataTable->GetAllRows<FPDItemData>(TEXT("FindPDItemBaseItemDataByID"), Rows);
+
+		for (const FPDItemData* Row : Rows)
+		{
+			if (Row && Row->ItemID == ItemID)
+			{
+				return Row;
+			}
+		}
+
+		return nullptr;
+	}
+}
 
 APDItemBase::APDItemBase()
 {
@@ -73,7 +98,7 @@ void APDItemBase::LoadItemData()
 {
 	if (!ItemDataTable || ItemRowName.IsNone()) return;
 
-	const FPDItemData* Row = ItemDataTable->FindRow<FPDItemData>(ItemRowName, TEXT("PDItemBase"));
+	const FPDItemData* Row = FindPDItemBaseItemDataByID(ItemDataTable, ItemRowName);
 	if (!Row) return;
 
 	CachedItemData = *Row;

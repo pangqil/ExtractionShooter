@@ -37,12 +37,13 @@ AActor* UPDInteractionComponent::FindInteractTarget() const
 	const FVector Start = OwnerActor->GetActorLocation() + FVector(0.f, 0.f, 50.f);
 	const FVector End = Start + OwnerActor->GetActorForwardVector() * InteractDistance;
 
-	FHitResult Hit;
+	TArray<FHitResult> Hits;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(PDInteractionTrace), false, OwnerActor);
+	Params.AddIgnoredActor(OwnerActor);
 	const FCollisionShape Shape = FCollisionShape::MakeSphere(80.f);
 
-	const bool bHit = GetWorld()->SweepSingleByChannel(
-		Hit,
+	const bool bHit = GetWorld()->SweepMultiByChannel(
+		Hits,
 		Start,
 		End,
 		FQuat::Identity,
@@ -51,5 +52,36 @@ AActor* UPDInteractionComponent::FindInteractTarget() const
 		Params
 	);
 
-	return bHit ? Hit.GetActor() : nullptr;
+	if (!bHit)
+	{
+		return nullptr;
+	}
+
+	AActor* ClosestInteractable = nullptr;
+	float ClosestDistanceSq = TNumericLimits<float>::Max();
+
+	for (const FHitResult& Hit : Hits)
+	{
+		AActor* HitActor = Hit.GetActor();
+
+		if (!HitActor || HitActor == OwnerActor)
+		{
+			continue;
+		}
+
+		if (!HitActor->GetClass()->ImplementsInterface(UPDInteractable::StaticClass()))
+		{
+			continue;
+		}
+
+		const float DistanceSq = FVector::DistSquared(Start, Hit.ImpactPoint);
+
+		if (DistanceSq < ClosestDistanceSq)
+		{
+			ClosestDistanceSq = DistanceSq;
+			ClosestInteractable = HitActor;
+		}
+	}
+
+	return ClosestInteractable;
 }
