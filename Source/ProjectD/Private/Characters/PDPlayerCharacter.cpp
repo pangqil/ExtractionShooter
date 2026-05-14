@@ -164,6 +164,8 @@ void APDPlayerCharacter::DropCurrentWeapon()
 
 	CurWeapon->OnUnequip();
 	CurWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	// 떨어뜨린 무기를 다시 픽업할 수 있도록 PickupCollision 복구 + 시뮬레이션 ON.
+	CurWeapon->SetDropped(true);
 	WeaponSlots[static_cast<int32>(CurrentSlot)]=nullptr;
 	CurrentSlot=EWeaponSlot::None;
 	ASC->RemoveLooseGameplayTag(CurWeapon->GetWeaponTypeTag());
