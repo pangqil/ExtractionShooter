@@ -24,6 +24,7 @@ class UUserWidget;
 class APDWeaponBase;
 class APDRifle;
 class UPDRootLayout;
+class UPDPingInputComponent;
 enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
@@ -90,6 +91,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "PD|Input")
 	TObjectPtr<UPDInputConfig> InputConfig;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ping")
+	TObjectPtr<UPDPingInputComponent> PingInputComp;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDInventoryWidget> InventoryWidgetClass;

@@ -7,13 +7,6 @@ void UPDPingSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	
-	// 만약 BP_PD_PingMarker 경로가 바뀌면 아래 경로도 같이 수정
-	if (!DefaultMarkerClass)
-	{
-		DefaultMarkerClass = LoadClass<APDPingMarker>(nullptr,
-			TEXT("/Game/Developers/dbals/UI/Ping/BP_PD_PingMarker.BP_PD_PingMarker_C"));
-	}
-
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
