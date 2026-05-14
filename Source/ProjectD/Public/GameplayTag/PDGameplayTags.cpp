@@ -51,5 +51,7 @@ namespace PDGameplayTags
 	// Weapon State
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_State_Firing, "Weapon.State.Firing")
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_State_Reloading, "Weapon.State.Reloading")
+	
+	UE_DEFINE_GAMEPLAY_TAG(Cover_Active, "Cover.Active")
 
 }

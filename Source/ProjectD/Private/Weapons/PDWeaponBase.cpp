@@ -56,7 +56,7 @@ APDWeaponBase::APDWeaponBase()
     PickupCollision->SetGenerateOverlapEvents(false);
 
     MagazineMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MagazineMesh"));
-    MagazineMesh->SetupAttachment(WeaponMesh, MagazineSocketName);
+    MagazineMesh->SetupAttachment(WeaponMesh);
     MagazineMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 }
@@ -66,6 +66,13 @@ void APDWeaponBase::BeginPlay()
     Super::BeginPlay();
     if (LevelStats.IsValidIndex(0))
         CurrentAmmo = LevelStats[0].MaxAmmo;
+
+    if (WeaponMesh->GetSkeletalMeshAsset())
+        MagazineMesh->AttachToComponent(WeaponMesh,
+            FAttachmentTransformRules::SnapToTargetIncludingScale, MagazineSocketName);
+    else
+        MagazineMesh->AttachToComponent(WeaponMesh,
+            FAttachmentTransformRules::SnapToTargetIncludingScale);
 
     LoadItemData();
 }

@@ -5,6 +5,7 @@
 #include "Interfaces/PDSurvivalSource.h"
 #include "Type/Types.h"
 #include "GameplayEffectTypes.h"
+#include "Component/PDCoverComponent.h"
 #include "PDPlayerCharacter.generated.h"
 
 class APDWeaponBase;
@@ -48,6 +49,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDInteractionComponent> InteractionComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDCoverComponent> CoverComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDQuickSlotComponent> QuickSlotComponent;
@@ -121,6 +125,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
 	void TryInteract();
 
+	UFUNCTION(BlueprintCallable, Category="PD|Cover")
+	void TryEnterCover() { CoverComponent->TryEnterCover(); }
+
+	UFUNCTION(BlueprintCallable, Category="PD|Cover")
+	void ExitCover() { CoverComponent->ExitCover(); }
+	
 	virtual TSubclassOf<UGameplayEffect> GetHungerDecayEffectClass()  const override { return HungerDecayEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetThirstDecayEffectClass()  const override { return ThirstDecayEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetStarvingEffectClass()     const override { return StarvingEffectClass; }

@@ -22,10 +22,11 @@ struct FPDAnimInstanceCache
 	float AimPitch=0.f;
 
 	EWeaponType WeaponType=EWeaponType::None;
-	
+
 	FVector LeftHandIKTarget=FVector::ZeroVector;
 	float  LeftHandIKAlpha=0.f;
-	
+
+	bool bIsInCover=false;
 };
 
 UCLASS()
@@ -64,6 +65,9 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category="Animation|IK")
 	float LeftHandIKAlpha=0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Animation")
+	bool bIsInCover=false;
 
 private:
 	UPROPERTY()

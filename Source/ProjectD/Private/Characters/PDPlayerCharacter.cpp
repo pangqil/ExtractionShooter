@@ -36,6 +36,8 @@ APDPlayerCharacter::APDPlayerCharacter()
 
 	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
 	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
+	CoverComponent=CreateDefaultSubobject<UPDCoverComponent>(TEXT("CoverComponent"));
+	
 	QuickSlotComponent=CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
 	EquipmentComponent=CreateDefaultSubobject<UPDEquipmentComponent>(TEXT("EquipmentComponent"));
 
