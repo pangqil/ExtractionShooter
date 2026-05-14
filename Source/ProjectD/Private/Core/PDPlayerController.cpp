@@ -135,8 +135,6 @@ void APDPlayerController::SetupInputComponent()
 		ETriggerEvent::Completed, this, &APDPlayerController::OnFireReleased);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Reload,
 		ETriggerEvent::Started, this, &APDPlayerController::OnReload);
-	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
-		ETriggerEvent::Started, this, &APDPlayerController::OnInteract);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot1,
 		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot1);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot2,
