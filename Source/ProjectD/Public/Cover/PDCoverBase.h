@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
-#include "../../../../../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Core/Public/Microsoft/AllowMicrosoftPlatformTypes.h"
+#include "GameFramework/Actor.h"
 #include "PDCoverBase.generated.h"
 
 UENUM(BlueprintType)

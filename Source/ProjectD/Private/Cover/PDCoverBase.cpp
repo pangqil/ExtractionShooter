@@ -1,5 +1,6 @@
 #include "Cover/PDCoverBase.h"
 #include "Component/PDCoverComponent.h"
+#include "Components/StaticMeshComponent.h"
 
 APDCoverBase::APDCoverBase()
 {
