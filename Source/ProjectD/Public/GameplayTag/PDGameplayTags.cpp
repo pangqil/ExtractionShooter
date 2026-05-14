@@ -10,8 +10,11 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Input_Quest, "Input.Quest")
 	
 	//Input 핑
-	UE_DEFINE_GAMEPLAY_TAG(Input_Ping,        "Input.Ping")
+	UE_DEFINE_GAMEPLAY_TAG(Input_Ping, "Input.Ping")
 	UE_DEFINE_GAMEPLAY_TAG(Input_PingConfirm, "Input.PingConfirm")
+	
+	//Input 월드맵
+	UE_DEFINE_GAMEPLAY_TAG(Input_Map, "Input.Map")
 	
 	// Input 무기 GAS 어빌리티
 	UE_DEFINE_GAMEPLAY_TAG(Input_Reload, "Input.Reload")

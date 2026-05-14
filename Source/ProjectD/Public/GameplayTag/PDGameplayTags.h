@@ -14,6 +14,9 @@ namespace PDGameplayTags
 	//Input 핑
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Ping);
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_PingConfirm);
+	
+	//Input 월드맵
+	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Map);
 
 	// ── Input: 무기 - GAS 어빌리티로 처리 (AbilityInputActions)
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Reload)

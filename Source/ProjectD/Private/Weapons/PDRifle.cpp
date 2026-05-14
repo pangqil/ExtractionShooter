@@ -22,6 +22,8 @@ void APDRifle::Fire_Implementation()
     if (PerformLineTrace(Hit))
         ApplyDamage(Hit.GetActor(), GetCurrentStats().Damage);
 
+    PlayFireEffects();
+    PlayWeaponMontage(FireMontage);
     PostFire();
 
     FTimerHandle T_Shell;

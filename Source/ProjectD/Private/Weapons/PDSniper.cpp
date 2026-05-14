@@ -25,7 +25,8 @@ void APDSniper::Fire_Implementation()
         UE_LOG(LogTemp, Warning, TEXT("PDSniper: ProjectileClass 미설정"));
         return;
     }
-
+    
+    PlayFireEffects();
     SpawnProjectile(CanPenetrate());
     PostFire();
 
