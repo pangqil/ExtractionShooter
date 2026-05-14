@@ -24,7 +24,7 @@ void UPDWorldMapWidget::NativeTick(const FGeometry& Geo, float DeltaTime)
 	}
 
 	//화살표 회전 (플레이어 방향 가리키기)
-	PlayerArrow->SetRenderTransformAngle(PlayerYaw + 90.f);
+	PlayerArrow->SetRenderTransformAngle(PlayerYaw);
 }
 
 FVector2D UPDWorldMapWidget::WorldToMap(const FVector& WorldPos) const
