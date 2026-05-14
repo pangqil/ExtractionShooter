@@ -20,7 +20,7 @@ void UPDMinimapWidget::NativeConstruct()
             PingSys->OnPingAdded.AddDynamic(this, &UPDMinimapWidget::HandlePingAdded);
             PingSys->OnPingRemoved.AddDynamic(this, &UPDMinimapWidget::HandlePingRemoved);
 
-            // 위젯 생성 시점에 이미 떠있는 핑들 그리기
+            //위젯 생성 시점에 이미 떠있는 핑들 그리기
             TArray<FPDPingData> Existing;
             PingSys->GetActivePings(Existing);
             for (const FPDPingData& P : Existing)
@@ -64,7 +64,7 @@ void UPDMinimapWidget::NativeTick(const FGeometry& Geo, float DeltaTime)
     const float PlayerYaw = Pawn->GetActorRotation().Yaw;
     OnPlayerTransformUpdated(PlayerLoc, PlayerYaw);
 
-    // 모든 핑 아이콘 위치 갱신
+    //모든 핑 아이콘 위치 갱신
     if (!PingCanvas) return;
     for (const auto& Pair : PingIcons)
     {
@@ -138,8 +138,8 @@ FVector2D UPDMinimapWidget::WorldToMinimap(const FVector& WorldPos) const
     const float HalfX = CanvasSize.X * 0.5f;
     const float HalfY = CanvasSize.Y * 0.5f;
 
-    // World X(Forward) → Minimap Y- (위)
-    // World Y(Right)   → Minimap X+ (오른쪽)
+    //World X(Forward)
+    //World Y(Right)   
     const float ScreenX = (Delta.Y / MapRadius) * HalfX;
     const float ScreenY = -(Delta.X / MapRadius) * HalfY;
 

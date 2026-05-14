@@ -46,10 +46,10 @@ protected:
 	void HandlePingRemoved(int32 PingId);
 
 private:
-	/** 활성 핑 위젯 추적. PingId → 위젯. */
+	//활성 핑 위젯 추적 PingId => 위젯
 	UPROPERTY(Transient)
 	TMap<int32, TObjectPtr<UPDPingIconWidget>> PingIcons;
 
-	/** 월드 좌표 → 미니맵 캔버스 로컬 좌표 변환. */
+	//월드 좌표 => 미니맵 캔버스 로컬 좌표 변환
 	FVector2D WorldToMinimap(const FVector& WorldPos) const;
 };
