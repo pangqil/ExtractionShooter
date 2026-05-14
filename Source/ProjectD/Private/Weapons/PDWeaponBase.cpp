@@ -13,6 +13,31 @@
 #include "Items/PDInventoryComponent.h"
 #include "Engine/DataTable.h"
 
+namespace
+{
+	const FPDItemData* FindItemDataByID(const UDataTable* DataTable, const FName& ItemID)
+	{
+		if (!DataTable || ItemID.IsNone())
+		{
+			return nullptr;
+		}
+
+		static const FString Context(TEXT("FindItemDataByID"));
+		TArray<FPDItemData*> Rows;
+		DataTable->GetAllRows<FPDItemData>(Context, Rows);
+
+		for (const FPDItemData* Row : Rows)
+		{
+			if (Row && Row->ItemID == ItemID)
+			{
+				return Row;
+			}
+		}
+
+		return nullptr;
+	}
+}
+
 APDWeaponBase::APDWeaponBase()
 {
     PrimaryActorTick.bCanEverTick = false;
@@ -50,7 +75,7 @@ void APDWeaponBase::LoadItemData()
 {
     if (!ItemDataTable || ItemRowName.IsNone()) return;
 
-    const FPDItemData* Row = ItemDataTable->FindRow<FPDItemData>(ItemRowName, TEXT("PDWeaponBase"));
+    const FPDItemData* Row = FindItemDataByID(ItemDataTable, ItemRowName);
     if (!Row) return;
 
     CachedItemData = *Row;

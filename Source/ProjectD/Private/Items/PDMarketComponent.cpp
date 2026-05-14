@@ -1,4 +1,30 @@
 #include "Items/PDMarketComponent.h"
+#include "Engine/DataTable.h"
+
+namespace
+{
+	const FPDItemData* FindItemDataByID(const UDataTable* DataTable, const FName& ItemID)
+	{
+		if (!DataTable || ItemID.IsNone())
+		{
+			return nullptr;
+		}
+
+		static const FString Context(TEXT("FindItemDataByID"));
+		TArray<FPDItemData*> Rows;
+		DataTable->GetAllRows<FPDItemData>(Context, Rows);
+
+		for (const FPDItemData* Row : Rows)
+		{
+			if (Row && Row->ItemID == ItemID)
+			{
+				return Row;
+			}
+		}
+
+		return nullptr;
+	}
+}
 
 UPDMarketComponent::UPDMarketComponent()
 {
@@ -104,7 +130,7 @@ bool UPDMarketComponent::ResolveEntryItemData(const FPDMarketEntry& Entry, FPDIt
 		return false;
 	}
 
-	const FPDItemData* Row = Entry.ItemDataTable->FindRow<FPDItemData>(Entry.ItemRowName, TEXT("PDMarketComponent"));
+	const FPDItemData* Row = FindItemDataByID(Entry.ItemDataTable, Entry.ItemRowName);
 	if (!Row)
 	{
 		return false;
