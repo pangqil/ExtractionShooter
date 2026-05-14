@@ -25,6 +25,15 @@ enum class EPDItemFilterTab : uint8
 };
 
 
+
+UENUM(BlueprintType)
+enum class EPDItemSortMode : uint8
+{
+	None UMETA(DisplayName = "None"),
+	Name UMETA(DisplayName = "Name"),
+	Type UMETA(DisplayName = "Type"),
+};
+
 UENUM(BlueprintType)
 enum class EPDEquipmentSlotType : uint8
 {

@@ -1,6 +1,8 @@
 
 #include "Widgets/Inventory/PDInventoryWidget.h"
 
+#include "Algo/Sort.h"
+
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/SlateBlueprintLibrary.h"
@@ -8,6 +10,7 @@
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "Components/TextBlock.h"
+#include "Components/Widget.h"
 #include "Components/PanelWidget.h"
 #include "Components/Button.h"
 #include "Core/PDPlayerController.h"
@@ -34,6 +37,8 @@ void UPDInventoryWidget::NativeConstruct()
 	BindInventoryChanged();
 	BindEquipmentChanged();
 	BindTabButtons();
+	BindSortButtons();
+	SetSortOptionsVisible(false);
 	ResolveEquipmentSlotWidgets();
 	RefreshEquipmentSlots();
 	RefreshInventoryGrid();
@@ -94,6 +99,8 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 				DisplaySlotIndices.Add(RealSlotIndex);
 			}
 		}
+
+		SortDisplaySlotIndices(DisplaySlotIndices, InventoryComponent);
 
 		for (int32 RealSlotIndex = 0; RealSlotIndex < InventoryComponent->Items.Num(); ++RealSlotIndex)
 		{
@@ -161,6 +168,21 @@ void UPDInventoryWidget::SetInventoryFilterTab(EPDItemFilterTab NewFilterTab)
 	}
 
 	CurrentFilterTab = NewFilterTab;
+	CurrentSortMode = EPDItemSortMode::None;
+	SetSortOptionsVisible(false);
+	RefreshInventoryGrid();
+}
+
+void UPDInventoryWidget::SetInventorySortMode(EPDItemSortMode NewSortMode)
+{
+	if (CurrentSortMode == NewSortMode)
+	{
+		SetSortOptionsVisible(false);
+		return;
+	}
+
+	CurrentSortMode = NewSortMode;
+	SetSortOptionsVisible(false);
 	RefreshInventoryGrid();
 }
 
@@ -179,6 +201,34 @@ void UPDInventoryWidget::BindTabButtons()
 	if (Button_Misc)
 	{
 		Button_Misc->OnClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleMiscTabClicked);
+	}
+}
+
+void UPDInventoryWidget::BindSortButtons()
+{
+	if (Button_Sort)
+	{
+		Button_Sort->OnClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleSortButtonClicked);
+	}
+
+	if (Button_SortByName)
+	{
+		Button_SortByName->OnClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleSortByNameClicked);
+	}
+
+	if (Button_SortByType)
+	{
+		Button_SortByType->OnClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleSortByTypeClicked);
+	}
+
+	if (Button_SortTab_Name)
+	{
+		Button_SortTab_Name->OnClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleSortByNameClicked);
+	}
+
+	if (Button_SortTab_Type)
+	{
+		Button_SortTab_Type->OnClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleSortByTypeClicked);
 	}
 }
 
@@ -290,6 +340,58 @@ bool UPDInventoryWidget::CanAcceptDropForCurrentFilter(const UPDInventoryDragDro
 		&& DoesItemTypeMatchCurrentFilter(DragOperation->SlotData.ItemData.ItemType);
 }
 
+void UPDInventoryWidget::SortDisplaySlotIndices(TArray<int32>& DisplaySlotIndices, const UPDInventoryComponent* InventoryComponent) const
+{
+	if (!InventoryComponent || CurrentSortMode == EPDItemSortMode::None)
+	{
+		return;
+	}
+
+	Algo::Sort(DisplaySlotIndices, [this, InventoryComponent](int32 LeftIndex, int32 RightIndex)
+	{
+		const FPDInventorySlot& LeftSlot = InventoryComponent->Items[LeftIndex];
+		const FPDInventorySlot& RightSlot = InventoryComponent->Items[RightIndex];
+
+		if (CurrentSortMode == EPDItemSortMode::Type)
+		{
+			const uint8 LeftType = static_cast<uint8>(LeftSlot.ItemData.ItemType);
+			const uint8 RightType = static_cast<uint8>(RightSlot.ItemData.ItemType);
+			if (LeftType != RightType)
+			{
+				return LeftType < RightType;
+			}
+		}
+
+		const FString LeftName = LeftSlot.ItemData.DisplayName.IsEmpty() ? LeftSlot.ItemData.ItemID.ToString() : LeftSlot.ItemData.DisplayName.ToString();
+		const FString RightName = RightSlot.ItemData.DisplayName.IsEmpty() ? RightSlot.ItemData.ItemID.ToString() : RightSlot.ItemData.DisplayName.ToString();
+		const int32 NameCompare = LeftName.Compare(RightName, ESearchCase::IgnoreCase);
+		if (NameCompare != 0)
+		{
+			return NameCompare < 0;
+		}
+
+		return LeftIndex < RightIndex;
+	});
+}
+
+void UPDInventoryWidget::SetSortOptionsVisible(bool bVisible)
+{
+	UWidget* SortPanel = Panel_SortTabs ? Panel_SortTabs.Get() : Panel_SortOptions.Get();
+	if (SortPanel)
+	{
+		SortPanel->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+}
+
+void UPDInventoryWidget::ToggleSortOptions()
+{
+	UWidget* SortPanel = Panel_SortTabs ? Panel_SortTabs.Get() : Panel_SortOptions.Get();
+	if (SortPanel)
+	{
+		SetSortOptionsVisible(SortPanel->GetVisibility() != ESlateVisibility::Visible);
+	}
+}
+
 void UPDInventoryWidget::HandleEquipmentTabClicked()
 {
 	SetInventoryFilterTab(EPDItemFilterTab::Equipment);
@@ -303,6 +405,21 @@ void UPDInventoryWidget::HandleConsumableTabClicked()
 void UPDInventoryWidget::HandleMiscTabClicked()
 {
 	SetInventoryFilterTab(EPDItemFilterTab::Misc);
+}
+
+void UPDInventoryWidget::HandleSortButtonClicked()
+{
+	ToggleSortOptions();
+}
+
+void UPDInventoryWidget::HandleSortByNameClicked()
+{
+	SetInventorySortMode(EPDItemSortMode::Name);
+}
+
+void UPDInventoryWidget::HandleSortByTypeClicked()
+{
+	SetInventorySortMode(EPDItemSortMode::Type);
 }
 
 

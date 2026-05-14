@@ -10,8 +10,6 @@
 
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
 #include "Items/PDItemBase.h"
-#include "Items/PDStashActor.h"
-#include "Items/PDStashComponent.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "Component/PDWeaponComponent.h"
 #include "Data/PDQuestComponent.h"
@@ -155,12 +153,6 @@ void APDEnemyBase::HandleDeath(AActor* Killer)
 	}
 
 	Super::HandleDeath(Killer);
-
-	// OnDeathDelegate broadcast 완료 후 다음 틱에 안전하게 소멸. delegate 구독자 처리가 끝난 뒤 destroy됨.
-	if (bDestroyOnDeath)
-	{
-		SetLifeSpan(KINDA_SMALL_NUMBER);
-	}
 }
 
 void APDEnemyBase::OnVisionExposureChanged_Implementation(AActor* Observer, float Exposure)
@@ -222,50 +214,11 @@ void APDEnemyBase::SpawnCorpseContainer()
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	Params.Owner = this;
 
-	AActor* Spawned = World->SpawnActor<AActor>(
+	World->SpawnActor<AActor>(
 		CorpseContainerClass,
 		GetActorLocation(),
 		GetActorRotation(),
 		Params);
-
-	// Stash 컨테이너가 아니면 기존 동작(빈 컨테이너 스폰)으로 종료. BP 비-Stash 컨테이너 호환.
-	APDStashActor* StashContainer = Cast<APDStashActor>(Spawned);
-	if (!StashContainer) return;
-
-	UPDStashComponent* StashComp = StashContainer->GetStashComponent();
-	if (!StashComp) return;
-
-	TArray<FPDInventorySlot> LootSlots;
-	HarvestEquippedWeaponSlots(LootSlots);
-	BuildConsumableLootSlots(LootSlots);
-
-	StashComp->InitializeFromLoot(LootSlots);
-}
-
-void APDEnemyBase::BuildConsumableLootSlots(TArray<FPDInventorySlot>& OutSlots) const
-{
-	static const FString Context = TEXT("PDEnemyBase::BuildConsumableLootSlots");
-
-	for (const FPDConsumableDropEntry& Entry : ConsumableDropTable)
-	{
-		if (FMath::FRand() > Entry.DropChance) continue;
-
-		const FPDItemData* Row = Entry.ItemRow.GetRow<FPDItemData>(Context);
-		if (!Row) continue;
-
-		// 안전장치: DT_ItemData에서 Consumable 외의 행을 잘못 지정해도 풀에 섞이지 않게 차단.
-		if (Row->ItemType != EPDItemType::Consumable) continue;
-
-		const int32 MinQ = FMath::Max(1, Entry.MinQuantity);
-		const int32 MaxQ = FMath::Max(MinQ, Entry.MaxQuantity);
-		const int32 Quantity = FMath::RandRange(MinQ, MaxQ);
-
-		FPDInventorySlot Slot;
-		Slot.ItemData = *Row;
-		Slot.Quantity = Quantity;
-		Slot.bIsEmpty = false;
-		OutSlots.Add(Slot);
-	}
 }
 
 void APDEnemyBase::SetAimTarget(AActor* Target)
