@@ -3,7 +3,9 @@
 
 #include "Widgets/Loading/PDLoadingScreenWidget.h"
 
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Engine/Texture2D.h"
 
 void UPDLoadingScreenWidget::NativeConstruct()
 {
@@ -30,5 +32,23 @@ void UPDLoadingScreenWidget::HandleLoadingReasonUpdated(const FText& InReason)
 	if (Text_LoadingReason)
 	{
 		Text_LoadingReason->SetText(InReason);
+	}
+}
+
+void UPDLoadingScreenWidget::SetSplashImage(UTexture2D* InTexture)
+{
+	if (!Image_Splash)
+	{
+		return;
+	}
+
+	if (InTexture)
+	{
+		Image_Splash->SetBrushFromTexture(InTexture);
+		Image_Splash->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	else
+	{
+		Image_Splash->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }

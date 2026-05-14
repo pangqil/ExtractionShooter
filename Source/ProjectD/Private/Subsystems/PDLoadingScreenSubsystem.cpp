@@ -7,6 +7,7 @@
 #include "DeveloperSettings/PDLoadingScreenSettings.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
+#include "Engine/Texture2D.h"
 #include "Widgets/Loading/PDLoadingScreenWidget.h"
 
 void UPDLoadingScreenSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -58,6 +59,41 @@ void UPDLoadingScreenSubsystem::SetLoadingReason(const FText& InReason)
 {
 	CurrentReason = InReason;
 	OnLoadingReasonUpdated.Broadcast(InReason);
+}
+
+void UPDLoadingScreenSubsystem::SetNextSplashOverride(TSoftObjectPtr<UTexture2D> InTexture)
+{
+	PendingSplashOverride = InTexture;
+}
+
+TSoftObjectPtr<UTexture2D> UPDLoadingScreenSubsystem::ResolveSplashTexture()
+{
+	if (!PendingSplashOverride.IsNull())
+	{
+		const TSoftObjectPtr<UTexture2D> Picked = PendingSplashOverride;
+		PendingSplashOverride.Reset();
+		return Picked;
+	}
+
+	const UPDLoadingScreenSettings* Settings = GetDefault<UPDLoadingScreenSettings>();
+	if (!Settings)
+	{
+		return TSoftObjectPtr<UTexture2D>();
+	}
+
+	if (!Settings->StaticSplashOverride.IsNull())
+	{
+		return Settings->StaticSplashOverride;
+	}
+
+	const TArray<TSoftObjectPtr<UTexture2D>>& Pool = Settings->SplashImagePool;
+	if (Pool.Num() > 0)
+	{
+		const int32 Idx = FMath::RandRange(0, Pool.Num() - 1);
+		return Pool[Idx];
+	}
+
+	return TSoftObjectPtr<UTexture2D>();
 }
 
 void UPDLoadingScreenSubsystem::HandlePreLoadMapWithContext(const FWorldContext& WorldContext, const FString& MapName)
@@ -117,6 +153,10 @@ void UPDLoadingScreenSubsystem::ShowLoadingScreen()
 	{
 		ActiveWidget->HandleLoadingReasonUpdated(CurrentReason);
 		OnLoadingReasonUpdated.AddDynamic(ActiveWidget, &UPDLoadingScreenWidget::HandleLoadingReasonUpdated);
+
+		const TSoftObjectPtr<UTexture2D> SplashSoft = ResolveSplashTexture();
+		UTexture2D* SplashTex = SplashSoft.IsNull() ? nullptr : SplashSoft.LoadSynchronous();
+		ActiveWidget->SetSplashImage(SplashTex);
 	}
 }
 
