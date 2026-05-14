@@ -7,14 +7,6 @@ void UPDPingSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	
-	// 만약 BP_PD_PingMarker 경로가 바뀌면 아래 경로도 같이 수정
-	if (DefaultMarkerClass.IsNull())
-	{
-		DefaultMarkerClass = TSoftClassPtr<APDPingMarker>(
-			FSoftObjectPath(TEXT("/Game/Developers/dbals/Ping/BP_PD_PingMarker.BP_PD_PingMarker_C"))
-		);
-	}
-
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
@@ -48,13 +40,13 @@ int32 UPDPingSubsystem::SpawnPing(EPDPingType InType, const FVector& InWorldLoca
 	Data.PingType = InType;
 	Data.WorldLocation = InWorldLocation;
 	Data.ExpireTime = (DefaultPingLifetime > 0.f) ? World->GetTimeSeconds() + DefaultPingLifetime : 0.f;
-
-	if (UClass* MarkerClass = DefaultMarkerClass.LoadSynchronous())
+	
+	if (UClass* MarkerClass = DefaultMarkerClass)
 	{
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		if (APDPingMarker* Marker = World->SpawnActor<APDPingMarker>(
-			MarkerClass, InWorldLocation, FRotator::ZeroRotator, Params))
+				MarkerClass, InWorldLocation, FRotator::ZeroRotator, Params))
 		{
 			Marker->InitializePing(InType);
 			Data.MarkerActor = Marker;

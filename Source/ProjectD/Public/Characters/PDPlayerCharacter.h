@@ -11,6 +11,8 @@
 class APDWeaponBase;
 class UPDVisionComponent;
 class UPDInteractionComponent;
+class UPDQuickSlotComponent;
+class UPDEquipmentComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -51,6 +53,12 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDCoverComponent> CoverComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDQuickSlotComponent> QuickSlotComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDEquipmentComponent> EquipmentComponent;
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
 	TSubclassOf<UGameplayEffect> HungerDecayEffectClass;
@@ -71,9 +79,11 @@ protected:
 	EWeaponSlot CurrentSlot=EWeaponSlot::None;
 
 	void OnStaminaChanged(const FOnAttributeChangeData& Data);
-	EWeaponSlot GetSlotForWeaponType(EWeaponType Type) const;
 
 public:
+	UFUNCTION(BlueprintPure, Category="PD|Player|Weapon")
+	EWeaponSlot GetSlotForWeaponType(EWeaponType Type) const;
+
 	UPROPERTY(BlueprintAssignable, Category="PD|Player|Events")
 	FOnWeaponSwapped OnWeaponSwapped;
 
@@ -82,6 +92,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	void PickupWeapon(APDWeaponBase* Weapon);
+
+	// 인벤토리/박스의 무기 아이템 데이터를 받아서 빈 슬롯이 있으면 spawn 후 자동 장착.
+	// 슬롯이 차 있거나 WeaponClass가 없으면 false 반환(호출자가 인벤토리로 보내야 함).
+	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
+	bool TryAutoEquipWeaponItem(const FPDItemData& ItemData);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
+	bool RemoveEquippedWeaponItem(const FPDItemData& ItemData, bool bDestroyWeaponActor = true);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	void SwitchToSlot(EWeaponSlot Slot);
@@ -97,6 +115,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|Player")
 	FORCEINLINE EWeaponSlot GetCurrentSlot() const { return CurrentSlot; }
+
+	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
+	UPDQuickSlotComponent* GetQuickSlotComponent() const { return QuickSlotComponent; }
+
+	UFUNCTION(BlueprintPure, Category="PD|Equipment")
+	UPDEquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent; }
 
 	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
 	void TryInteract();

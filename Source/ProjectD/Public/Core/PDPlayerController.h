@@ -1,7 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Type/Types.h"
 #include "PDPlayerController.generated.h"
 
 struct FGameplayTag;
@@ -9,22 +10,24 @@ class UNiagaraSystem;
 class UInputMappingContext;
 class UInputAction;
 class UPathFollowingComponent;
+class UPDInputConfig;
 class UPDInventoryWidget;
 class UPDStashWidget;
+class UPDStashComponent;
 class UPDMarketWidget;
 class UPDMarketComponent;
+class UPDQuestWindowWidget;
 class APDPlayerCharacter;
 class UPDHUDWidget;
 class UPDActivatableBase;
+class UUserWidget;
+class APDWeaponBase;
+class APDRifle;
+class UPDRootLayout;
+class UPDPingInputComponent;
+enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
-
-class UInputMappingContext;
-class UPDInputConfig;
-
-class APDPlayerCharacter;
-class APDWeaponBase;       
-class APDRifle;           
 
 UCLASS(abstract)
 class PROJECTD_API APDPlayerController : public APlayerController
@@ -38,13 +41,17 @@ public:
 	void RequestExtraction();
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
-	void OpenStashInterface();
+	void OpenStashInterface(UPDStashComponent* StashSource);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void CloseStashInterface();
 
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	bool IsStashInterfaceOpen() const;
+
+	// 현재 열린 박스의 컴포넌트. stash 인터페이스가 닫혀있으면 nullptr.
+	UFUNCTION(BlueprintPure, Category = "PD|Stash")
+	FORCEINLINE UPDStashComponent* GetActiveStashComponent() const { return ActiveStashComponent.Get(); }
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void OpenMarketInterface(UPDMarketComponent* MarketComponent);
@@ -58,25 +65,35 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	bool SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity = 1);
 
-	virtual void PlayerTick(float DeltaTime) override; 
+	UFUNCTION(BlueprintCallable, Category = "PD|Quest")
+	void OpenQuestInterface();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Quest")
+	void CloseQuestInterface();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Quest")
+	bool IsQuestInterfaceOpen() const;
+
+	virtual void PlayerTick(float DeltaTime) override;
 
 protected:
-	/** HUD 위젯 클래스. BeginPlay에서 자동 생성되어 viewport ZOrder=0에 깔린다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDHUDWidget> HUDClass;
 
-	/** HUD 위젯 생성 + viewport 추가. BeginPlay에서 호출. 자식 PC가 override 가능. */
-	virtual void CreateAndAddHUDWidget();
+	/** 레이어드 UI의 루트. BP에서 WBP_RootLayout 지정. 미지정 시 레이어드 API 미작동(legacy 경로는 정상). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDRootLayout> RootLayoutClass;
 
-	/** 현재 열려 있는 화면을 닫고 싶을 때 BP에서 호출. */
-	UFUNCTION(BlueprintCallable, Category = "PD|UI")
-	void RequestCloseCurrentScreen();
+	virtual void CreateAndAddHUDWidget();
 
 	UPROPERTY(EditAnywhere, Category = "PD|Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
 	UPROPERTY(EditAnywhere, Category = "PD|Input")
 	TObjectPtr<UPDInputConfig> InputConfig;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ping")
+	TObjectPtr<UPDPingInputComponent> PingInputComp;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDInventoryWidget> InventoryWidgetClass;
@@ -87,11 +104,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
+
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	
+	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnUnPossess() override;
+
 private:
+	void UseQuickSlot(int32 SlotIndex);
+
 	void OnMove(const struct FInputActionValue& Value);
 	void OnJump();
 	void OnAbilityInputPressed(FGameplayTag InputTag);
@@ -99,7 +123,11 @@ private:
 	void UpdateAimRotation();
 
 	void ToggleInventory();
+	void ToggleQuest();
 	void TryInteract();
+
+	bool IsGameplayInputBlockedByModalUI() const;
+	void SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus = nullptr);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryWidget> InventoryWidgetInstance;
@@ -111,19 +139,41 @@ private:
 	TObjectPtr<UPDMarketWidget> MarketWidgetInstance;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UPDQuestWindowWidget> QuestWindowWidgetInstance;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketComponent> ActiveMarketComponent;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDHUDWidget> HUDInstance;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UPDRootLayout> RootLayoutInstance;
+
+	// OpenStashInterface 시 캐시. 박스가 파괴되어도 TWeakObjectPtr가 자동 무효화.
+	TWeakObjectPtr<UPDStashComponent> ActiveStashComponent;
+
+	bool bIsGameplayInputBlockedByModalUI = false;
+	bool bMouseCursorVisibleBeforeModalUI = false;
+	bool bMouseClickEventsEnabledBeforeModalUI = false;
+	bool bMouseOverEventsEnabledBeforeModalUI = false;
+
+	/** Subsystem의 OnEffectiveUIStateChanged 콜백. 입력 모드/시스템 커서/크로스헤어 visibility 일괄 적용. */
+	void ApplyEffectiveUIState(EWidgetInputMode Mode);
+
+	void OnFirePressed();
+	void OnFireReleased();
+	void OnReload();
 	void OnInteract();
 	void OnSwitchSlot1();
 	void OnSwitchSlot2();
 	void OnSwitchSlot3();
+	void OnUseQuickSlot4();
 	void OnZoom();
 	void OnToggleFireMode();
 	void OnDropWeapon();
+	void UpdateCrosshair();
 
-	bool bShowMouseCursor=true;
-
+	UFUNCTION()
+	void OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot);
 };

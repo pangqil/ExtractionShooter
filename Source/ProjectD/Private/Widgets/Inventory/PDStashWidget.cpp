@@ -2,11 +2,17 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
+#include "Characters/PDPlayerCharacter.h"
+#include "Components/Button.h"
+#include "Components/TextBlock.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDInventoryComponent.h"
+#include "Items/PDItemSlotTransfer.h"
+#include "Items/PDQuickSlotComponent.h"
 #include "Items/PDStashComponent.h"
+#include "Weapons/PDWeaponBase.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
 
@@ -14,11 +20,18 @@ void UPDStashWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	BindStashChanged();
+	BindTabButtons();
 	RefreshStashGrid();
+	UpdateTabButtonStyle();
 }
 
 void UPDStashWidget::NativeDestruct()
 {
+	if (ActiveQuantityPopup && ActiveQuantityPopup->IsInViewport())
+	{
+		ActiveQuantityPopup->RemoveFromParent();
+	}
+	ClearQuantityRequest();
 	UnbindStashChanged();
 	Super::NativeDestruct();
 }
@@ -43,11 +56,37 @@ void UPDStashWidget::RefreshStashGrid()
 
 	UPDStashComponent* StashComponent = FindStashComponent();
 
-	const int32 Columns = StashComponent ? FMath::Max(1, StashComponent->GridColumns) : FMath::Max(1, FallbackGridColumns);
-	const int32 Rows = StashComponent ? FMath::Max(1, StashComponent->GridRows) : FMath::Max(1, FallbackGridRows);
-	const int32 SlotCount = StashComponent ? StashComponent->GetMaxSlotCount() : Columns * Rows;
+	// 화면 표시 칸 수는 WBP 설정값을 우선 사용한다.
+	// 실제 StashComponent 용량과 UI 표시 크기를 분리해 나중에 창고 용량을 늘려도 UI를 따로 조정할 수 있다.
+	const int32 Columns = FMath::Max(1, FallbackGridColumns);
+	const int32 Rows = FMath::Max(1, FallbackGridRows);
+	const int32 SlotCount = Columns * Rows;
 
-	for (int32 Index = 0; Index < SlotCount; ++Index)
+	TArray<int32> DisplaySlotIndices;
+	if (StashComponent)
+	{
+		// 현재 탭 아이템을 먼저 모아 보여주고, 남는 칸은 실제 빈 스태시 슬롯 인덱스로 매핑한다.
+		// 그래야 빈 칸에 드롭해도 INDEX_NONE이 아니라 실제 스태시 슬롯으로 이동된다.
+		for (int32 RealSlotIndex = 0; RealSlotIndex < StashComponent->StashItems.Num(); ++RealSlotIndex)
+		{
+			const FPDInventorySlot& StashSlotData = StashComponent->StashItems[RealSlotIndex];
+			if (!StashSlotData.IsEmpty() && DoesSlotMatchCurrentFilter(StashSlotData))
+			{
+				DisplaySlotIndices.Add(RealSlotIndex);
+			}
+		}
+
+		for (int32 RealSlotIndex = 0; RealSlotIndex < StashComponent->StashItems.Num(); ++RealSlotIndex)
+		{
+			const FPDInventorySlot& StashSlotData = StashComponent->StashItems[RealSlotIndex];
+			if (StashSlotData.IsEmpty())
+			{
+				DisplaySlotIndices.Add(RealSlotIndex);
+			}
+		}
+	}
+
+	for (int32 DisplayIndex = 0; DisplayIndex < SlotCount; ++DisplayIndex)
 	{
 		UUserWidget* CreatedSlotWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), StashSlotWidgetClass);
 		if (!CreatedSlotWidget)
@@ -57,25 +96,184 @@ void UPDStashWidget::RefreshStashGrid()
 
 		if (UPDInventorySlotWidget* StashSlotWidget = Cast<UPDInventorySlotWidget>(CreatedSlotWidget))
 		{
+			StashSlotWidget->SetSlotContainerType(EPDItemContainerType::Stash);
 			StashSlotWidget->OnSlotLeftClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleStashSlotLeftClicked);
+			StashSlotWidget->OnSlotItemDropped.AddUniqueDynamic(this, &UPDStashWidget::HandleStashSlotItemDropped);
 
-			if (StashComponent && StashComponent->StashItems.IsValidIndex(Index))
+			if (StashComponent && DisplaySlotIndices.IsValidIndex(DisplayIndex))
 			{
-				StashSlotWidget->SetSlotData(StashComponent->StashItems[Index], Index);
+				const int32 RealSlotIndex = DisplaySlotIndices[DisplayIndex];
+				if (StashComponent->StashItems.IsValidIndex(RealSlotIndex) && !StashComponent->StashItems[RealSlotIndex].IsEmpty())
+				{
+					StashSlotWidget->SetSlotData(StashComponent->StashItems[RealSlotIndex], RealSlotIndex);
+				}
+				else
+				{
+					StashSlotWidget->ClearSlotData(RealSlotIndex);
+				}
 			}
 			else
 			{
-				StashSlotWidget->ClearSlotData(Index);
+				StashSlotWidget->ClearSlotData(INDEX_NONE);
 			}
 		}
 
-		UUniformGridSlot* GridSlot = StashGridPanel->AddChildToUniformGrid(CreatedSlotWidget, Index / Columns, Index % Columns);
+		UUniformGridSlot* GridSlot = StashGridPanel->AddChildToUniformGrid(CreatedSlotWidget, DisplayIndex / Columns, DisplayIndex % Columns);
 		if (GridSlot)
 		{
 			GridSlot->SetHorizontalAlignment(HAlign_Center);
 			GridSlot->SetVerticalAlignment(VAlign_Center);
 		}
 	}
+
+	UpdateTabButtonStyle();
+}
+
+void UPDStashWidget::SetStashFilterTab(EPDItemFilterTab NewFilterTab)
+{
+	if (CurrentFilterTab == NewFilterTab)
+	{
+		UpdateTabButtonStyle();
+		return;
+	}
+
+	CurrentFilterTab = NewFilterTab;
+	RefreshStashGrid();
+}
+
+void UPDStashWidget::BindTabButtons()
+{
+	if (Button_Equipment)
+	{
+		Button_Equipment->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleEquipmentTabClicked);
+	}
+
+	if (Button_Consumable)
+	{
+		Button_Consumable->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleConsumableTabClicked);
+	}
+
+	if (Button_Misc)
+	{
+		Button_Misc->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleMiscTabClicked);
+	}
+}
+
+void UPDStashWidget::UpdateTabButtonStyle()
+{
+	const FLinearColor SelectedColor(0.15f, 0.85f, 0.15f, 1.0f);
+	const FLinearColor NormalColor(0.02f, 0.02f, 0.02f, 0.85f);
+
+	const int32 MaxSlots = GetStashDisplaySlotCount();
+	const int32 EquipmentUsedSlots = CountOccupiedStashSlotsByType(EPDItemType::Equipment);
+	const int32 ConsumableUsedSlots = CountOccupiedStashSlotsByType(EPDItemType::Consumable);
+	const int32 MiscUsedSlots = CountOccupiedStashSlotsByType(EPDItemType::Misc);
+
+	if (Button_Equipment)
+	{
+		Button_Equipment->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Equipment ? SelectedColor : NormalColor);
+		SetTabButtonLabel(Button_Equipment, FText::FromString(TEXT("장비")), EquipmentUsedSlots, MaxSlots);
+	}
+
+	if (Button_Consumable)
+	{
+		Button_Consumable->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Consumable ? SelectedColor : NormalColor);
+		SetTabButtonLabel(Button_Consumable, FText::FromString(TEXT("소모")), ConsumableUsedSlots, MaxSlots);
+	}
+
+	if (Button_Misc)
+	{
+		Button_Misc->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Misc ? SelectedColor : NormalColor);
+		SetTabButtonLabel(Button_Misc, FText::FromString(TEXT("기타")), MiscUsedSlots, MaxSlots);
+	}
+}
+
+int32 UPDStashWidget::CountOccupiedStashSlotsByType(EPDItemType ItemType) const
+{
+	const UPDStashComponent* StashComponent = FindStashComponent();
+	if (!StashComponent)
+	{
+		return 0;
+	}
+
+	int32 UsedSlotCount = 0;
+	for (const FPDInventorySlot& StashSlotData : StashComponent->StashItems)
+	{
+		if (!StashSlotData.IsEmpty() && StashSlotData.ItemData.ItemType == ItemType)
+		{
+			++UsedSlotCount;
+		}
+	}
+
+	return UsedSlotCount;
+}
+
+int32 UPDStashWidget::GetStashDisplaySlotCount() const
+{
+	const int32 Columns = FMath::Max(1, FallbackGridColumns);
+	const int32 Rows = FMath::Max(1, FallbackGridRows);
+	return Columns * Rows;
+}
+
+void UPDStashWidget::SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const
+{
+	if (!TargetButton)
+	{
+		return;
+	}
+
+	if (UTextBlock* ButtonText = Cast<UTextBlock>(TargetButton->GetContent()))
+	{
+		ButtonText->SetText(FText::FromString(FString::Printf(TEXT("%s (%d/%d)"), *BaseLabel.ToString(), UsedSlots, FMath::Max(1, MaxSlots))));
+	}
+}
+
+bool UPDStashWidget::DoesSlotMatchCurrentFilter(const FPDInventorySlot& StashSlotData) const
+{
+	return !StashSlotData.IsEmpty() && DoesItemTypeMatchCurrentFilter(StashSlotData.ItemData.ItemType);
+}
+
+bool UPDStashWidget::DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const
+{
+	if (CurrentFilterTab == EPDItemFilterTab::Equipment)
+	{
+		return ItemType == EPDItemType::Equipment;
+	}
+
+	if (CurrentFilterTab == EPDItemFilterTab::Consumable)
+	{
+		return ItemType == EPDItemType::Consumable;
+	}
+
+	if (CurrentFilterTab == EPDItemFilterTab::Misc)
+	{
+		return ItemType == EPDItemType::Misc;
+	}
+
+	return false;
+}
+
+bool UPDStashWidget::CanAcceptDropForCurrentFilter(const UPDInventoryDragDropOperation* DragOperation) const
+{
+	return DragOperation
+		&& DragOperation->IsValidPayload()
+		&& !DragOperation->SlotData.IsEmpty()
+		&& DoesItemTypeMatchCurrentFilter(DragOperation->SlotData.ItemData.ItemType);
+}
+
+void UPDStashWidget::HandleEquipmentTabClicked()
+{
+	SetStashFilterTab(EPDItemFilterTab::Equipment);
+}
+
+void UPDStashWidget::HandleConsumableTabClicked()
+{
+	SetStashFilterTab(EPDItemFilterTab::Consumable);
+}
+
+void UPDStashWidget::HandleMiscTabClicked()
+{
+	SetStashFilterTab(EPDItemFilterTab::Misc);
 }
 
 void UPDStashWidget::ResolveStashGridPanel()
@@ -107,14 +305,22 @@ void UPDStashWidget::ResolveStashGridPanel()
 	}
 }
 
-UPDStashComponent* UPDStashWidget::FindStashComponent() const
+void UPDStashWidget::InitializeStash(UPDStashComponent* InStashComponent)
 {
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	if (TargetStashComponent == InStashComponent)
 	{
-		return OwningPawn->FindComponentByClass<UPDStashComponent>();
+		return;
 	}
 
-	return nullptr;
+	UnbindStashChanged();
+	TargetStashComponent = InStashComponent;
+	BindStashChanged();
+	RefreshStashGrid();
+}
+
+UPDStashComponent* UPDStashWidget::FindStashComponent() const
+{
+	return TargetStashComponent;
 }
 
 UPDInventoryComponent* UPDStashWidget::FindInventoryComponent() const
@@ -125,6 +331,45 @@ UPDInventoryComponent* UPDStashWidget::FindInventoryComponent() const
 	}
 
 	return nullptr;
+}
+
+UPDQuickSlotComponent* UPDStashWidget::FindQuickSlotComponent() const
+{
+	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	{
+		return OwningPawn->FindComponentByClass<UPDQuickSlotComponent>();
+	}
+
+	return nullptr;
+}
+
+const FPDInventorySlot* UPDStashWidget::FindStashSlot(int32 SlotIndex) const
+{
+	const UPDStashComponent* StashComponent = FindStashComponent();
+	return StashComponent && StashComponent->StashItems.IsValidIndex(SlotIndex) ? &StashComponent->StashItems[SlotIndex] : nullptr;
+}
+
+const FPDInventorySlot* UPDStashWidget::FindSourceSlot(EPDItemContainerType SourceContainerType, int32 SlotIndex) const
+{
+	switch (SourceContainerType)
+	{
+	case EPDItemContainerType::Inventory:
+		if (const UPDInventoryComponent* InventoryComponent = FindInventoryComponent())
+		{
+			return InventoryComponent->Items.IsValidIndex(SlotIndex) ? &InventoryComponent->Items[SlotIndex] : nullptr;
+		}
+		return nullptr;
+	case EPDItemContainerType::Stash:
+		return FindStashSlot(SlotIndex);
+	case EPDItemContainerType::QuickSlot:
+		if (const UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
+		{
+			return QuickSlotComponent->QuickSlotItems.IsValidIndex(SlotIndex) ? &QuickSlotComponent->QuickSlotItems[SlotIndex] : nullptr;
+		}
+		return nullptr;
+	default:
+		return nullptr;
+	}
 }
 
 void UPDStashWidget::HandleStashSlotLeftClicked(UPDInventorySlotWidget* SlotWidget, int32 ClickedSlotIndex)
@@ -145,6 +390,36 @@ void UPDStashWidget::HandleStashSlotLeftClicked(UPDInventorySlotWidget* SlotWidg
 	OpenQuantityPopup(ClickedSlotIndex, SlotData.Quantity, DisplayName);
 }
 
+void UPDStashWidget::HandleStashSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 TargetSlotIndex, UPDInventoryDragDropOperation* DragOperation)
+{
+	if (!SlotWidget || !CanAcceptDropForCurrentFilter(DragOperation) || TargetSlotIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	// Stash should only store real inventory/stash items. Ignore quick-slot references.
+	if (DragOperation->SourceContainerType == EPDItemContainerType::QuickSlot)
+	{
+		return;
+	}
+
+	if (DragOperation->SourceContainerType == EPDItemContainerType::Stash)
+	{
+		ExecuteStashSlotTransfer(DragOperation->SourceContainerType, DragOperation->SourceSlotIndex, TargetSlotIndex, DragOperation->SlotData.Quantity);
+		return;
+	}
+
+	int32 MaxQuantity = 0;
+	FText Title;
+	if (ShouldOpenTransferQuantityPopup(DragOperation->SourceContainerType, DragOperation->SourceSlotIndex, TargetSlotIndex, MaxQuantity, Title))
+	{
+		OpenTransferQuantityPopup(DragOperation->SourceContainerType, DragOperation->SourceSlotIndex, TargetSlotIndex, MaxQuantity, Title);
+		return;
+	}
+
+	ExecuteStashSlotTransfer(DragOperation->SourceContainerType, DragOperation->SourceSlotIndex, TargetSlotIndex, DragOperation->SlotData.Quantity);
+}
+
 void UPDStashWidget::TakeStashSlotQuantity(int32 SlotIndex, int32 Quantity)
 {
 	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
@@ -155,7 +430,84 @@ void UPDStashWidget::TakeStashSlotQuantity(int32 SlotIndex, int32 Quantity)
 		return;
 	}
 
+	// 무기 아이템이고 해당 슬롯이 비어있으면 인벤토리 우회하여 즉시 장착.
+	if (const FPDInventorySlot* SourceSlot = FindStashSlot(SlotIndex))
+	{
+		if (SourceSlot->ItemData.WeaponClass)
+		{
+			if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwningPlayerPawn()))
+			{
+				if (PlayerCharacter->TryAutoEquipWeaponItem(SourceSlot->ItemData))
+				{
+					StashComponent->StashItems[SlotIndex].Quantity -= 1;
+					if (StashComponent->StashItems[SlotIndex].Quantity <= 0)
+					{
+						StashComponent->StashItems[SlotIndex].Clear();
+					}
+					StashComponent->OnStashChanged.Broadcast();
+					return;
+				}
+			}
+		}
+	}
+
 	StashComponent->TakeStashSlotQuantity(InventoryComponent, SlotIndex, Quantity);
+}
+
+
+void UPDStashWidget::ExecuteStashSlotTransfer(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	if (Quantity <= 0)
+	{
+		return;
+	}
+
+	UPDStashComponent* StashComponent = FindStashComponent();
+	if (!StashComponent)
+	{
+		return;
+	}
+
+	switch (SourceContainerType)
+	{
+	case EPDItemContainerType::Inventory:
+		if (UPDInventoryComponent* InventoryComponent = FindInventoryComponent())
+		{
+			StashComponent->StoreInventorySlotQuantityToSlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+		}
+		break;
+	case EPDItemContainerType::Stash:
+		StashComponent->MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+		break;
+	case EPDItemContainerType::QuickSlot:
+		// Quick slots are shortcuts to inventory items, not storage items.
+		// Dropping a quick slot into stash is intentionally ignored.
+		break;
+	default:
+		break;
+	}
+}
+
+bool UPDStashWidget::ShouldOpenTransferQuantityPopup(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32& OutMaxQuantity, FText& OutTitle) const
+{
+	OutMaxQuantity = 0;
+	OutTitle = FText::GetEmpty();
+
+	if (SourceContainerType == EPDItemContainerType::Stash)
+	{
+		return false;
+	}
+
+	const FPDInventorySlot* SourceSlot = FindSourceSlot(SourceContainerType, SourceSlotIndex);
+	const FPDInventorySlot* TargetSlot = FindStashSlot(TargetSlotIndex);
+	if (!SourceSlot || !TargetSlot || SourceSlot->IsEmpty())
+	{
+		return false;
+	}
+
+	OutMaxQuantity = FPDItemSlotTransfer::GetQuantityLimit(*SourceSlot, *TargetSlot);
+	OutTitle = SourceSlot->ItemData.DisplayName.IsEmpty() ? FText::FromName(SourceSlot->ItemData.ItemID) : SourceSlot->ItemData.DisplayName;
+	return FPDItemSlotTransfer::CanPromptForPartial(*SourceSlot, *TargetSlot) && OutMaxQuantity > 1;
 }
 
 void UPDStashWidget::OpenQuantityPopup(int32 SlotIndex, int32 MaxQuantity, const FText& Title)
@@ -178,20 +530,74 @@ void UPDStashWidget::OpenQuantityPopup(int32 SlotIndex, int32 MaxQuantity, const
 		return;
 	}
 
+	bPendingTransferQuantityRequest = false;
 	PendingSlotIndex = SlotIndex;
 	ActiveQuantityPopup->OnConfirmed.RemoveDynamic(this, &UPDStashWidget::HandleQuantityConfirmed);
 	ActiveQuantityPopup->OnConfirmed.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityConfirmed);
+	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
+	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
+	ActiveQuantityPopup->AddToViewport(100);
+	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+}
+
+void UPDStashWidget::OpenTransferQuantityPopup(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 MaxQuantity, const FText& Title)
+{
+	if (!QuantityPopupWidgetClass)
+	{
+		ExecuteStashSlotTransfer(SourceContainerType, SourceSlotIndex, TargetSlotIndex, MaxQuantity);
+		return;
+	}
+
+	if (ActiveQuantityPopup && ActiveQuantityPopup->IsInViewport())
+	{
+		ActiveQuantityPopup->RemoveFromParent();
+	}
+
+	ActiveQuantityPopup = CreateWidget<UPDQuantityPopupWidget>(GetOwningPlayer(), QuantityPopupWidgetClass);
+	if (!ActiveQuantityPopup)
+	{
+		ExecuteStashSlotTransfer(SourceContainerType, SourceSlotIndex, TargetSlotIndex, MaxQuantity);
+		return;
+	}
+
+	bPendingTransferQuantityRequest = true;
+	PendingTransferSourceContainerType = SourceContainerType;
+	PendingTransferSourceSlotIndex = SourceSlotIndex;
+	PendingTransferTargetSlotIndex = TargetSlotIndex;
+	PendingSlotIndex = INDEX_NONE;
+	ActiveQuantityPopup->OnConfirmed.RemoveDynamic(this, &UPDStashWidget::HandleQuantityConfirmed);
+	ActiveQuantityPopup->OnConfirmed.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityConfirmed);
+	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
+	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->AddToViewport(100);
 	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
 }
 
 void UPDStashWidget::HandleQuantityConfirmed(int32 Quantity)
 {
-	if (PendingSlotIndex != INDEX_NONE)
+	if (bPendingTransferQuantityRequest)
+	{
+		ExecuteStashSlotTransfer(PendingTransferSourceContainerType, PendingTransferSourceSlotIndex, PendingTransferTargetSlotIndex, Quantity);
+	}
+	else if (PendingSlotIndex != INDEX_NONE)
 	{
 		TakeStashSlotQuantity(PendingSlotIndex, Quantity);
 	}
 
+	ClearQuantityRequest();
+}
+
+void UPDStashWidget::HandleQuantityCancelled()
+{
+	ClearQuantityRequest();
+}
+
+void UPDStashWidget::ClearQuantityRequest()
+{
+	bPendingTransferQuantityRequest = false;
+	PendingTransferSourceContainerType = EPDItemContainerType::None;
+	PendingTransferSourceSlotIndex = INDEX_NONE;
+	PendingTransferTargetSlotIndex = INDEX_NONE;
 	PendingSlotIndex = INDEX_NONE;
 	ActiveQuantityPopup = nullptr;
 }

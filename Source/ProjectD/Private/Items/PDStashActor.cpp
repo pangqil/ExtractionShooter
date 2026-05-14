@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "Items/PDStashComponent.h"
 
 APDStashActor::APDStashActor()
 {
@@ -21,6 +22,8 @@ APDStashActor::APDStashActor()
 	StashMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StashMesh"));
 	StashMesh->SetupAttachment(InteractionCollision);
 	StashMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	StashComponent = CreateDefaultSubobject<UPDStashComponent>(TEXT("StashComponent"));
 }
 
 void APDStashActor::Interact_Implementation(AActor* Interactor)
@@ -43,5 +46,5 @@ void APDStashActor::Interact_Implementation(AActor* Interactor)
 		return;
 	}
 
-	PlayerController->OpenStashInterface();
+	PlayerController->OpenStashInterface(StashComponent);
 }

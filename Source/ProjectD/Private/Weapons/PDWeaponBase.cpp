@@ -1,4 +1,4 @@
-﻿#include "Weapons/PDWeaponBase.h"
+#include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDShellActor.h"
 #include "Weapons/PDMagazineActor.h"
 #include "Characters/PDPlayerCharacter.h"
@@ -6,9 +6,12 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
+#include "Component/PDWeaponComponent.h"
 
 #include "Animation/AnimInstance.h"
 #include "Interfaces/PDDamageable.h"
+#include "Items/PDInventoryComponent.h"
+#include "Engine/DataTable.h"
 
 APDWeaponBase::APDWeaponBase()
 {
@@ -20,12 +23,18 @@ APDWeaponBase::APDWeaponBase()
     PickupCollision = CreateDefaultSubobject<USphereComponent>(TEXT("PickupCollision"));
     PickupCollision->SetupAttachment(RootComponent);
     PickupCollision->SetSphereRadius(80.f);
-    PickupCollision->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
-    PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // Interact 트레이스(ECC_Visibility)만 Block — PDItemBase와 동일 패턴
+    PickupCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    PickupCollision->SetCollisionObjectType(ECC_WorldDynamic);
+    PickupCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+    PickupCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+    PickupCollision->SetGenerateOverlapEvents(false);
 
     MagazineMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MagazineMesh"));
     MagazineMesh->SetupAttachment(WeaponMesh, MagazineSocketName);
     MagazineMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
 }
 
 void APDWeaponBase::BeginPlay()
@@ -34,21 +43,46 @@ void APDWeaponBase::BeginPlay()
     if (LevelStats.IsValidIndex(0))
         CurrentAmmo = LevelStats[0].MaxAmmo;
 
-    if (bIsDropped)
+    LoadItemData();
+}
+
+void APDWeaponBase::LoadItemData()
+{
+    if (!ItemDataTable || ItemRowName.IsNone()) return;
+
+    const FPDItemData* Row = ItemDataTable->FindRow<FPDItemData>(ItemRowName, TEXT("PDWeaponBase"));
+    if (!Row) return;
+
+    CachedItemData = *Row;
+    if (CachedItemData.ItemID.IsNone())
     {
-        PickupCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        CachedItemData.ItemID = ItemRowName;
     }
 }
 
 void APDWeaponBase::Interact_Implementation(AActor* Interactor)
 {
+    // 월드 무기는 상호작용 시 즉시 캐릭터에 장착하지 않고, 항상 인벤토리에 먼저 들어간다.
+    // 실제 장착/메시 부착은 인벤토리 우클릭 > 장착하기에서 EquipmentComponent를 통해 처리한다.
     if (WeaponOwner.IsValid()) return;
 
     APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(Interactor);
     if (!Player) return;
 
-    Player->PickupWeapon(this);
-    SetDropped(false);
+    if (CachedItemData.ItemID.IsNone())
+    {
+        OnPickupFailed();
+        return;
+    }
+
+    UPDInventoryComponent* Inventory = Player->FindComponentByClass<UPDInventoryComponent>();
+    if (!Inventory || !Inventory->AddItem(CachedItemData, 1))
+    {
+        OnPickupFailed();
+        return;
+    }
+
+    Destroy();
 }
 
 void APDWeaponBase::Fire_Implementation() {}
@@ -344,4 +378,18 @@ APlayerController* APDWeaponBase::GetOwnerPlayerController() const
 {
     if (!WeaponOwner.IsValid()) return nullptr;
     return Cast<APlayerController>(WeaponOwner->GetInstigatorController());
+}
+
+FVector APDWeaponBase::GetAimDirectionFromOwner(const FVector& StartLocation) const
+{
+    if (!WeaponOwner.IsValid()) return FVector::ForwardVector;
+
+    // WeaponComponent에 조준 방향 위임 (플레이어/적 구분은 컴포넌트가 처리)
+    if (UPDWeaponComponent* Comp =
+        WeaponOwner->FindComponentByClass<UPDWeaponComponent>())
+    {
+        return Comp->GetAimDirection(StartLocation);
+    }
+
+    return WeaponOwner->GetActorForwardVector();
 }

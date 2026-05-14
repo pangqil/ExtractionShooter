@@ -1,4 +1,4 @@
-﻿#include "Characters/PDPlayerCharacter.h"
+#include "Characters/PDPlayerCharacter.h"
 #include "AttributeSet/PDAttributeSet.h"
 #include "Camera/CameraComponent.h"
 #include "Component/PDVisionComponent.h"
@@ -6,6 +6,8 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Items/PDQuickSlotComponent.h"
+#include "Items/PDEquipmentComponent.h"
 #include "Weapons/PDWeaponBase.h"
 
 APDPlayerCharacter::APDPlayerCharacter()
@@ -36,9 +38,12 @@ APDPlayerCharacter::APDPlayerCharacter()
 	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
 	CoverComponent=CreateDefaultSubobject<UPDCoverComponent>(TEXT("CoverComponent"));
 	
+	QuickSlotComponent=CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
+	EquipmentComponent=CreateDefaultSubobject<UPDEquipmentComponent>(TEXT("EquipmentComponent"));
+
 	PrimaryActorTick.bCanEverTick=true;
 	PrimaryActorTick.bStartWithTickEnabled=true;
-	WeaponSlots.SetNum(3);
+	WeaponSlots.SetNum(4);
 
 	// Player 팀. AI 의 GetTeamAttitudeTowards 에서 적대 판정의 기준이 됨.
 	TeamID = 1;
@@ -52,8 +57,10 @@ void APDPlayerCharacter::BeginPlay()
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Shotgun, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Sniper,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
+            ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Pistol,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
         }
 	LinkDefaultAnimLayer();
+
 }
 
 void APDPlayerCharacter::Tick(float DeltaTime)
@@ -108,8 +115,8 @@ void APDPlayerCharacter::PickupWeapon(APDWeaponBase* Weapon)
 	if (TargetSlot==EWeaponSlot::None) return;
 
 	int32 Idx=static_cast<int32>(TargetSlot);
-	if (WeaponSlots[Idx])
-		WeaponSlots[Idx]->OnUnequip();
+	// 슬롯이 차있을 때는 호출자(Interact/AutoEquip)에서 인벤토리 경로로 우회해야 한다.
+	if (WeaponSlots[Idx]) return;
 
 	WeaponSlots[Idx]=Weapon;
 	Weapon->OnEquip(this);           
@@ -142,6 +149,7 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Rifle);
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Shotgun);
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Sniper);
+		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Pistol);
 		ASC->AddLooseGameplayTag(NewWeapon->GetWeaponTypeTag());
 	}
 	NewWeapon->SetActorHiddenInGame(false);
@@ -181,8 +189,74 @@ EWeaponSlot APDPlayerCharacter::GetSlotForWeaponType(EWeaponType Type) const
 	case EWeaponType::Rifle:   return EWeaponSlot::Slot1_Rifle;
 	case EWeaponType::Shotgun: return EWeaponSlot::Slot2_Shotgun;
 	case EWeaponType::Sniper:  return EWeaponSlot::Slot3_Sniper;
+	case EWeaponType::Pistol:  return EWeaponSlot::Slot4_Pistol;
 	default:                   return EWeaponSlot::None;
 	}
+}
+
+bool APDPlayerCharacter::TryAutoEquipWeaponItem(const FPDItemData& ItemData)
+{
+	if (!ItemData.WeaponClass) return false;
+
+	const EWeaponSlot TargetSlot = GetSlotForWeaponType(ItemData.WeaponType);
+	if (TargetSlot == EWeaponSlot::None) return false;
+
+	// 이미 해당 슬롯에 무기가 있으면 자동 장착 안 함(호출자가 인벤토리로 보내야 함).
+	if (GetWeaponInSlot(TargetSlot)) return false;
+
+	UWorld* World = GetWorld();
+	if (!World) return false;
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = this;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	APDWeaponBase* SpawnedWeapon = World->SpawnActor<APDWeaponBase>(
+		ItemData.WeaponClass, GetActorTransform(), SpawnParams);
+	if (!SpawnedWeapon) return false;
+
+	PickupWeapon(SpawnedWeapon);
+	return true;
+}
+
+
+bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, bool bDestroyWeaponActor)
+{
+	const EWeaponSlot TargetSlot = GetSlotForWeaponType(ItemData.WeaponType);
+	if (TargetSlot == EWeaponSlot::None)
+	{
+		return false;
+	}
+
+	const int32 SlotIndex = static_cast<int32>(TargetSlot);
+	if (!WeaponSlots.IsValidIndex(SlotIndex) || !WeaponSlots[SlotIndex])
+	{
+		return false;
+	}
+
+	APDWeaponBase* WeaponToRemove = WeaponSlots[SlotIndex];
+	WeaponToRemove->OnUnequip();
+	WeaponToRemove->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	WeaponToRemove->SetActorHiddenInGame(true);
+
+	if (ASC)
+	{
+		ASC->RemoveLooseGameplayTag(WeaponToRemove->GetWeaponTypeTag());
+	}
+
+	WeaponSlots[SlotIndex] = nullptr;
+	if (CurrentSlot == TargetSlot)
+	{
+		CurrentSlot = EWeaponSlot::None;
+	}
+
+	if (bDestroyWeaponActor)
+	{
+		WeaponToRemove->Destroy();
+	}
+
+	return true;
 }
 
 void APDPlayerCharacter::TryInteract()

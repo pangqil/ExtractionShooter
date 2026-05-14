@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
@@ -8,6 +8,7 @@
 #include "Interfaces/PDStatusEffectSource.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Component/PDWeaponComponent.h"
 #include "PDCharacterBase.generated.h"
 
 class UPDAttributeSet;
@@ -75,6 +76,10 @@ protected:
 public:
 	UPROPERTY(BlueprintAssignable, Category = "PD|Damage")
 	FOnDeathSignature OnDeathDelegate;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPDWeaponComponent> WeaponComponent;
 
 	virtual void ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo) override;
 	virtual float GetCurrentHealth_Implementation() const override;

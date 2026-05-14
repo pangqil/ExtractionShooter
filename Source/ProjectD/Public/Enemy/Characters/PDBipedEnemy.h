@@ -32,10 +32,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Combat")
 	FORCEINLINE UPDCombatComponent* GetCombatComponent() const { return CombatComponent; }
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stat", meta = (AllowPrivateAccess = "true"))
+private:
+	UPROPERTY(VisibleAnywhere, Category = "PD|Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPDStatComponent> StatComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Combat", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, Category = "PD|Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPDCombatComponent> CombatComponent;
 };

@@ -3,7 +3,10 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
+#include "Templates/SubclassOf.h"
 #include "Types.generated.h"
+
+class APDWeaponBase;
 
 USTRUCT(BlueprintType)
 struct FPDPlayerData
@@ -15,6 +18,43 @@ struct FPDPlayerData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Experience = 0;
+};
+
+UENUM(BlueprintType)
+enum class EPDItemType : uint8
+{
+	Equipment  UMETA(DisplayName = "Equipment"),
+	Consumable UMETA(DisplayName = "Consumable"),
+	Misc       UMETA(DisplayName = "Misc"),
+};
+
+UENUM(BlueprintType)
+enum class EPDItemFilterTab : uint8
+{
+	Equipment  UMETA(DisplayName = "Equipment"),
+	Consumable UMETA(DisplayName = "Consumable"),
+	Misc       UMETA(DisplayName = "Misc"),
+};
+
+
+UENUM(BlueprintType)
+enum class EPDEquipmentSlotType : uint8
+{
+	None   UMETA(DisplayName = "None"),
+	Weapon UMETA(DisplayName = "Weapon"),
+	Head   UMETA(DisplayName = "Head"),
+	Armor  UMETA(DisplayName = "Armor"),
+	Bag    UMETA(DisplayName = "Bag"),
+};
+
+UENUM(BlueprintType)
+enum class EWeaponType : uint8
+{
+	None    UMETA(DisplayName = "None"),
+	Rifle   UMETA(DisplayName = "Rifle"),
+	Shotgun UMETA(DisplayName = "Shotgun"),
+	Sniper  UMETA(DisplayName = "Sniper"),
+	Pistol  UMETA(DisplayName = "Pistol"),
 };
 
 USTRUCT(BlueprintType)
@@ -29,6 +69,12 @@ struct FPDItemData : public FTableRowBase
 	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDItemType ItemType = EPDItemType::Misc;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bIsQuestItem = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<UTexture2D> Icon = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -39,6 +85,18 @@ struct FPDItemData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText Description;
+
+	// 장비 아이템일 때 어느 장비 슬롯에 들어갈지 지정. WeaponType은 전투 타입 구분용으로만 사용.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDEquipmentSlotType EquipmentSlotType = EPDEquipmentSlotType::None;
+
+	// 무기 아이템일 때만 설정. nullptr이면 비-무기 아이템(소비/잡템).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<APDWeaponBase> WeaponClass;
+
+	// 무기 아이템일 때 전투 타입을 지정. 장착 위치는 EquipmentSlotType으로 결정한다.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EWeaponType WeaponType = EWeaponType::None;
 };
 
 USTRUCT(BlueprintType)
@@ -65,6 +123,30 @@ struct FPDInventorySlot
 		ItemData = FPDItemData();
 		Quantity = 0;
 		bIsEmpty = true;
+	}
+};
+
+
+USTRUCT(BlueprintType)
+struct FPDEquippedItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDEquipmentSlotType SlotType = EPDEquipmentSlotType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPDInventorySlot ItemSlot;
+
+	bool IsEmpty() const
+	{
+		return SlotType == EPDEquipmentSlotType::None || ItemSlot.IsEmpty();
+	}
+
+	void Clear()
+	{
+		SlotType = EPDEquipmentSlotType::None;
+		ItemSlot.Clear();
 	}
 };
 
@@ -123,24 +205,17 @@ enum class ERaidState : uint8
 };
 
 // ─── 무기 시스템 ────────────────────────────────────────────────
+// EWeaponType은 FPDItemData보다 위에 정의됨(FPDItemData::WeaponType 기본값에서 사용).
 
-UENUM(BlueprintType)
-enum class EWeaponType : uint8
-{
-	None    UMETA(DisplayName = "None"),
-	Rifle   UMETA(DisplayName = "Rifle"),
-	Shotgun UMETA(DisplayName = "Shotgun"),
-	Sniper  UMETA(DisplayName = "Sniper"),
-};
-
-// 슬롯 인덱스: Slot1_Rifle=0, Slot2_Shotgun=1, Slot3_Sniper=2 (배열 인덱스로 직접 사용)
-// None=3 은 "선택 없음" 센티넬. 인덱스로 쓰기 전에 None 체크 필수.
+// 슬롯 인덱스: Slot1_Rifle=0, Slot2_Shotgun=1, Slot3_Sniper=2, Slot4_Pistol=3 (배열 인덱스로 직접 사용)
+// None=4 은 "선택 없음" 센티넬. 인덱스로 쓰기 전에 None 체크 필수.
 UENUM(BlueprintType)
 enum class EWeaponSlot : uint8
 {
 	Slot1_Rifle   UMETA(DisplayName = "Rifle"),
 	Slot2_Shotgun UMETA(DisplayName = "Shotgun"),
 	Slot3_Sniper  UMETA(DisplayName = "Sniper"),
+	Slot4_Pistol  UMETA(DisplayName = "Pistol"),
 	None          UMETA(DisplayName = "None"),
 };
 
@@ -173,4 +248,13 @@ struct FWeaponLevelStats
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	float Accuracy = 0.95f;
+};
+
+
+UENUM(BlueprintType)
+enum class EUILayer : uint8
+{
+	Frontend UMETA(DisplayName = "Frontend"), 
+	GameMenu UMETA(DisplayName = "Game Menu"),
+	Modal    UMETA(DisplayName = "Modal"),
 };

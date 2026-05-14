@@ -3,9 +3,13 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Data/PDQuestData.h"
+#include "Engine/DataTable.h"
 #include "PDQuestComponent.generated.h"
 
 class UPDInventoryComponent;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnQuestUpdated);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnQuestStateChanged, FName, QuestID, EPDQuestState, NewState);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class PROJECTD_API UPDQuestComponent : public UActorComponent
@@ -16,13 +20,52 @@ public:
 	UPDQuestComponent();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Quest")
+	TObjectPtr<UDataTable> QuestTable = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Quest")
 	TArray<FPDQuestProgress> ActiveQuests;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Quest")
+	FName TrackedQuestID;
+
+	UPROPERTY(BlueprintAssignable, Category="PD|Quest")
+	FPDOnQuestUpdated OnQuestUpdated;
+
+	UPROPERTY(BlueprintAssignable, Category="PD|Quest")
+	FPDOnQuestStateChanged OnQuestStateChanged;
 
 	UFUNCTION(BlueprintCallable, Category="PD|Quest")
 	bool AddQuest(const FPDQuestData& QuestData);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool AddQuestByID(FName QuestID);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
 	bool UpdateObjectiveProgress(FName QuestID, FName ObjectiveID, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool ReportQuestObjectiveEvent(EPDQuestObjectiveType ObjectiveType, FName TargetID = NAME_None, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool ReportItemAcquired(FName ItemID, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool ReportQuestItemAcquired(FName ItemID, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool ReportEnemyKilled(FName EnemyID, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool ReportQuestEnemyKilled(FName EnemyID, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool ReportLocationReached(FName LocationID, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool ReportNPCTalked(FName NPCID, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool ReportItemDropped(FName ItemID, int32 Amount = 1);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Quest")
 	bool IsQuestCompleted(FName QuestID) const;
@@ -30,8 +73,36 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Quest")
 	bool GiveReward(FName QuestID, UPDInventoryComponent* InventoryComponent);
 
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	bool SetTrackedQuest(FName QuestID);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Quest")
+	void ClearTrackedQuest();
+
+	UFUNCTION(BlueprintPure, Category="PD|Quest")
+	bool GetQuestProgress(FName QuestID, FPDQuestProgress& OutQuestProgress) const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Quest")
+	TArray<FPDQuestProgress> GetQuestsByState(EPDQuestState State) const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Quest")
+	TArray<FPDQuestData> GetAvailableQuests() const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Quest")
+	int32 GetObjectiveProgress(FName QuestID, FName ObjectiveID) const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Quest")
+	int32 GetObjectiveRequiredCount(FName QuestID, FName ObjectiveID) const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Quest")
+	float GetQuestProgressRatio(FName QuestID) const;
+
 private:
 	FPDQuestProgress* FindQuest(FName QuestID);
 	const FPDQuestProgress* FindQuest(FName QuestID) const;
+	const FPDQuestData* FindQuestData(FName QuestID) const;
+	bool DoesObjectiveMatchEvent(const FPDQuestObjective& Objective, EPDQuestObjectiveType ObjectiveType, FName TargetID) const;
+	bool ApplyObjectiveProgress(FPDQuestProgress& QuestProgress, const FPDQuestObjective& Objective, int32 Amount);
 	void RefreshQuestState(FPDQuestProgress& QuestProgress);
+	void BroadcastQuestUpdated(FName QuestID, EPDQuestState PreviousState, EPDQuestState NewState);
 };

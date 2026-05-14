@@ -7,7 +7,12 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Input_Jump,     "Input.Jump")
 	UE_DEFINE_GAMEPLAY_TAG(Input_Interact, "Input.Interact")
 	UE_DEFINE_GAMEPLAY_TAG(Input_Inventory, "Input.Inventory")
-
+	UE_DEFINE_GAMEPLAY_TAG(Input_Quest, "Input.Quest")
+	
+	//Input 핑
+	UE_DEFINE_GAMEPLAY_TAG(Input_Ping,        "Input.Ping")
+	UE_DEFINE_GAMEPLAY_TAG(Input_PingConfirm, "Input.PingConfirm")
+	
 	// Input 무기 GAS 어빌리티
 	UE_DEFINE_GAMEPLAY_TAG(Input_Reload, "Input.Reload")
 
@@ -36,6 +41,7 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Rifle,   "Weapon.Type.Rifle")
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Shotgun, "Weapon.Type.Shotgun")
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Sniper,  "Weapon.Type.Sniper")
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Pistol,  "Weapon.Type.Pistol")
 	UE_DEFINE_GAMEPLAY_TAG(State_Aiming, "State.Aiming")
 
 	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_EquipEnd,      "Anim.Notify.EquipEnd")

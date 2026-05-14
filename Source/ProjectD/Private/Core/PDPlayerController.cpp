@@ -1,4 +1,4 @@
-﻿#include "Core/PDPlayerController.h"
+#include "Core/PDPlayerController.h"
 #include "Characters/PDPlayerCharacter.h"
 
 #include "AbilitySystemComponent.h"
@@ -12,28 +12,40 @@
 #include "Engine/LocalPlayer.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "Input/PDInputComponent.h"
 
 #include "InputCoreTypes.h"
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
 #include "Widgets/Inventory/PDMarketWidget.h"
+#include "Widgets/Quest/PDQuestWindowWidget.h"
 #include "Items/PDMarketComponent.h"
 #include "Items/PDInventoryComponent.h"
+#include "Items/PDQuickSlotComponent.h"
+#include "Data/PDQuestComponent.h"
+#include "Items/PDStashComponent.h"
 #include "Widgets/HUD/PDHUDWidget.h"
+#include "Widgets/PDActivatableBase.h"
+#include "Widgets/PDRootLayout.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
+#include "Blueprint/UserWidget.h"
 
 DEFINE_LOG_CATEGORY(LogPDCharacter);
 
 #include "Interfaces/PDInteractable.h"
 #include "Weapons/PDWeaponBase.h"
 #include "Weapons/PDRifle.h"
+#include "Weapons/PDShotgun.h"
 #include "Weapons/PDSniper.h"
 
+#include "Ping/PDPingSubsystem.h"
+#include "Ping/PDPingInputComponent.h"
 
 APDPlayerController::APDPlayerController()
 {
 	PrimaryActorTick.bCanEverTick=true;
+	PingInputComp = CreateDefaultSubobject<UPDPingInputComponent>(TEXT("PingInputComp"));
 }
 
 void APDPlayerController::RequestExtraction()
@@ -47,21 +59,14 @@ void APDPlayerController::RequestExtraction()
 void APDPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
-	static float LogTimer = 0.f;
-	LogTimer += DeltaTime;
-	if (LogTimer >= 1.f)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Cursor Visible: %s, Cursor Type: %d"), 
-			bShowMouseCursor ? TEXT("True") : TEXT("False"), (int32)CurrentMouseCursor.GetValue());
-		LogTimer = 0.f;
-	}
 	UpdateAimRotation();
+	UpdateCrosshair();
 }
 
 void APDPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	
+
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
 		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
@@ -76,7 +81,12 @@ void APDPlayerController::SetupInputComponent()
 	if (!InputConfig)
 	{
 		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &APDPlayerController::ToggleInventory);
+		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
+		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
+		InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
+		InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
+		InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
 		return;
 	}
 
@@ -95,6 +105,16 @@ void APDPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &APDPlayerController::ToggleInventory);
 	}
 
+	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Quest))
+	{
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quest,
+			ETriggerEvent::Started, this, &APDPlayerController::ToggleQuest);
+	}
+	else
+	{
+		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
+	}
+
 	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Interact))
 	{
 		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
@@ -109,6 +129,12 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindAbilityActions(InputConfig, this, &APDPlayerController::OnAbilityInputPressed,
 		&APDPlayerController::OnAbilityInputReleased);
 
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Fire,
+		ETriggerEvent::Started, this, &APDPlayerController::OnFirePressed);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Fire,
+		ETriggerEvent::Completed, this, &APDPlayerController::OnFireReleased);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Reload,
+		ETriggerEvent::Started, this, &APDPlayerController::OnReload);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
 		ETriggerEvent::Started, this, &APDPlayerController::OnInteract);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot1,
@@ -125,7 +151,15 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_DropWeapon,
 		ETriggerEvent::Started, this, &APDPlayerController::OnDropWeapon);
 
+	InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
+	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
+	InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
+	InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
 	
+	if (PingInputComp && InputConfig)
+	{
+		PingInputComp->BindInputs(PDIC, InputConfig);
+	}
 }
 
 void APDPlayerController::BeginPlay()
@@ -137,51 +171,148 @@ void APDPlayerController::BeginPlay()
 	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
 
-	bShowMouseCursor = true;
+	bShowMouseCursor = false;
+	bEnableClickEvents = true;
+	bEnableMouseOverEvents = true;
 	DefaultMouseCursor = EMouseCursor::Default;
+	CurrentMouseCursor = EMouseCursor::Default;
+
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		Ch->OnWeaponSwapped.AddDynamic(this, &APDPlayerController::OnWeaponChanged);
 
 	CreateAndAddHUDWidget();
+	
+	if (RootLayoutClass)
+	{
+		RootLayoutInstance = CreateWidget<UPDRootLayout>(this, RootLayoutClass);
+		if (RootLayoutInstance)
+		{
+			RootLayoutInstance->AddToViewport(5);
+			if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
+			{
+				UISubsystem->OnEffectiveUIStateChanged.AddUObject(this, &APDPlayerController::ApplyEffectiveUIState);
+				UISubsystem->RegisterRootLayout(RootLayoutInstance);
+			}
+		}
+	}
 }
 
 void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (QuestWindowWidgetInstance)
+	{
+		QuestWindowWidgetInstance->RemoveFromParent();
+		QuestWindowWidgetInstance = nullptr;
+	}
+
 	if (HUDInstance)
 	{
+		HUDInstance->Deactivate();
 		HUDInstance->RemoveFromParent();
 		HUDInstance = nullptr;
 	}
 
 	if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
 	{
-		UISubsystem->CloseScreen();
+		UISubsystem->OnEffectiveUIStateChanged.RemoveAll(this);
+		UISubsystem->UnregisterRootLayout();
+	}
+
+	if (RootLayoutInstance)
+	{
+		RootLayoutInstance->RemoveFromParent();
+		RootLayoutInstance = nullptr;
 	}
 
 	Super::EndPlay(EndPlayReason);
 }
 
+void APDPlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+
+	if (HUDInstance)
+	{
+		UAbilitySystemComponent* ASC = InPawn
+			? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InPawn)
+			: nullptr;
+		HUDInstance->RebindToASC(ASC);
+	}
+}
+
+void APDPlayerController::OnUnPossess()
+{
+	if (HUDInstance)
+	{
+		HUDInstance->RebindToASC(nullptr);
+	}
+	Super::OnUnPossess();
+}
+
 void APDPlayerController::CreateAndAddHUDWidget()
 {
 	if (!HUDClass) return;
-	if (HUDInstance) return; // 이중 호출 방지
+	if (HUDInstance) return;
 
 	HUDInstance = CreateWidget<UPDHUDWidget>(this, HUDClass);
 	if (HUDInstance)
 	{
-		HUDInstance->AddToViewport(0); // ZOrder 0 = 가장 아래, 메뉴(10) 밑에 깔림
+		HUDInstance->AddToViewport(0);
 		HUDInstance->Activate();
 	}
 }
 
-void APDPlayerController::RequestCloseCurrentScreen()
+void APDPlayerController::ApplyEffectiveUIState(EWidgetInputMode Mode)
 {
-	if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
+	switch (Mode)
 	{
-		UISubsystem->CloseScreen();
+	case EWidgetInputMode::Game:
+		{
+			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			InputMode.SetHideCursorDuringCapture(false);
+			SetInputMode(InputMode);
+			bShowMouseCursor = false;
+			if (HUDInstance)
+			{
+				HUDInstance->SetCrosshairVisible(true);
+			}
+			break;
+		}
+	case EWidgetInputMode::GameAndMenu:
+		{
+			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			InputMode.SetHideCursorDuringCapture(false);
+			SetInputMode(InputMode);
+			bShowMouseCursor = true;
+			if (HUDInstance)
+			{
+				HUDInstance->SetCrosshairVisible(false);
+			}
+			break;
+		}
+	case EWidgetInputMode::Menu:
+		{
+			FInputModeUIOnly InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			SetInputMode(InputMode);
+			bShowMouseCursor = true;
+			if (HUDInstance)
+			{
+				HUDInstance->SetCrosshairVisible(false);
+			}
+			break;
+		}
+	case EWidgetInputMode::Passive:
+		break;
 	}
 }
 
 void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 {
+	if (IsGameplayInputBlockedByModalUI()) return;
+
 	APawn* ControlledPawn =GetPawn();
 	if (!ControlledPawn) return;
 
@@ -192,6 +323,8 @@ void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 
 void APDPlayerController::OnJump()
 {
+	if (IsGameplayInputBlockedByModalUI()) return;
+
 	if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetPawn()))
 	{
 		OwnerCharacter->Jump();
@@ -266,6 +399,8 @@ void APDPlayerController::OpenMarketInterface(UPDMarketComponent* MarketComponen
 	{
 		MarketWidgetInstance->InitializeMarket(MarketComponent);
 	}
+
+	SetGameplayInputBlockedByModalUI(true, MarketWidgetInstance);
 }
 
 void APDPlayerController::CloseMarketInterface()
@@ -282,6 +417,11 @@ void APDPlayerController::CloseMarketInterface()
 		InventoryWidgetInstance->RemoveFromParent();
 	}
 	InventoryWidgetInstance = nullptr;
+
+	if (!IsStashInterfaceOpen() && !IsQuestInterfaceOpen())
+	{
+		SetGameplayInputBlockedByModalUI(false);
+	}
 }
 
 bool APDPlayerController::IsMarketInterfaceOpen() const
@@ -289,7 +429,7 @@ bool APDPlayerController::IsMarketInterfaceOpen() const
 	return MarketWidgetInstance && MarketWidgetInstance->IsInViewport();
 }
 
-void APDPlayerController::OpenStashInterface()
+void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
 {
 	if (!InventoryWidgetClass)
 	{
@@ -303,18 +443,31 @@ void APDPlayerController::OpenStashInterface()
 		return;
 	}
 
+	if (!StashSource)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("OpenStashInterface called with null StashSource."));
+		return;
+	}
+
 	if (IsMarketInterfaceOpen())
 	{
 		CloseMarketInterface();
 	}
+
+	ActiveStashComponent = StashSource;
 
 	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
 	{
 		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
 		if (InventoryWidgetInstance)
 		{
+			InventoryWidgetInstance->SetActiveStashComponent(StashSource);
 			InventoryWidgetInstance->AddToViewport();
 		}
+	}
+	else
+	{
+		InventoryWidgetInstance->SetActiveStashComponent(StashSource);
 	}
 
 	if (!StashWidgetInstance || !StashWidgetInstance->IsInViewport())
@@ -322,9 +475,17 @@ void APDPlayerController::OpenStashInterface()
 		StashWidgetInstance = CreateWidget<UPDStashWidget>(this, StashWidgetClass);
 		if (StashWidgetInstance)
 		{
+			StashWidgetInstance->InitializeStash(StashSource);
 			StashWidgetInstance->AddToViewport();
 		}
 	}
+	else
+	{
+		// 다른 박스로 열기를 다시 누른 경우: 위젯은 유지하고 데이터만 교체.
+		StashWidgetInstance->InitializeStash(StashSource);
+	}
+
+	SetGameplayInputBlockedByModalUI(true, StashWidgetInstance);
 }
 
 void APDPlayerController::CloseStashInterface()
@@ -340,6 +501,13 @@ void APDPlayerController::CloseStashInterface()
 		InventoryWidgetInstance->RemoveFromParent();
 	}
 	InventoryWidgetInstance = nullptr;
+
+	ActiveStashComponent.Reset();
+
+	if (!IsMarketInterfaceOpen() && !IsQuestInterfaceOpen())
+	{
+		SetGameplayInputBlockedByModalUI(false);
+	}
 }
 
 bool APDPlayerController::IsStashInterfaceOpen() const
@@ -370,8 +538,92 @@ bool APDPlayerController::SellInventorySlotToActiveMarket(int32 SlotIndex, int32
 	return ActiveMarketComponent->SellInventorySlot(InventoryComponent, SlotIndex, Quantity);
 }
 
+
+void APDPlayerController::OpenQuestInterface()
+{
+	if (IsQuestInterfaceOpen())
+	{
+		return;
+	}
+
+	if (IsStashInterfaceOpen())
+	{
+		CloseStashInterface();
+	}
+
+	if (IsMarketInterfaceOpen())
+	{
+		CloseMarketInterface();
+	}
+
+	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance->RemoveFromParent();
+		InventoryWidgetInstance = nullptr;
+	}
+
+	if (!QuestWindowWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("QuestWindowWidgetClass is not set."));
+		SetGameplayInputBlockedByModalUI(false);
+		return;
+	}
+
+	QuestWindowWidgetInstance = CreateWidget<UPDQuestWindowWidget>(this, QuestWindowWidgetClass);
+	if (!QuestWindowWidgetInstance)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Failed to create quest window widget."));
+		SetGameplayInputBlockedByModalUI(false);
+		return;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	UPDQuestComponent* QuestComponent = ControlledPawn ? ControlledPawn->FindComponentByClass<UPDQuestComponent>() : nullptr;
+	UPDInventoryComponent* InventoryComponent = ControlledPawn ? ControlledPawn->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+	QuestWindowWidgetInstance->InitializeQuestWindow(QuestComponent, InventoryComponent);
+	QuestWindowWidgetInstance->AddToViewport();
+
+	SetGameplayInputBlockedByModalUI(true, QuestWindowWidgetInstance);
+}
+
+void APDPlayerController::CloseQuestInterface()
+{
+	if (QuestWindowWidgetInstance && QuestWindowWidgetInstance->IsInViewport())
+	{
+		QuestWindowWidgetInstance->RemoveFromParent();
+	}
+	QuestWindowWidgetInstance = nullptr;
+
+	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen())
+	{
+		SetGameplayInputBlockedByModalUI(false);
+	}
+}
+
+bool APDPlayerController::IsQuestInterfaceOpen() const
+{
+	return QuestWindowWidgetInstance && QuestWindowWidgetInstance->IsInViewport();
+}
+
+void APDPlayerController::ToggleQuest()
+{
+	if (IsQuestInterfaceOpen())
+	{
+		CloseQuestInterface();
+		return;
+	}
+
+	OpenQuestInterface();
+}
+
 void APDPlayerController::ToggleInventory()
 {
+	if (IsQuestInterfaceOpen())
+	{
+		CloseQuestInterface();
+		return;
+	}
+
 	if (IsStashInterfaceOpen())
 	{
 		CloseStashInterface();
@@ -389,9 +641,7 @@ void APDPlayerController::ToggleInventory()
 		InventoryWidgetInstance->RemoveFromParent();
 		InventoryWidgetInstance = nullptr;
 
-		FInputModeGameOnly InputMode;
-		SetInputMode(InputMode);
-		bShowMouseCursor = false;
+		SetGameplayInputBlockedByModalUI(false);
 		return;
 	}
 
@@ -410,12 +660,7 @@ void APDPlayerController::ToggleInventory()
 
 	InventoryWidgetInstance->AddToViewport();
 
-	FInputModeGameAndUI InputMode;
-	InputMode.SetWidgetToFocus(InventoryWidgetInstance->TakeWidget());
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	
-	SetInputMode(InputMode);
-	bShowMouseCursor = true;
+	SetGameplayInputBlockedByModalUI(true, InventoryWidgetInstance);
 }
 
 void APDPlayerController::TryInteract()
@@ -426,8 +671,85 @@ void APDPlayerController::TryInteract()
 	}
 }
 
+bool APDPlayerController::IsGameplayInputBlockedByModalUI() const
+{
+	return bIsGameplayInputBlockedByModalUI;
+}
+
+void APDPlayerController::SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus)
+{
+	if (bBlocked)
+	{
+		if (!bIsGameplayInputBlockedByModalUI)
+		{
+			bMouseCursorVisibleBeforeModalUI = bShowMouseCursor;
+			bMouseClickEventsEnabledBeforeModalUI = bEnableClickEvents;
+			bMouseOverEventsEnabledBeforeModalUI = bEnableMouseOverEvents;
+		}
+
+		bIsGameplayInputBlockedByModalUI = true;
+		SetIgnoreMoveInput(true);
+		SetIgnoreLookInput(true);
+
+		if (APawn* ControlledPawn = GetPawn())
+		{
+			if (UPawnMovementComponent* MovementComponent = ControlledPawn->GetMovementComponent())
+			{
+				MovementComponent->StopMovementImmediately();
+			}
+		}
+
+		FInputModeGameAndUI InputMode;
+		if (WidgetToFocus)
+		{
+			InputMode.SetWidgetToFocus(WidgetToFocus->TakeWidget());
+		}
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+
+		bShowMouseCursor = true;
+		bEnableClickEvents = true;
+		bEnableMouseOverEvents = true;
+		DefaultMouseCursor = EMouseCursor::Default;
+		CurrentMouseCursor = EMouseCursor::Default;
+
+		// 인벤토리/창고/마켓 같은 모달 UI가 열려 있는 동안에는
+		// 게임 조준 크로스헤어를 숨기고, 시스템 마우스 커서만 보이게 한다.
+		if (HUDInstance)
+		{
+			HUDInstance->SetCrosshairVisible(false);
+		}
+
+		return;
+	}
+
+	if (!bIsGameplayInputBlockedByModalUI)
+	{
+		return;
+	}
+
+	bIsGameplayInputBlockedByModalUI = false;
+	SetIgnoreMoveInput(false);
+	SetIgnoreLookInput(false);
+
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+	bShowMouseCursor = bMouseCursorVisibleBeforeModalUI;
+	bEnableClickEvents = bMouseClickEventsEnabledBeforeModalUI;
+	bEnableMouseOverEvents = bMouseOverEventsEnabledBeforeModalUI;
+
+	// 모달 UI가 닫히면 게임 조준 크로스헤어를 다시 표시한다.
+	if (HUDInstance)
+	{
+		HUDInstance->SetCrosshairVisible(true);
+	}
+}
+
 void APDPlayerController::UpdateAimRotation()
 {
+	if (IsGameplayInputBlockedByModalUI()) return;
+
 	APawn* ControlledPawn =GetPawn();
 	if (!ControlledPawn) return;
 
@@ -447,23 +769,24 @@ void APDPlayerController::UpdateAimRotation()
 	}
 }
 
-// 슬롯 전환
 void APDPlayerController::OnSwitchSlot1()
 {
-	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		Ch->SwitchToSlot(EWeaponSlot::Slot1_Rifle);
+	UseQuickSlot(0);
 }
 
 void APDPlayerController::OnSwitchSlot2()
 {
-	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		Ch->SwitchToSlot(EWeaponSlot::Slot2_Shotgun);
+	UseQuickSlot(1);
 }
 
 void APDPlayerController::OnSwitchSlot3()
 {
-	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		Ch->SwitchToSlot(EWeaponSlot::Slot3_Sniper);
+	UseQuickSlot(2);
+}
+
+void APDPlayerController::OnUseQuickSlot4()
+{
+	UseQuickSlot(3);
 }
 
 void APDPlayerController::OnZoom()
@@ -486,6 +809,28 @@ void APDPlayerController::OnDropWeapon()
 {
 	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
 		Ch->DropCurrentWeapon();
+}
+
+void APDPlayerController::UseQuickSlot(int32 SlotIndex)
+{
+	if (IsGameplayInputBlockedByModalUI())
+	{
+		return;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return;
+	}
+
+	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	{
+		if (QuickSlotComponent->UseQuickSlot(SlotIndex) && HUDInstance)
+		{
+			HUDInstance->RefreshNewQuickSlots();
+		}
+	}
 }
 
 void APDPlayerController::OnInteract()
@@ -517,5 +862,65 @@ void APDPlayerController::OnInteract()
 
 	if (ClosestInteractable)
 		IPDInteractable::Execute_Interact(ClosestInteractable, ControlledPawn);
+}
+
+void APDPlayerController::OnFirePressed()
+{	
+	if (UPDPingSubsystem* PingSys = GetWorld()->GetSubsystem<UPDPingSubsystem>())
+	{
+		if (PingSys->IsPingActive()) return;
+	}
+	
+	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
+	if (!Ch) return;
+	APDWeaponBase* Weapon = Ch->GetCurrentWeapon();
+	if (!Weapon) return;
+
+	if (APDRifle* Rifle = Cast<APDRifle>(Weapon))
+		Rifle->StartFire();
+	else if (APDShotgun* Shotgun = Cast<APDShotgun>(Weapon))
+	{
+		if (Shotgun->IsReloading()) Shotgun->InterruptReloadAndFire();
+		else Shotgun->Fire();
+	}
+	else
+		Weapon->Fire();
+}
+
+void APDPlayerController::OnFireReleased()
+{
+	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
+	if (!Ch) return;
+	if (APDRifle* Rifle = Cast<APDRifle>(Ch->GetCurrentWeapon()))
+		Rifle->StopFire();
+}
+
+void APDPlayerController::OnReload()
+{
+	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
+	if (!Ch) return;
+	if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
+		Weapon->Reload();
+}
+
+void APDPlayerController::UpdateCrosshair()
+{
+	if (!HUDInstance) return;
+
+	float MouseX, MouseY;
+	GetMousePosition(MouseX, MouseY);
+
+	float Spread = 0.f;
+	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
+			Spread = Weapon->GetCurrentRecoilSpread();
+
+	HUDInstance->UpdateCrosshair(FVector2D(MouseX, MouseY), Spread);
+}
+
+void APDPlayerController::OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot)
+{
+	if (!HUDInstance || !NewWeapon) return;
+	HUDInstance->SetCrosshairType(NewWeapon->GetWeaponType());
 }
 

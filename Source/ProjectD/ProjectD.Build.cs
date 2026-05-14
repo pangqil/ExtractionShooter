@@ -12,7 +12,8 @@ public class ProjectD : ModuleRules
 			"AIModule", "NavigationSystem",
 			"StateTreeModule", "GameplayStateTreeModule",
 			"UMG", "Slate", "SlateCore", "Niagara", "CommonUI", "CommonInput",
-			"PhysicsCore"
+			"PhysicsCore",
+			"PreLoadScreen", "DeveloperSettings"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

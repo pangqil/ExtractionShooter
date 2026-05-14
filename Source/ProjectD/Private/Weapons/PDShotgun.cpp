@@ -147,32 +147,18 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
     FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
         : WeaponOwnerActor->GetActorLocation();
+    
+    // GetAimDirectionFromOwner()로 플레이어/적 공통 처리
+    FVector Forward = GetAimDirectionFromOwner(Start);
  
-    FVector Forward = WeaponOwnerActor->GetActorForwardVector();
- 
+    float TraceLength = GetCurrentStats().Range;
     if (PC)
     {
-        // 1순위: 커서가 Pawn 위 → 부위 조준
-        FHitResult PawnHit;
-        if (PC->GetHitResultUnderCursorForObjects(
-            { UEngineTypes::ConvertToObjectType(ECC_Pawn) }, true, PawnHit)
-            && PawnHit.GetActor() && PawnHit.GetActor() != WeaponOwnerActor)
-        {
-            FVector Dir = PawnHit.Location - Start;
-            if (!Dir.IsNearlyZero()) Forward = Dir.GetSafeNormal();
-        }
-        // 2순위: 지면 커서
-        else
-        {
-            FHitResult CursorHit;
-            if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
-            {
-                FVector Dir = CursorHit.Location - Start;
-                if (!Dir.IsNearlyZero()) Forward = Dir.GetSafeNormal();
-            }
-        }
+        FHitResult CursorHit;
+        if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
+            TraceLength = FVector::Dist(Start, CursorHit.Location);
     }
- 
+
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);
     Params.AddIgnoredActor(WeaponOwnerActor);
@@ -184,7 +170,7 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
     for (int32 i = 0; i < Pellets; ++i)
     {
         FVector RandDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(SpreadAngle));
-        FVector End     = Start + RandDir * Range;
+        FVector End = Start + RandDir * TraceLength;
         FHitResult Hit;
         if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params))
         {

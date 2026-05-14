@@ -24,6 +24,17 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Ping")
 	void GetActivePings(TArray<FPDPingData>& OutPings) const;
+	
+	//휠이 열려 있거나 활성 핑이 있는지 확인
+	UFUNCTION(BlueprintPure, Category="Ping")
+	bool IsPingActive() const {return bGPressed || bWheelOpen || ActivePings.Num() > 0;}
+
+	//BP에서 휠 생성/제거 시 호출
+	UFUNCTION(BlueprintCallable, Category="Ping")
+	void SetWheelOpen(bool bInOpen) {bWheelOpen = bInOpen;}
+	
+	UFUNCTION(BlueprintCallable, Category="Ping")
+	void SetGPressed(bool bInPressed) {bGPressed = bInPressed;}
 
 	UPROPERTY(BlueprintAssignable, Category="Ping")
 	FOnPingAdded OnPingAdded;
@@ -31,8 +42,8 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Ping")
 	FOnPingRemoved OnPingRemoved;
 
-	UPROPERTY(EditDefaultsOnly, Category="Ping")
-	TSoftClassPtr<APDPingMarker> DefaultMarkerClass;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ping")
+	TSubclassOf<APDPingMarker> DefaultMarkerClass;
 	
 	//핑 자동 만료 시간(초).
 	UPROPERTY(EditDefaultsOnly, Category="Ping")
@@ -45,6 +56,9 @@ public:
 private:
 	void ClearAllPings(); //월드 종료 시 핑 전부 제거
 	void TickExpiration(); //만료된 핑 제거
+	
+	bool bWheelOpen = false; //핑 활성화 상태
+	bool bGPressed = false; //G누른 상태
 
 	UPROPERTY()
 	TMap<int32, FPDPingData> ActivePings;

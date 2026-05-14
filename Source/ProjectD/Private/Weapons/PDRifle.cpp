@@ -91,45 +91,35 @@ void APDRifle::OnUnequip_Implementation()
     StopFire();
     Super::OnUnequip_Implementation();
 }
+
 bool APDRifle::PerformLineTrace(FHitResult& OutHit)
 {
     const FWeaponLevelStats& Stats = GetCurrentStats();
     AActor* WeaponOwnerActor = GetWeaponOwner();
     if (!WeaponOwnerActor) return false;
 
-    APlayerController* PC = Cast<APlayerController>(WeaponOwnerActor->GetInstigatorController());
-    if (!PC) return false;
+    APlayerController* PC = Cast<APlayerController>(
+        WeaponOwnerActor->GetInstigatorController());
 
     FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
         : WeaponOwnerActor->GetActorLocation();
 
-    FVector AimDir = WeaponOwnerActor->GetActorForwardVector();
+    //GetAimDirectionFromOwner()로 플레이어 / 적 공통 처리
+    FVector AimDir = GetAimDirectionFromOwner(Start);
 
-    // 1순위: 커서가 Pawn 위 → 부위 직접 조준
-    FHitResult PawnHit;
-    if (PC->GetHitResultUnderCursorForObjects(
-        { UEngineTypes::ConvertToObjectType(ECC_Pawn) }, true, PawnHit)
-        && PawnHit.GetActor() && PawnHit.GetActor() != WeaponOwnerActor)
-    {
-        FVector Dir = PawnHit.Location - Start;
-        if (!Dir.IsNearlyZero()) AimDir = Dir.GetSafeNormal();
-    }
-    // 2순위: 지면 커서 → Z 유지
-    else
+    float TraceLength = Stats.Range;
+    if (PC)
     {
         FHitResult CursorHit;
         if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
-        {
-            FVector Dir = CursorHit.Location - Start;
-            if (!Dir.IsNearlyZero()) AimDir = Dir.GetSafeNormal();
-        }
+            TraceLength = FVector::Dist(Start, CursorHit.Location);
     }
     // 연사시 탄퍼짐
     const float BaseSpread = (1.f - Stats.Accuracy) * 5.f;
     const float TotalSpread = FMath::DegreesToRadians(BaseSpread + CurrentRecoilSpread);
     const FVector ShootDir = FMath::VRandCone(AimDir, TotalSpread);
-    const FVector End = Start + ShootDir * Stats.Range;
+    const FVector End = Start + ShootDir * TraceLength;
 
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);

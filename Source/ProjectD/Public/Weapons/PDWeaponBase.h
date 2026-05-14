@@ -14,6 +14,7 @@ class APDShellActor;
 class APDMagazineActor;
 class USphereComponent;
 class UNiagaraSystem;
+class UDataTable;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponFired, APDWeaponBase*, Weapon);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponLevelChanged, APDWeaponBase*, Weapon, int32, NewLevel);
@@ -105,6 +106,16 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon")
 	TWeakObjectPtr<AActor> WeaponOwner;
 
+	// 슬롯이 차있을 때 인벤토리로 보내기 위한 아이템 데이터
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Item")
+	UDataTable* ItemDataTable = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Item")
+	FName ItemRowName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Item")
+	FPDItemData CachedItemData;
+
 	// Recoil 설정
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Recoil")
 	TSubclassOf<UCameraShakeBase> FireCameraShakeClass;
@@ -150,6 +161,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|Events")
 	FOnWeaponReloaded OnWeaponReloaded;
+
+	// 슬롯도 차있고 인벤토리도 가득 차서 픽업이 실패했을 때 BP에서 UI 피드백 등 처리
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Weapon")
+	void OnPickupFailed();
 
 public:
 
@@ -226,6 +241,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|Weapon|Animation")
 	FORCEINLINE FName GetLeftHandGripSocket() const { return LeftHandGripSocket; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Weapon|Recoil")
+	FORCEINLINE float GetCurrentRecoilSpread() const { return CurrentRecoilSpread; }
 	
 	void FinishReload();
 
@@ -253,9 +271,13 @@ protected:
 	UFUNCTION()
 	void TickMeshRecoilRecovery();
 
+	FVector GetAimDirectionFromOwner(const FVector& StartLocation) const;
+
 private:
 	UFUNCTION()
 	void OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	void LoadItemData();
 };
 
 
