@@ -110,8 +110,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Item")
 	UDataTable* ItemDataTable = nullptr;
 
+	// DT_ItemData에서 조회할 ItemID. 더 이상 RowName이 아니라 FPDItemData::ItemID 컬럼과 매칭됨.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Item")
-	FName ItemRowName;
+	FName ItemID;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Item")
 	FPDItemData CachedItemData;

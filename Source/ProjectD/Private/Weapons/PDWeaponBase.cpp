@@ -72,15 +72,16 @@ void APDWeaponBase::BeginPlay()
 
 void APDWeaponBase::LoadItemData()
 {
-    if (!ItemDataTable || ItemRowName.IsNone()) return;
+    if (!ItemDataTable || ItemID.IsNone()) return;
 
-    const FPDItemData* Row = FindPDWeaponItemDataByID(ItemDataTable, ItemRowName);
+    const FPDItemData* Row = FindPDWeaponItemDataByID(ItemDataTable, ItemID);
     if (!Row) return;
 
     CachedItemData = *Row;
+    // DT 행의 ItemID 컬럼이 비어있을 때만 멤버 ItemID로 보정.
     if (CachedItemData.ItemID.IsNone())
     {
-        CachedItemData.ItemID = ItemRowName;
+        CachedItemData.ItemID = ItemID;
     }
 }
 
