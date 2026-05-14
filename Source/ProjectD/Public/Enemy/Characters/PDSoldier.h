@@ -38,6 +38,9 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void OnEnterState_Dead() override;
 
+	// EquippedWeapon의 CachedItemData를 loot box 슬롯으로 변환. Super(SpawnCorpseContainer) 단계에서 호출됨.
+	virtual void HarvestEquippedWeaponSlots(TArray<FPDInventorySlot>& OutSlots) const override;
+
 	/** 디자이너가 BP 디폴트에서 지정. nullptr 이면 무기 미장착 — 발사 시 경고. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	TSubclassOf<APDWeaponBase> DefaultWeaponClass;

@@ -230,6 +230,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Weapon")
 	FORCEINLINE AActor* GetWeaponOwner()    const { return WeaponOwner.Get(); }
 
+	// Loot box 등 외부에서 무기의 아이템 데이터(인벤토리 슬롯 변환용)를 읽을 때 사용. C++ 전용 — 복사 회피.
+	FORCEINLINE const FPDItemData& GetCachedItemData() const { return CachedItemData; }
+
+	// Blueprint 노출용 래퍼: UFUNCTION 반환 타입에 const& 사용 불가하므로 값 복사 버전 제공.
+	UFUNCTION(BlueprintPure, Category = "PD|Weapon|Item", DisplayName = "Get Cached Item Data")
+	FORCEINLINE FPDItemData K2_GetCachedItemData() const { return CachedItemData; }
+
 	UFUNCTION(BlueprintPure, Category = "PD|Weapon")
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
 
