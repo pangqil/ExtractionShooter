@@ -40,6 +40,12 @@ public:
 	void ResetStash();
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	void LoadFromGameInstance();
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	void SaveToGameInstance();
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	int32 AddItemPartial(const FPDItemData& ItemData, int32 Quantity = 1);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")

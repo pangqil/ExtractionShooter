@@ -8,18 +8,6 @@
 
 class APDWeaponBase;
 
-USTRUCT(BlueprintType)
-struct FPDPlayerData
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Gold = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Experience = 0;
-};
-
 UENUM(BlueprintType)
 enum class EPDItemType : uint8
 {
@@ -126,6 +114,21 @@ struct FPDInventorySlot
 	}
 };
 
+
+USTRUCT(BlueprintType)
+struct FPDPlayerData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Gold = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Experience = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FPDInventorySlot> StashItems;
+};
 
 USTRUCT(BlueprintType)
 struct FPDEquippedItem

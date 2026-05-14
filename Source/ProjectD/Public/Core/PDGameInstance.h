@@ -18,6 +18,12 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "PD|Save")
 	FPDPlayerData GetPlayerData() const { return PlayerData; }
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
+	void SetStashItems(const TArray<FPDInventorySlot>& InStashItems);
+
+	UFUNCTION(BlueprintPure, Category = "PD|Stash")
+	const TArray<FPDInventorySlot>& GetStashItems() const;
 	
 	UFUNCTION(BlueprintCallable, Category = "PD|Save")
 	void SaveToDisk();

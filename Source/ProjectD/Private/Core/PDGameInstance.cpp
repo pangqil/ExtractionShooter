@@ -13,6 +13,16 @@ void UPDGameInstance::SetPlayerData(const FPDPlayerData& InData)
 	PlayerData=InData;
 }
 
+void UPDGameInstance::SetStashItems(const TArray<FPDInventorySlot>& InStashItems)
+{
+	PlayerData.StashItems=InStashItems;
+}
+
+const TArray<FPDInventorySlot>& UPDGameInstance::GetStashItems() const
+{
+	return PlayerData.StashItems;
+}
+
 void UPDGameInstance::SaveToDisk()
 {
 	UPDSaveGame* SaveObject=Cast<UPDSaveGame>(UGameplayStatics::CreateSaveGameObject(UPDSaveGame::StaticClass()));
