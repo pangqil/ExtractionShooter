@@ -25,6 +25,7 @@ class APDWeaponBase;
 class APDRifle;
 class UPDRootLayout;
 class UPDPingInputComponent;
+class UPDWorldMapWidget;
 enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
@@ -94,6 +95,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ping")
 	TObjectPtr<UPDPingInputComponent> PingInputComp;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="WorldMap")
+	TSubclassOf<UPDWorldMapWidget> WorldMapClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDInventoryWidget> InventoryWidgetClass;
@@ -125,6 +129,8 @@ private:
 	void ToggleInventory();
 	void ToggleQuest();
 	void TryInteract();
+	
+	void OnToggleWorldMap();
 
 	bool IsGameplayInputBlockedByModalUI() const;
 	void SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus = nullptr);
@@ -149,6 +155,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDRootLayout> RootLayoutInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDWorldMapWidget> WorldMapInstance;
 
 	// OpenStashInterface 시 캐시. 박스가 파괴되어도 TWeakObjectPtr가 자동 무효화.
 	TWeakObjectPtr<UPDStashComponent> ActiveStashComponent;

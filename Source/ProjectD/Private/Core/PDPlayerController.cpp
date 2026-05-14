@@ -41,6 +41,7 @@ DEFINE_LOG_CATEGORY(LogPDCharacter);
 
 #include "Ping/PDPingSubsystem.h"
 #include "Ping/PDPingInputComponent.h"
+#include "Widgets/HUD/PDWorldMapWidget.h"
 
 APDPlayerController::APDPlayerController()
 {
@@ -159,6 +160,10 @@ void APDPlayerController::SetupInputComponent()
 	{
 		PingInputComp->BindInputs(PDIC, InputConfig);
 	}
+	
+	//월드맵
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Map,
+	ETriggerEvent::Started, this, &APDPlayerController::OnToggleWorldMap);
 }
 
 void APDPlayerController::BeginPlay()
@@ -936,3 +941,22 @@ void APDPlayerController::OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot 
 	HUDInstance->SetCrosshairType(NewWeapon->GetWeaponType());
 }
 
+void APDPlayerController::OnToggleWorldMap()
+{
+	//이미 떠 있으면 닫기
+	if (IsValid(WorldMapInstance))
+	{
+		WorldMapInstance->RemoveFromParent();
+		WorldMapInstance = nullptr;
+		return;
+	}
+
+	//열기
+	if (!WorldMapClass) return;
+
+	WorldMapInstance = CreateWidget<UPDWorldMapWidget>(this, WorldMapClass);
+	if (WorldMapInstance)
+	{
+		WorldMapInstance->AddToViewport(10);
+	}
+}
