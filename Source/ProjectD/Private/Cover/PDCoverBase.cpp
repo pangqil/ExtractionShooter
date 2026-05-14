@@ -4,123 +4,85 @@
 
 APDCoverBase::APDCoverBase()
 {
-	CoverMesh=CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CoverMesh"));
+	CoverMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CoverMesh"));
+	SetRootComponent(CoverMesh);
+	CoverMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 }
 
 void APDCoverBase::BeginPlay()
 {
 	Super::BeginPlay();
-	CurrentHP=MaxHP;
+	CurrentHP = MaxHP;
 }
 
-void APDCoverBase::OnConstruction(const FTransform& Transform)
+FVector APDCoverBase::GetSnapLocation(AActor* Requester) const
 {
-	Super::OnConstruction(Transform);
-	GenerateSlots();
-}
-
-FCoverSlot* APDCoverBase::FindBestSlot(AActor* Requster)
-{
-	if (!IsUsable()) return nullptr;
+	if (!CoverMesh || !Requester) return GetActorLocation();
 	
-	FCoverSlot* Best=nullptr;
-	float BestDist=FLT_MAX;
-	const FVector RequesterLoc=Requster->GetActorLocation();
+	const FVector CoverCenter = CoverMesh->GetComponentLocation();
 	
-	for (FCoverSlot& Slot :Slots)
-	{
-		if (Slot.bOccupied) continue;
-		const FVector WorldSlotPos=GetActorTransform().TransformPosition(Slot.LocalOffset);
-		const float Dist=FVector::DistSquared(RequesterLoc, WorldSlotPos);
-		if (Dist<BestDist)
-		{
-			BestDist=Dist;
-			Best=&Slot;
-		}
-	}
-	return Best;
+	FVector ToCharacter = (Requester->GetActorLocation() - CoverCenter);
+	ToCharacter.Z = 0.f;
+	ToCharacter = ToCharacter.GetSafeNormal();
+	
+	const FBoxSphereBounds Bounds = CoverMesh->CalcBounds(CoverMesh->GetComponentTransform());
+	const FVector Extent = Bounds.BoxExtent;
+	const float HalfExtent = FMath::Abs(ToCharacter.X) * Extent.X
+	                        + FMath::Abs(ToCharacter.Y) * Extent.Y;
+
+	FVector SnapPos = CoverCenter + ToCharacter * (HalfExtent + CharacterClearance);
+	SnapPos.Z = Requester->GetActorLocation().Z; // 캐릭터 Z 높이 유지
+
+	return SnapPos;
 }
 
-bool APDCoverBase::OccupySlot(AActor* Requester, FCoverSlot* Slot)
+FRotator APDCoverBase::GetSnapRotation(AActor* Requester) const
 {
-	if (!Slot||Slot->bOccupied) return false;
-	Slot->bOccupied=true;
-	Slot->Occupant=Requester;
+	if (!Requester) return GetActorRotation();
+	
+	FVector OutDir = (Requester->GetActorLocation() - GetActorLocation());
+	OutDir.Z = 0.f;
+	return OutDir.GetSafeNormal().Rotation();
+}
+
+bool APDCoverBase::TryOccupy(AActor* Requester)
+{
+	if (Occupant.IsValid()) return false;
+	Occupant = Requester;
 	return true;
 }
 
-void APDCoverBase::ReleaseSlot(AActor* Requester)
+void APDCoverBase::Release(AActor* Requester)
 {
-	for (FCoverSlot& Slot:Slots)
-	{
-		if (Slot.Occupant==Requester)
-		{
-			Slot.bOccupied=false;
-			Slot.Occupant=nullptr;
-			return;
-		}
-	}
+	if (Occupant == Requester)
+		Occupant = nullptr;
 }
 
 void APDCoverBase::TakeCoverDamage(float Damage)
 {
-	if (CoverState==ECoverState::Destroyed) return;
-	CurrentHP=FMath::Max(CurrentHP-Damage, 0.f);
+	if (CoverState == ECoverState::Destroyed) return;
+	CurrentHP = FMath::Max(CurrentHP - Damage, 0.f);
 
-	if (CurrentHP<=0.f)
+	if (CurrentHP <= 0.f)
 		SetCoverState(ECoverState::Destroyed);
-	else if (CurrentHP<=MaxHP*DamagedThreshold)
+	else if (CurrentHP <= MaxHP * DamagedThreshold)
 		SetCoverState(ECoverState::Damaged);
 }
 
 void APDCoverBase::SetCoverState(ECoverState NewState)
 {
-	if (CoverState==NewState) return;
-	CoverState=NewState;
-	if (CoverState==ECoverState::Destroyed)
+	if (CoverState == NewState) return;
+	CoverState = NewState;
+	if (CoverState == ECoverState::Destroyed)
 		OnDestroyed_Internal();
 }
 
 void APDCoverBase::OnDestroyed_Internal()
 {
-	NotifyOccupantsDestroyed();
-}
+	if (!Occupant.IsValid()) return;
 
-void APDCoverBase::NotifyOccupantsDestroyed()
-{
-	for (FCoverSlot& Slot:Slots)
-	{
-		if (!Slot.bOccupied||!Slot.Occupant.IsValid()) continue;
-		if (UPDCoverComponent* CoverComp=Slot.Occupant->FindComponentByClass<UPDCoverComponent>())
-			CoverComp->ForceExitCover();
-		Slot.bOccupied=false;
-		Slot.Occupant=nullptr;
-	}
-}
+	if (UPDCoverComponent* CoverComp = Occupant->FindComponentByClass<UPDCoverComponent>())
+		CoverComp->ForceExitCover();
 
-void APDCoverBase::GenerateSlots()
-{
-	Slots.Empty();
-	if (!CoverMesh) return;
-
-	const FBoxSphereBounds LocalBounds=CoverMesh->CalcLocalBounds();
-	const FVector Extent=LocalBounds.BoxExtent;
-
-	const TArray<FVector> Directions={
-		FVector( 1.f,  0.f, 0.f),
-		FVector(-1.f,  0.f, 0.f),
-		FVector( 0.f,  1.f, 0.f),
-		FVector( 0.f, -1.f, 0.f),
-	};
-
-	for (const FVector& Dir:Directions)
-	{
-		FCoverSlot NewSlot;
-		const float ExtentAlongDir=FMath::Abs(Dir.X)*Extent.X
-								  +FMath::Abs(Dir.Y)*Extent.Y;
-		NewSlot.LocalOffset=Dir*(ExtentAlongDir+CharacterClearance);
-		NewSlot.LocalOffset.Z=0.f;
-		NewSlot.FacingRotation=Dir.Rotation();
-		Slots.Add(NewSlot);
-	}
+	Occupant = nullptr;
 }

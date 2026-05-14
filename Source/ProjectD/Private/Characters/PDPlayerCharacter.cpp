@@ -271,10 +271,19 @@ void APDPlayerCharacter::TryInteract()
 
 void APDPlayerCharacter::OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[Layer] TagChanged: %s | Count: %d"), *Tag.ToString(), NewCount);
 	if (NewCount==0) return;
+
 	APDWeaponBase* CurWeapon=GetCurrentWeapon();
-	if (!IsValid(CurWeapon)) return;
+	if (!IsValid(CurWeapon))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Layer] CurWeapon NULL"));
+		return;
+	}
+
 	TSubclassOf<UAnimInstance> LayerClass=CurWeapon->GetWeaponAnimLayerClass();
+	UE_LOG(LogTemp, Warning, TEXT("[Layer] LayerClass: %s"), LayerClass ? *LayerClass->GetName() : TEXT("NULL"));
+
 	if (!LayerClass) { LinkDefaultAnimLayer(); return; }
 	if (USkeletalMeshComponent* SkelMesh=GetMesh())
 		SkelMesh->LinkAnimClassLayers(LayerClass);
