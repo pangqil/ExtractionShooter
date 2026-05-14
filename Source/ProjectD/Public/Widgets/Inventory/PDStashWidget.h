@@ -13,6 +13,7 @@ class UPDInventorySlotWidget;
 class UUserWidget;
 class UPDQuantityPopupWidget;
 class UButton;
+class UWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDStashWidget : public UPDActivatableBase
@@ -29,6 +30,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void SetStashFilterTab(EPDItemFilterTab NewFilterTab);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
+	void SetStashSortMode(EPDItemSortMode NewSortMode);
 
 protected:
 	virtual void NativeConstruct() override;
@@ -61,6 +65,27 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Tabs")
 	TObjectPtr<UButton> Button_Misc;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Sort")
+	TObjectPtr<UButton> Button_Sort;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Sort")
+	TObjectPtr<UButton> Button_SortByName;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Sort")
+	TObjectPtr<UButton> Button_SortByType;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Sort")
+	TObjectPtr<UButton> Button_SortTab_Name;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Sort")
+	TObjectPtr<UButton> Button_SortTab_Type;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Sort")
+	TObjectPtr<UWidget> Panel_SortOptions;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Sort")
+	TObjectPtr<UWidget> Panel_SortTabs;
+
 	UFUNCTION()
 	void HandleStashSlotLeftClicked(UPDInventorySlotWidget* SlotWidget, int32 ClickedSlotIndex);
 
@@ -82,9 +107,19 @@ protected:
 	UFUNCTION()
 	void HandleMiscTabClicked();
 
+	UFUNCTION()
+	void HandleSortButtonClicked();
+
+	UFUNCTION()
+	void HandleSortByNameClicked();
+
+	UFUNCTION()
+	void HandleSortByTypeClicked();
+
 private:
 	void ResolveStashGridPanel();
 	void BindTabButtons();
+	void BindSortButtons();
 	void UpdateTabButtonStyle();
 	int32 CountOccupiedStashSlotsByType(EPDItemType ItemType) const;
 	int32 GetStashDisplaySlotCount() const;
@@ -92,6 +127,9 @@ private:
 	bool DoesSlotMatchCurrentFilter(const FPDInventorySlot& StashSlotData) const;
 	bool DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const;
 	bool CanAcceptDropForCurrentFilter(const UPDInventoryDragDropOperation* DragOperation) const;
+	void SortDisplaySlotIndices(TArray<int32>& DisplaySlotIndices, const UPDStashComponent* StashComponent) const;
+	void SetSortOptionsVisible(bool bVisible);
+	void ToggleSortOptions();
 	UPDStashComponent* FindStashComponent() const;
 	UPDInventoryComponent* FindInventoryComponent() const;
 	UPDQuickSlotComponent* FindQuickSlotComponent() const;
@@ -122,6 +160,7 @@ private:
 	int32 PendingTransferTargetSlotIndex = INDEX_NONE;
 
 	EPDItemFilterTab CurrentFilterTab = EPDItemFilterTab::Equipment;
+	EPDItemSortMode CurrentSortMode = EPDItemSortMode::None;
 
 	int32 PendingSlotIndex = INDEX_NONE;
 };
