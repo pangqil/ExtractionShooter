@@ -1,5 +1,17 @@
 #include "Data/PDQuestComponent.h"
+
+#include "Core/PDGameInstance.h"
 #include "Items/PDInventoryComponent.h"
+
+namespace
+{
+	const FName AnyQuestTargetID(TEXT("ANY"));
+
+	bool IsAnyQuestTarget(FName TargetID)
+	{
+		return TargetID == AnyQuestTargetID;
+	}
+}
 
 UPDQuestComponent::UPDQuestComponent()
 {
@@ -26,8 +38,22 @@ bool UPDQuestComponent::AddQuest(const FPDQuestData& QuestData)
 		}
 	}
 
+	for (const FPDQuestObjective& Objective : QuestData.Objectives)
+	{
+		if (IsItemCountObjective(Objective) && !Objective.TargetID.IsNone())
+		{
+			const FName ProgressKey = Objective.GetProgressKey();
+			if (!ProgressKey.IsNone())
+			{
+				NewProgress.ObjectiveProgress.FindOrAdd(ProgressKey) = FMath::Clamp(GetInventoryAndStashItemCount(Objective.TargetID), 0, FMath::Max(1, Objective.RequiredCount));
+			}
+		}
+	}
+
+	RefreshQuestState(NewProgress);
+
 	ActiveQuests.Add(NewProgress);
-	BroadcastQuestUpdated(QuestData.QuestID, EPDQuestState::Inactive, EPDQuestState::Active);
+	BroadcastQuestUpdated(QuestData.QuestID, EPDQuestState::Inactive, NewProgress.State);
 	return true;
 }
 
@@ -84,7 +110,14 @@ bool UPDQuestComponent::ReportQuestObjectiveEvent(EPDQuestObjectiveType Objectiv
 		{
 			if (DoesObjectiveMatchEvent(Objective, ObjectiveType, TargetID))
 			{
-				bUpdatedAny |= ApplyObjectiveProgress(QuestProgress, Objective, Amount);
+				if (IsItemCountObjective(Objective))
+				{
+					bUpdatedAny |= RefreshItemCountObjective(QuestProgress, Objective);
+				}
+				else
+				{
+					bUpdatedAny |= ApplyObjectiveProgress(QuestProgress, Objective, Amount);
+				}
 			}
 		}
 	}
@@ -124,7 +157,25 @@ bool UPDQuestComponent::ReportNPCTalked(FName NPCID, int32 Amount)
 
 bool UPDQuestComponent::ReportItemDropped(FName ItemID, int32 Amount)
 {
-	return ReportQuestObjectiveEvent(EPDQuestObjectiveType::ItemDropped, ItemID, Amount);
+	bool bUpdated = ReportQuestObjectiveEvent(EPDQuestObjectiveType::ItemDropped, ItemID, Amount);
+
+	for (FPDQuestProgress& QuestProgress : ActiveQuests)
+	{
+		if (QuestProgress.State != EPDQuestState::Active)
+		{
+			continue;
+		}
+
+		for (const FPDQuestObjective& Objective : QuestProgress.QuestData.Objectives)
+		{
+			if (IsItemCountObjective(Objective) && DoesObjectiveMatchEvent(Objective, Objective.ObjectiveType, ItemID))
+			{
+				bUpdated |= RefreshItemCountObjective(QuestProgress, Objective);
+			}
+		}
+	}
+
+	return bUpdated;
 }
 
 bool UPDQuestComponent::IsQuestCompleted(FName QuestID) const
@@ -137,6 +188,11 @@ bool UPDQuestComponent::GiveReward(FName QuestID, UPDInventoryComponent* Invento
 {
 	FPDQuestProgress* QuestProgress = FindQuest(QuestID);
 	if (!QuestProgress || QuestProgress->State != EPDQuestState::Completed || !InventoryComponent)
+	{
+		return false;
+	}
+
+	if (!RemoveQuestObjectiveItems(*QuestProgress, InventoryComponent))
 	{
 		return false;
 	}
@@ -345,7 +401,7 @@ bool UPDQuestComponent::DoesObjectiveMatchEvent(const FPDQuestObjective& Objecti
 		return false;
 	}
 
-	return Objective.TargetID.IsNone() || Objective.TargetID == TargetID;
+	return Objective.TargetID.IsNone() || IsAnyQuestTarget(Objective.TargetID) || Objective.TargetID == TargetID;
 }
 
 bool UPDQuestComponent::ApplyObjectiveProgress(FPDQuestProgress& QuestProgress, const FPDQuestObjective& Objective, int32 Amount)
@@ -376,6 +432,225 @@ bool UPDQuestComponent::ApplyObjectiveProgress(FPDQuestProgress& QuestProgress, 
 	}
 
 	return false;
+}
+
+
+bool UPDQuestComponent::IsItemCountObjective(const FPDQuestObjective& Objective) const
+{
+	return Objective.ObjectiveType == EPDQuestObjectiveType::ItemAcquired || Objective.ObjectiveType == EPDQuestObjectiveType::QuestItemAcquired;
+}
+
+int32 UPDQuestComponent::GetInventoryAndStashItemCount(FName ItemID, const UPDInventoryComponent* InventoryComponent) const
+{
+	if (ItemID.IsNone())
+	{
+		return 0;
+	}
+
+	const bool bCountAnyItem = IsAnyQuestTarget(ItemID);
+	int32 TotalQuantity = 0;
+	const UPDInventoryComponent* SourceInventory = InventoryComponent;
+	if (!SourceInventory)
+	{
+		SourceInventory = GetOwner() ? GetOwner()->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+	}
+
+	if (SourceInventory)
+	{
+		for (const FPDInventorySlot& Slot : SourceInventory->Items)
+		{
+			if (!Slot.IsEmpty() && (bCountAnyItem || Slot.ItemData.ItemID == ItemID))
+			{
+				TotalQuantity += Slot.Quantity;
+			}
+		}
+	}
+
+	const UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr;
+	if (GI)
+	{
+		for (const FPDInventorySlot& Slot : GI->GetStashItems())
+		{
+			if (!Slot.IsEmpty() && (bCountAnyItem || Slot.ItemData.ItemID == ItemID))
+			{
+				TotalQuantity += Slot.Quantity;
+			}
+		}
+	}
+
+	return TotalQuantity;
+}
+
+bool UPDQuestComponent::RefreshItemCountObjective(FPDQuestProgress& QuestProgress, const FPDQuestObjective& Objective)
+{
+	if (QuestProgress.State != EPDQuestState::Active || Objective.TargetID.IsNone())
+	{
+		return false;
+	}
+
+	const FName ProgressKey = Objective.GetProgressKey();
+	if (ProgressKey.IsNone())
+	{
+		return false;
+	}
+
+	const int32 RequiredCount = FMath::Max(1, Objective.RequiredCount);
+	int32& Progress = QuestProgress.ObjectiveProgress.FindOrAdd(ProgressKey);
+	const int32 PreviousProgress = Progress;
+	const EPDQuestState PreviousState = QuestProgress.State;
+
+	Progress = FMath::Clamp(GetInventoryAndStashItemCount(Objective.TargetID), 0, RequiredCount);
+	RefreshQuestState(QuestProgress);
+
+	if (PreviousProgress != Progress || PreviousState != QuestProgress.State)
+	{
+		BroadcastQuestUpdated(QuestProgress.QuestData.QuestID, PreviousState, QuestProgress.State);
+		return true;
+	}
+
+	return false;
+}
+
+void UPDQuestComponent::RefreshAllItemCountObjectives(FPDQuestProgress& QuestProgress)
+{
+	if (QuestProgress.State != EPDQuestState::Active)
+	{
+		return;
+	}
+
+	for (const FPDQuestObjective& Objective : QuestProgress.QuestData.Objectives)
+	{
+		if (IsItemCountObjective(Objective))
+		{
+			RefreshItemCountObjective(QuestProgress, Objective);
+		}
+	}
+}
+
+int32 UPDQuestComponent::RemoveQuestItemsFromStash(FName ItemID, int32 Quantity)
+{
+	if (ItemID.IsNone() || Quantity <= 0)
+	{
+		return 0;
+	}
+
+	UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr;
+	if (!GI)
+	{
+		return 0;
+	}
+
+	TArray<FPDInventorySlot> StashItems = GI->GetStashItems();
+	const bool bRemoveAnyItem = IsAnyQuestTarget(ItemID);
+	int32 RemainingQuantity = Quantity;
+	int32 RemovedQuantity = 0;
+
+	for (int32 Index = StashItems.Num() - 1; Index >= 0 && RemainingQuantity > 0; --Index)
+	{
+		FPDInventorySlot& Slot = StashItems[Index];
+		if (Slot.IsEmpty() || (!bRemoveAnyItem && Slot.ItemData.ItemID != ItemID))
+		{
+			continue;
+		}
+
+		const int32 RemoveAmount = FMath::Min(RemainingQuantity, Slot.Quantity);
+		Slot.Quantity -= RemoveAmount;
+		RemainingQuantity -= RemoveAmount;
+		RemovedQuantity += RemoveAmount;
+
+		if (Slot.Quantity <= 0)
+		{
+			Slot.Clear();
+		}
+	}
+
+	if (RemovedQuantity > 0)
+	{
+		GI->SetStashItems(StashItems);
+	}
+
+	return RemovedQuantity;
+}
+
+bool UPDQuestComponent::RemoveQuestObjectiveItems(FPDQuestProgress& QuestProgress, UPDInventoryComponent* InventoryComponent)
+{
+	if (!InventoryComponent)
+	{
+		return false;
+	}
+
+	TMap<FName, int32> RequiredItems;
+	for (const FPDQuestObjective& Objective : QuestProgress.QuestData.Objectives)
+	{
+		if (Objective.ObjectiveType == EPDQuestObjectiveType::QuestItemAcquired && !Objective.TargetID.IsNone())
+		{
+			RequiredItems.FindOrAdd(Objective.TargetID) += FMath::Max(1, Objective.RequiredCount);
+		}
+	}
+
+	for (const TPair<FName, int32>& Pair : RequiredItems)
+	{
+		if (GetInventoryAndStashItemCount(Pair.Key, InventoryComponent) < Pair.Value)
+		{
+			return false;
+		}
+	}
+
+	for (const TPair<FName, int32>& Pair : RequiredItems)
+	{
+		int32 RemainingQuantity = Pair.Value;
+		int32 InventoryQuantity = 0;
+
+		const bool bRemoveAnyItem = IsAnyQuestTarget(Pair.Key);
+
+		for (const FPDInventorySlot& Slot : InventoryComponent->Items)
+		{
+			if (!Slot.IsEmpty() && (bRemoveAnyItem || Slot.ItemData.ItemID == Pair.Key))
+			{
+				InventoryQuantity += Slot.Quantity;
+			}
+		}
+
+		int32 RemoveFromInventory = FMath::Min(RemainingQuantity, InventoryQuantity);
+		if (RemoveFromInventory > 0)
+		{
+			if (bRemoveAnyItem)
+			{
+				for (int32 Index = InventoryComponent->Items.Num() - 1; Index >= 0 && RemoveFromInventory > 0; --Index)
+				{
+					const FPDInventorySlot& Slot = InventoryComponent->Items[Index];
+					if (Slot.IsEmpty())
+					{
+						continue;
+					}
+
+					const int32 RemoveAmount = FMath::Min(RemoveFromInventory, Slot.Quantity);
+					if (InventoryComponent->RemoveItemFromSlot(Index, RemoveAmount))
+					{
+						RemoveFromInventory -= RemoveAmount;
+						RemainingQuantity -= RemoveAmount;
+					}
+				}
+			}
+			else if (InventoryComponent->RemoveItem(Pair.Key, RemoveFromInventory))
+			{
+				RemainingQuantity -= RemoveFromInventory;
+			}
+		}
+
+		if (RemainingQuantity > 0)
+		{
+			const int32 RemovedFromStash = RemoveQuestItemsFromStash(Pair.Key, RemainingQuantity);
+			RemainingQuantity -= RemovedFromStash;
+		}
+
+		if (RemainingQuantity > 0)
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 void UPDQuestComponent::RefreshQuestState(FPDQuestProgress& QuestProgress)

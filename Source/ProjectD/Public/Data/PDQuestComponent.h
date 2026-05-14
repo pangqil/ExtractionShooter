@@ -103,6 +103,12 @@ private:
 	const FPDQuestData* FindQuestData(FName QuestID) const;
 	bool DoesObjectiveMatchEvent(const FPDQuestObjective& Objective, EPDQuestObjectiveType ObjectiveType, FName TargetID) const;
 	bool ApplyObjectiveProgress(FPDQuestProgress& QuestProgress, const FPDQuestObjective& Objective, int32 Amount);
+	bool IsItemCountObjective(const FPDQuestObjective& Objective) const;
+	int32 GetInventoryAndStashItemCount(FName ItemID, const UPDInventoryComponent* InventoryComponent = nullptr) const;
+	bool RefreshItemCountObjective(FPDQuestProgress& QuestProgress, const FPDQuestObjective& Objective);
+	void RefreshAllItemCountObjectives(FPDQuestProgress& QuestProgress);
+	int32 RemoveQuestItemsFromStash(FName ItemID, int32 Quantity);
+	bool RemoveQuestObjectiveItems(FPDQuestProgress& QuestProgress, UPDInventoryComponent* InventoryComponent);
 	void RefreshQuestState(FPDQuestProgress& QuestProgress);
 	void BroadcastQuestUpdated(FName QuestID, EPDQuestState PreviousState, EPDQuestState NewState);
 };

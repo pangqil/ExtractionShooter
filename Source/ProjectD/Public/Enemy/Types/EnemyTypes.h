@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/DataTable.h"
 #include "EnemyTypes.generated.h"
 
 class APDItemBase;
@@ -43,6 +44,32 @@ struct FPDLootEntry
 	/** 0~1. 0 이면 항상 미드랍, 1 이면 항상 드랍. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Loot", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float DropChance = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Loot", meta = (ClampMin = "1"))
+	int32 MinQuantity = 1;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Loot", meta = (ClampMin = "1"))
+	int32 MaxQuantity = 1;
+};
+
+/**
+ * Loot box 컨테이너에 채워질 소비 아이템 한 줄.
+ * 디자이너가 EnemyBase BP의 ConsumableDropTable에 DT_ItemData 행을 직접 지정.
+ * RowType 필터로 FPDItemData 행만 선택 가능하게 제한.
+ */
+USTRUCT(BlueprintType)
+struct FPDConsumableDropEntry
+{
+	GENERATED_BODY()
+
+	/** DT_ItemData에서 소비 아이템 행 참조. ItemType == Consumable 인 행만 의미가 있다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Loot",
+		meta = (RowType = "/Script/ProjectD.PDItemData"))
+	FDataTableRowHandle ItemRow;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Loot",
+		meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float DropChance = 0.5f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Loot", meta = (ClampMin = "1"))
 	int32 MinQuantity = 1;

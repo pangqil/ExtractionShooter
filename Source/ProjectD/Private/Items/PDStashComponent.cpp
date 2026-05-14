@@ -81,6 +81,18 @@ void UPDStashComponent::InitializeStash()
 	OnStashChanged.Broadcast();
 }
 
+void UPDStashComponent::InitializeFromLoot(const TArray<FPDInventorySlot>& InitialSlots)
+{
+	// 그리드 사이즈 보장 후 한 번에 채운다. AddItemPartial 내부 Broadcast가 잦지만 스폰 직후 1회성이라 허용.
+	InitializeStash();
+
+	for (const FPDInventorySlot& Source : InitialSlots)
+	{
+		if (Source.IsEmpty()) continue;
+		AddItemPartial(Source.ItemData, Source.Quantity);
+	}
+}
+
 void UPDStashComponent::ResetStash()
 {
 	StashItems.SetNum(GetMaxSlotCount());
