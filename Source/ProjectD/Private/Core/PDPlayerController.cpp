@@ -11,6 +11,7 @@
 #include "Core/PDGameMode.h"
 #include "Engine/LocalPlayer.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Ability/PDGameplayAbilityBase.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Input/PDInputComponent.h"
@@ -332,27 +333,16 @@ void APDPlayerController::OnJump()
 
 void APDPlayerController::OnAbilityInputPressed(FGameplayTag InputTag)
 {
-	UE_LOG(LogPDCharacter, Warning, TEXT("[Input] AbilityInputPressed: %s"), *InputTag.ToString());
-
 	if (UAbilitySystemComponent* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
 		const bool bActivated = ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
-		UE_LOG(LogPDCharacter, Warning, TEXT("[Input] TryActivate result: %s"), bActivated ? TEXT("SUCCESS") : TEXT("FAIL"));
-	}
-	else
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("[Input] ASC is NULL"));
 	}
 }
 
 
 void APDPlayerController::OnAbilityInputReleased(FGameplayTag InputTag)
 {
-	if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
-	{
-		FGameplayTagContainer TagContainer(InputTag);
-		ASC->CancelAbilities(&TagContainer);
-	}
+
 }
 
 
@@ -760,6 +750,7 @@ void APDPlayerController::UpdateAimRotation()
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
 		if (ASC->HasMatchingGameplayTag(PDGameplayTags::State_Rolling)) return;
+		if (ASC->HasMatchingGameplayTag(PDGameplayTags::Cover_Active)) return;
 	}
 
 	APawn* ControlledPawn =GetPawn();
