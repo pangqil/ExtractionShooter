@@ -41,6 +41,7 @@ DEFINE_LOG_CATEGORY(LogPDCharacter);
 
 #include "Ping/PDPingSubsystem.h"
 #include "Ping/PDPingInputComponent.h"
+#include "Component/PDCoverComponent.h"
 
 APDPlayerController::APDPlayerController()
 {
@@ -148,6 +149,8 @@ void APDPlayerController::SetupInputComponent()
 		ETriggerEvent::Started, this, &APDPlayerController::OnToggleFireMode);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_DropWeapon,
 		ETriggerEvent::Started, this, &APDPlayerController::OnDropWeapon);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Cover,
+		ETriggerEvent::Started, this, &APDPlayerController::OnCoverToggle);
 
 	InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
 	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
@@ -748,6 +751,12 @@ void APDPlayerController::UpdateAimRotation()
 {
 	if (IsGameplayInputBlockedByModalUI()) return;
 
+	if (UAbilitySystemComponent* ASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+	{
+		if (ASC->HasMatchingGameplayTag(PDGameplayTags::State_Rolling)) return;
+	}
+
 	APawn* ControlledPawn =GetPawn();
 	if (!ControlledPawn) return;
 
@@ -914,6 +923,22 @@ void APDPlayerController::UpdateCrosshair()
 			Spread = Weapon->GetCurrentRecoilSpread();
 
 	HUDInstance->UpdateCrosshair(FVector2D(MouseX, MouseY), Spread);
+}
+
+void APDPlayerController::OnCoverToggle()
+{
+	if (IsGameplayInputBlockedByModalUI()) return;
+
+	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
+	if (!Ch) return;
+
+	if (UPDCoverComponent* CoverComp = Ch->FindComponentByClass<UPDCoverComponent>())
+	{
+		if (CoverComp->IsInCover())
+			CoverComp->ExitCover();
+		else
+			CoverComp->TryEnterCover();
+	}
 }
 
 void APDPlayerController::OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot)
