@@ -66,6 +66,12 @@ struct FPDItemData : public FTableRowBase
 	TObjectPtr<UTexture2D> Icon = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 BuyPrice = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 SellPrice = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Price = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

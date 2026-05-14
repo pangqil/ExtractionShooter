@@ -3,16 +3,15 @@
 
 namespace
 {
-	const FPDItemData* FindItemDataByID(const UDataTable* DataTable, const FName& ItemID)
+	const FPDItemData* FindPDMarketItemDataByID(const UDataTable* DataTable, const FName& ItemID)
 	{
 		if (!DataTable || ItemID.IsNone())
 		{
 			return nullptr;
 		}
 
-		static const FString Context(TEXT("FindItemDataByID"));
 		TArray<FPDItemData*> Rows;
-		DataTable->GetAllRows<FPDItemData>(Context, Rows);
+		DataTable->GetAllRows<FPDItemData>(TEXT("FindPDMarketItemDataByID"), Rows);
 
 		for (const FPDItemData* Row : Rows)
 		{
@@ -100,7 +99,12 @@ bool UPDMarketComponent::SellInventorySlot(UPDInventoryComponent* SellerInventor
 	}
 
 	FPDMarketEntry* Entry = FindEntryByItemID(SourceSlot.ItemData.ItemID);
-	const int32 UnitPrice = Entry ? GetEntryUnitPrice(*Entry) : FMath::Max(0, SourceSlot.ItemData.Price);
+	if (SourceSlot.ItemData.bIsQuestItem)
+	{
+		return false;
+	}
+
+	const int32 UnitPrice = Entry ? FMath::Max(0, SourceSlot.ItemData.SellPrice) : FMath::Max(0, SourceSlot.ItemData.SellPrice > 0 ? SourceSlot.ItemData.SellPrice : SourceSlot.ItemData.Price);
 
 	FPDInventorySlot& MutableSourceSlot = SellerInventory->Items[SlotIndex];
 	MutableSourceSlot.Quantity -= SellQuantity;
@@ -130,7 +134,7 @@ bool UPDMarketComponent::ResolveEntryItemData(const FPDMarketEntry& Entry, FPDIt
 		return false;
 	}
 
-	const FPDItemData* Row = FindItemDataByID(Entry.ItemDataTable, Entry.ItemRowName);
+	const FPDItemData* Row = FindPDMarketItemDataByID(Entry.ItemDataTable, Entry.ItemRowName);
 	if (!Row)
 	{
 		return false;
@@ -153,7 +157,7 @@ int32 UPDMarketComponent::GetEntryUnitPrice(const FPDMarketEntry& Entry) const
 	}
 
 	FPDItemData ItemData;
-	return ResolveEntryItemData(Entry, ItemData) ? FMath::Max(0, ItemData.Price) : 0;
+	return ResolveEntryItemData(Entry, ItemData) ? FMath::Max(0, ItemData.BuyPrice > 0 ? ItemData.BuyPrice : ItemData.Price) : 0;
 }
 
 FPDMarketEntry* UPDMarketComponent::FindEntryByItemID(FName ItemID)

@@ -15,16 +15,15 @@
 
 namespace
 {
-	const FPDItemData* FindItemDataByID(const UDataTable* DataTable, const FName& ItemID)
+	const FPDItemData* FindPDWeaponItemDataByID(const UDataTable* DataTable, const FName& ItemID)
 	{
 		if (!DataTable || ItemID.IsNone())
 		{
 			return nullptr;
 		}
 
-		static const FString Context(TEXT("FindItemDataByID"));
 		TArray<FPDItemData*> Rows;
-		DataTable->GetAllRows<FPDItemData>(Context, Rows);
+		DataTable->GetAllRows<FPDItemData>(TEXT("FindPDWeaponItemDataByID"), Rows);
 
 		for (const FPDItemData* Row : Rows)
 		{
@@ -75,7 +74,7 @@ void APDWeaponBase::LoadItemData()
 {
     if (!ItemDataTable || ItemRowName.IsNone()) return;
 
-    const FPDItemData* Row = FindItemDataByID(ItemDataTable, ItemRowName);
+    const FPDItemData* Row = FindPDWeaponItemDataByID(ItemDataTable, ItemRowName);
     if (!Row) return;
 
     CachedItemData = *Row;

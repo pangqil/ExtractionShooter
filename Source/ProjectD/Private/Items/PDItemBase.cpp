@@ -7,16 +7,15 @@
 
 namespace
 {
-	const FPDItemData* FindItemDataByID(const UDataTable* DataTable, const FName& ItemID)
+	const FPDItemData* FindPDItemBaseItemDataByID(const UDataTable* DataTable, const FName& ItemID)
 	{
 		if (!DataTable || ItemID.IsNone())
 		{
 			return nullptr;
 		}
 
-		static const FString Context(TEXT("FindItemDataByID"));
 		TArray<FPDItemData*> Rows;
-		DataTable->GetAllRows<FPDItemData>(Context, Rows);
+		DataTable->GetAllRows<FPDItemData>(TEXT("FindPDItemBaseItemDataByID"), Rows);
 
 		for (const FPDItemData* Row : Rows)
 		{
@@ -99,7 +98,7 @@ void APDItemBase::LoadItemData()
 {
 	if (!ItemDataTable || ItemRowName.IsNone()) return;
 
-	const FPDItemData* Row = FindItemDataByID(ItemDataTable, ItemRowName);
+	const FPDItemData* Row = FindPDItemBaseItemDataByID(ItemDataTable, ItemRowName);
 	if (!Row) return;
 
 	CachedItemData = *Row;
