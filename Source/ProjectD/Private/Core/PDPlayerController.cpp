@@ -126,6 +126,7 @@ void APDPlayerController::SetupInputComponent()
 	}
 
 
+	UE_LOG(LogPDCharacter, Warning, TEXT("[Input] AbilityInputActions count: %d"), InputConfig->AbilityInputActions.Num());
 	PDIC->BindAbilityActions(InputConfig, this, &APDPlayerController::OnAbilityInputPressed,
 		&APDPlayerController::OnAbilityInputReleased);
 
@@ -331,9 +332,16 @@ void APDPlayerController::OnJump()
 
 void APDPlayerController::OnAbilityInputPressed(FGameplayTag InputTag)
 {
+	UE_LOG(LogPDCharacter, Warning, TEXT("[Input] AbilityInputPressed: %s"), *InputTag.ToString());
+
 	if (UAbilitySystemComponent* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
-		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
+		const bool bActivated = ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
+		UE_LOG(LogPDCharacter, Warning, TEXT("[Input] TryActivate result: %s"), bActivated ? TEXT("SUCCESS") : TEXT("FAIL"));
+	}
+	else
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("[Input] ASC is NULL"));
 	}
 }
 
@@ -747,6 +755,12 @@ void APDPlayerController::SetGameplayInputBlockedByModalUI(bool bBlocked, UUserW
 void APDPlayerController::UpdateAimRotation()
 {
 	if (IsGameplayInputBlockedByModalUI()) return;
+
+	if (UAbilitySystemComponent* ASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+	{
+		if (ASC->HasMatchingGameplayTag(PDGameplayTags::State_Rolling)) return;
+	}
 
 	APawn* ControlledPawn =GetPawn();
 	if (!ControlledPawn) return;
