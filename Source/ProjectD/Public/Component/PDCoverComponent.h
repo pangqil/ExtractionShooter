@@ -48,6 +48,7 @@ private:
 	ACharacter* GetOwnerCharacter() const;
 
 	TWeakObjectPtr<APDCoverBase> CurrentCoverActor;
+	FCoverSlot* PendingSlot=nullptr;
 	FVector SnapLocation=FVector::ZeroVector;
 	FRotator SnapRotation=FRotator::ZeroRotator;
 

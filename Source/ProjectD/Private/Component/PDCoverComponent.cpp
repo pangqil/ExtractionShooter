@@ -74,7 +74,8 @@ void UPDCoverComponent::TryEnterCover()
     if (!BestCover||!BestSlot) return;
 	
     CurrentCoverActor=BestCover;
-	
+    PendingSlot=BestSlot;
+
     SnapLocation=BestCover->GetActorTransform().TransformPosition(BestSlot->LocalOffset);
     SnapRotation=(BestCover->GetActorRotation().Quaternion()*BestSlot->FacingRotation.Quaternion()).Rotator();
 	
@@ -115,7 +116,11 @@ void UPDCoverComponent::OnCoverArrived()
 	Char->SetActorLocation(SnapLocation, false, nullptr, ETeleportType::TeleportPhysics);
 	Char->SetActorRotation(SnapRotation);
 
-	CurrentCoverActor->ReleaseSlot(Char);
+	if (PendingSlot)
+	{
+		CurrentCoverActor->OccupySlot(Char, PendingSlot);
+		PendingSlot=nullptr;
+	}
 
 	LockMovement();
 	ApplyCoverState();
@@ -156,14 +161,19 @@ void UPDCoverComponent::ExitCover()
 
 	ACharacter* Char=GetOwnerCharacter();
 	if (IsValid(Char))
+	{
 		Char->GetController()->StopMovement();
 
-	UnlockMovement();
+		if (CurrentCoverActor.IsValid())
+			CurrentCoverActor->ReleaseSlot(Char);
+	}
 
+	PendingSlot=nullptr;
 	CurrentCoverActor=nullptr;
 	SnapLocation=FVector::ZeroVector;
 	SnapRotation=FRotator::ZeroRotator;
 
+	UnlockMovement();
 	RemoveCoverState();
 }
 
