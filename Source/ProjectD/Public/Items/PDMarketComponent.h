@@ -28,15 +28,15 @@ struct FPDMarketEntry
 };
 
 USTRUCT(BlueprintType)
-struct FPDTraderReputationLevelData
+struct FPDMarketLevelData : public FTableRowBase
 {
 	GENERATED_BODY()
 
-	// 1부터 시작하는 상인 평판 레벨.
+	// 1부터 시작하는 마켓 레벨.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
 	int32 Level = 1;
 
-	// 해당 레벨에 도달하기 위해 필요한 누적 평판 경험치.
+	// 해당 레벨에 도달하기 위해 필요한 누적 마켓 경험치.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
 	int32 RequiredExp = 0;
 
@@ -58,19 +58,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
 	TArray<FPDMarketEntry> Goods;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Reputation")
-	TArray<FPDTraderReputationLevelData> ReputationLevels;
+	// DT_MarketLevelData를 지정하면 마켓 레벨/필요 EXP/구매 가능 등급을 데이터테이블에서 관리합니다.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level")
+	TObjectPtr<UDataTable> MarketLevelDataTable = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Reputation", meta=(ClampMin="0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="0"))
 	int32 TraderReputationExp = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Reputation", meta=(ClampMin="1"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="1"))
 	int32 TraderReputationLevel = 1;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Reputation", meta=(ClampMin="0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="0"))
 	int32 BuyReputationExpPercent = 5;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Reputation", meta=(ClampMin="0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="0"))
 	int32 SellReputationExpPercent = 2;
 
 	// 아이템 Price 기준 판매 비율. 기본값 0.35 = 구매 기준가의 35%.
@@ -80,7 +81,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="PD|Market")
 	FPDOnMarketChanged OnMarketChanged;
 
-	UPROPERTY(BlueprintAssignable, Category="PD|Market|Reputation")
+	UPROPERTY(BlueprintAssignable, Category="PD|Market|Level")
 	FPDOnTraderReputationChanged OnTraderReputationChanged;
 
 	UFUNCTION(BlueprintCallable, Category="PD|Market")
@@ -101,40 +102,50 @@ public:
 	UFUNCTION(BlueprintPure, Category="PD|Market")
 	int32 GetItemSellPrice(const FPDItemData& ItemData) const;
 
-	UFUNCTION(BlueprintPure, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	bool CanBuyEntry(int32 EntryIndex) const;
 
-	UFUNCTION(BlueprintPure, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	bool CanBuyItemData(const FPDItemData& ItemData) const;
 
 	// 현재 레벨에서 구매 가능하거나 다음 레벨에 잠금 표시(????)할 상품이면 true.
-	UFUNCTION(BlueprintPure, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	bool ShouldShowEntry(int32 EntryIndex) const;
 
-	UFUNCTION(BlueprintPure, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	int32 GetRequiredTraderLevelForGrade(EPDItemGrade ItemGrade) const;
 
-	UFUNCTION(BlueprintPure, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	int32 GetRequiredTraderLevelForEntry(int32 EntryIndex) const;
 
-	UFUNCTION(BlueprintPure, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	EPDItemGrade GetMaxPurchasableGradeForLevel(int32 Level) const;
 
-	UFUNCTION(BlueprintPure, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	int32 GetCurrentTraderLevelRequiredExp() const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	int32 GetNextTraderLevelRequiredExp() const;
 
-	UFUNCTION(BlueprintCallable, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	int32 GetCurrentTraderLevelDisplayExp() const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	int32 GetNextTraderLevelDisplayRequiredExp() const;
+
+	UFUNCTION(BlueprintCallable, Category="PD|Market|Level")
 	void AddTraderReputationExp(int32 Amount);
 
-	UFUNCTION(BlueprintCallable, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintCallable, Category="PD|Market|Level")
 	void SyncTraderReputationFromSave();
 
-	UFUNCTION(BlueprintCallable, Category="PD|Market|Reputation")
+	UFUNCTION(BlueprintCallable, Category="PD|Market|Level")
 	void RecalculateTraderReputationLevel();
 
 private:
 	FPDMarketEntry* FindEntryByItemID(FName ItemID);
-	void InitializeDefaultReputationLevels();
+	const UDataTable* GetResolvedMarketLevelDataTable() const;
+	const FPDMarketLevelData* FindMarketLevelDataByLevel(int32 Level) const;
 	void LoadTraderReputationFromSave();
 	void SaveTraderReputationToSave() const;
 	int32 CalculateReputationReward(int32 TotalPrice, int32 Percent) const;

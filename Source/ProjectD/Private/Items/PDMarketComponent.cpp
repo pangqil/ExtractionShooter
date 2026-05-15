@@ -25,6 +25,8 @@ namespace
 
 		return nullptr;
 	}
+
+	const TCHAR* DefaultMarketLevelDataTablePath = TEXT("/Game/Main/Blueprints/Data/DT_MarketLevelData.DT_MarketLevelData");
 }
 
 UPDMarketComponent::UPDMarketComponent()
@@ -35,7 +37,6 @@ UPDMarketComponent::UPDMarketComponent()
 void UPDMarketComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	InitializeDefaultReputationLevels();
 	SyncTraderReputationFromSave();
 }
 
@@ -219,14 +220,28 @@ bool UPDMarketComponent::ShouldShowEntry(int32 EntryIndex) const
 
 int32 UPDMarketComponent::GetRequiredTraderLevelForGrade(EPDItemGrade ItemGrade) const
 {
-	int32 BestLevel = INDEX_NONE;
-	for (const FPDTraderReputationLevelData& LevelData : ReputationLevels)
+	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
+	if (!LevelTable)
 	{
-		if (static_cast<uint8>(LevelData.MaxPurchasableGrade) >= static_cast<uint8>(ItemGrade))
+		return 1;
+	}
+
+	TArray<FPDMarketLevelData*> LevelRows;
+	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("GetRequiredTraderLevelForGrade"), LevelRows);
+
+	int32 BestLevel = INDEX_NONE;
+	for (const FPDMarketLevelData* LevelData : LevelRows)
+	{
+		if (!LevelData)
 		{
-			if (BestLevel == INDEX_NONE || LevelData.Level < BestLevel)
+			continue;
+		}
+
+		if (static_cast<uint8>(LevelData->MaxPurchasableGrade) >= static_cast<uint8>(ItemGrade))
+		{
+			if (BestLevel == INDEX_NONE || LevelData->Level < BestLevel)
 			{
-				BestLevel = LevelData.Level;
+				BestLevel = LevelData->Level;
 			}
 		}
 	}
@@ -252,34 +267,96 @@ int32 UPDMarketComponent::GetRequiredTraderLevelForEntry(int32 EntryIndex) const
 
 EPDItemGrade UPDMarketComponent::GetMaxPurchasableGradeForLevel(int32 Level) const
 {
+	const FPDMarketLevelData* ExactLevelData = FindMarketLevelDataByLevel(Level);
+	if (ExactLevelData)
+	{
+		return ExactLevelData->MaxPurchasableGrade;
+	}
+
+	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
+	if (!LevelTable)
+	{
+		return EPDItemGrade::Grade1;
+	}
+
+	// Fallback: 지정 레벨 Row가 없으면 현재 레벨 이하 중 가장 높은 Row를 사용합니다.
+	TArray<FPDMarketLevelData*> LevelRows;
+	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("GetMaxPurchasableGradeForLevel"), LevelRows);
+
 	EPDItemGrade Result = EPDItemGrade::Grade1;
 	int32 BestLevel = 0;
-
-	for (const FPDTraderReputationLevelData& LevelData : ReputationLevels)
+	for (const FPDMarketLevelData* LevelData : LevelRows)
 	{
-		if (LevelData.Level <= Level && LevelData.Level >= BestLevel)
+		if (!LevelData)
 		{
-			BestLevel = LevelData.Level;
-			Result = LevelData.MaxPurchasableGrade;
+			continue;
+		}
+
+		if (LevelData->Level <= Level && LevelData->Level >= BestLevel)
+		{
+			BestLevel = LevelData->Level;
+			Result = LevelData->MaxPurchasableGrade;
 		}
 	}
 
 	return Result;
 }
 
+
+int32 UPDMarketComponent::GetCurrentTraderLevelRequiredExp() const
+{
+	const FPDMarketLevelData* CurrentLevelData = FindMarketLevelDataByLevel(FMath::Max(1, TraderReputationLevel));
+	return CurrentLevelData ? FMath::Max(0, CurrentLevelData->RequiredExp) : 0;
+}
+
 int32 UPDMarketComponent::GetNextTraderLevelRequiredExp() const
 {
-	int32 NextRequiredExp = INDEX_NONE;
-	for (const FPDTraderReputationLevelData& LevelData : ReputationLevels)
+	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
+	if (!LevelTable)
 	{
-		if (LevelData.Level == TraderReputationLevel + 1)
+		UE_LOG(LogTemp, Warning, TEXT("PDMarketComponent: MarketLevelDataTable is not set and default DT_MarketLevelData could not be loaded."));
+		return INDEX_NONE;
+	}
+
+	TArray<FPDMarketLevelData*> LevelRows;
+	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("GetNextTraderLevelRequiredExp"), LevelRows);
+
+	int32 NextRequiredExp = INDEX_NONE;
+	for (const FPDMarketLevelData* LevelData : LevelRows)
+	{
+		if (!LevelData)
 		{
-			NextRequiredExp = LevelData.RequiredExp;
-			break;
+			continue;
+		}
+
+		// RequiredExp는 누적 경험치입니다. 현재 EXP보다 큰 가장 가까운 값을 다음 목표로 사용합니다.
+		if (LevelData->RequiredExp > TraderReputationExp &&
+			(NextRequiredExp == INDEX_NONE || LevelData->RequiredExp < NextRequiredExp))
+		{
+			NextRequiredExp = LevelData->RequiredExp;
 		}
 	}
 
 	return NextRequiredExp;
+}
+
+int32 UPDMarketComponent::GetCurrentTraderLevelDisplayExp() const
+{
+	const int32 CurrentLevelStartExp = GetCurrentTraderLevelRequiredExp();
+	return FMath::Max(0, TraderReputationExp - CurrentLevelStartExp);
+}
+
+int32 UPDMarketComponent::GetNextTraderLevelDisplayRequiredExp() const
+{
+	const int32 CurrentLevelStartExp = GetCurrentTraderLevelRequiredExp();
+	const int32 NextRequiredExp = GetNextTraderLevelRequiredExp();
+
+	if (NextRequiredExp == INDEX_NONE)
+	{
+		return INDEX_NONE;
+	}
+
+	return FMath::Max(0, NextRequiredExp - CurrentLevelStartExp);
 }
 
 void UPDMarketComponent::AddTraderReputationExp(int32 Amount)
@@ -306,20 +383,81 @@ void UPDMarketComponent::SyncTraderReputationFromSave()
 
 void UPDMarketComponent::RecalculateTraderReputationLevel()
 {
-	InitializeDefaultReputationLevels();
+	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
+	if (!LevelTable)
+	{
+		TraderReputationLevel = FMath::Max(1, TraderReputationLevel);
+		return;
+	}
+
+	TArray<FPDMarketLevelData*> LevelRows;
+	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("RecalculateTraderReputationLevel"), LevelRows);
 
 	int32 NewLevel = 1;
-	int32 BestRequiredExp = 0;
-	for (const FPDTraderReputationLevelData& LevelData : ReputationLevels)
+	int32 BestRequiredExp = INDEX_NONE;
+	for (const FPDMarketLevelData* LevelData : LevelRows)
 	{
-		if (TraderReputationExp >= LevelData.RequiredExp && LevelData.RequiredExp >= BestRequiredExp)
+		if (!LevelData)
 		{
-			BestRequiredExp = LevelData.RequiredExp;
-			NewLevel = FMath::Max(1, LevelData.Level);
+			continue;
+		}
+
+		if (TraderReputationExp >= LevelData->RequiredExp &&
+			(BestRequiredExp == INDEX_NONE || LevelData->RequiredExp >= BestRequiredExp))
+		{
+			BestRequiredExp = LevelData->RequiredExp;
+			NewLevel = FMath::Max(1, LevelData->Level);
 		}
 	}
 
 	TraderReputationLevel = NewLevel;
+}
+
+const UDataTable* UPDMarketComponent::GetResolvedMarketLevelDataTable() const
+{
+	if (MarketLevelDataTable)
+	{
+		return MarketLevelDataTable;
+	}
+
+	// 마켓 Actor 컴포넌트에 DT 지정이 누락돼도 공통 DT를 사용하도록 fallback 처리합니다.
+	return LoadObject<UDataTable>(nullptr, DefaultMarketLevelDataTablePath);
+}
+
+const FPDMarketLevelData* UPDMarketComponent::FindMarketLevelDataByLevel(int32 Level) const
+{
+	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
+	if (!LevelTable || Level <= 0)
+	{
+		return nullptr;
+	}
+
+	// 권장 RowName: 1, 2, 3 ...
+	const FName NumericRowName(*FString::FromInt(Level));
+	if (const FPDMarketLevelData* Row = LevelTable->FindRow<FPDMarketLevelData>(NumericRowName, TEXT("FindMarketLevelDataByLevel"), false))
+	{
+		return Row;
+	}
+
+	// 호환용 fallback: 기존 Level_1, Level_2 ... RowName도 지원합니다.
+	const FName LegacyRowName(*FString::Printf(TEXT("Level_%d"), Level));
+	if (const FPDMarketLevelData* Row = LevelTable->FindRow<FPDMarketLevelData>(LegacyRowName, TEXT("FindMarketLevelDataByLevel"), false))
+	{
+		return Row;
+	}
+
+	// 최종 fallback: RowName이 달라도 Level 컬럼 값이 맞으면 사용합니다.
+	TArray<FPDMarketLevelData*> LevelRows;
+	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("FindMarketLevelDataByLevel"), LevelRows);
+	for (const FPDMarketLevelData* LevelData : LevelRows)
+	{
+		if (LevelData && LevelData->Level == Level)
+		{
+			return LevelData;
+		}
+	}
+
+	return nullptr;
 }
 
 FPDMarketEntry* UPDMarketComponent::FindEntryByItemID(FName ItemID)
@@ -339,42 +477,6 @@ FPDMarketEntry* UPDMarketComponent::FindEntryByItemID(FName ItemID)
 	}
 
 	return nullptr;
-}
-
-void UPDMarketComponent::InitializeDefaultReputationLevels()
-{
-	if (ReputationLevels.Num() > 0)
-	{
-		return;
-	}
-
-	ReputationLevels.Reset();
-
-	FPDTraderReputationLevelData LevelData;
-	LevelData.Level = 1;
-	LevelData.RequiredExp = 0;
-	LevelData.MaxPurchasableGrade = EPDItemGrade::Grade1;
-	ReputationLevels.Add(LevelData);
-
-	LevelData.Level = 2;
-	LevelData.RequiredExp = 1000;
-	LevelData.MaxPurchasableGrade = EPDItemGrade::Grade2;
-	ReputationLevels.Add(LevelData);
-
-	LevelData.Level = 3;
-	LevelData.RequiredExp = 3500;
-	LevelData.MaxPurchasableGrade = EPDItemGrade::Grade3;
-	ReputationLevels.Add(LevelData);
-
-	LevelData.Level = 4;
-	LevelData.RequiredExp = 8000;
-	LevelData.MaxPurchasableGrade = EPDItemGrade::Grade4;
-	ReputationLevels.Add(LevelData);
-
-	LevelData.Level = 5;
-	LevelData.RequiredExp = 15000;
-	LevelData.MaxPurchasableGrade = EPDItemGrade::Grade5;
-	ReputationLevels.Add(LevelData);
 }
 
 void UPDMarketComponent::LoadTraderReputationFromSave()

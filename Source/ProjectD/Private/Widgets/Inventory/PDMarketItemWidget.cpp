@@ -1,5 +1,6 @@
 #include "Widgets/Inventory/PDMarketItemWidget.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
 #include "Components/Image.h"
@@ -19,6 +20,13 @@ void UPDMarketItemWidget::SetMarketEntry(UPDMarketComponent* InMarketComponent, 
 	Entry = InEntry;
 	EntryIndex = InEntryIndex;
 	ResolveWidgets();
+	RefreshVisuals();
+}
+
+
+void UPDMarketItemWidget::SetShowLockedRequirementText(bool bInShow)
+{
+	bShowLockedRequirementText = bInShow;
 	RefreshVisuals();
 }
 
@@ -58,6 +66,11 @@ void UPDMarketItemWidget::ResolveWidgets()
 			ButtonBuyWidget->OnClicked.AddUniqueDynamic(this, &UPDMarketItemWidget::HandleBuyClicked);
 		}
 	}
+
+	if (!TextRequiredTraderLevelWidget && !TextRequiredTraderLevelWidgetName.IsNone())
+	{
+		TextRequiredTraderLevelWidget = Cast<UTextBlock>(WidgetTree->FindWidget(TextRequiredTraderLevelWidgetName));
+	}
 }
 
 void UPDMarketItemWidget::RefreshVisuals()
@@ -70,41 +83,108 @@ void UPDMarketItemWidget::RefreshVisuals()
 
 	const bool bLocked = IsLocked();
 	const int32 RequiredLevel = GetRequiredTraderLevel();
-	const FText LockedToolTip = FText::FromString(FString::Printf(TEXT("상인 평판 레벨 %d 필요"), RequiredLevel));
+	const FText LockedRequirementText = FText::FromString(FString::Printf(TEXT("마켓 레벨 %d 필요"), RequiredLevel));
+
+	ClearMarketTooltips();
 
 	if (ImageItemIconWidget)
 	{
 		ImageItemIconWidget->SetBrushFromTexture(bLocked ? nullptr : ItemData.Icon);
 		ImageItemIconWidget->SetVisibility(!bLocked && ItemData.Icon ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
-		ImageItemIconWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 	}
 
 	if (TextItemNameWidget)
 	{
 		const FText DisplayName = ItemData.DisplayName.IsEmpty() ? FText::FromName(ItemData.ItemID) : ItemData.DisplayName;
 		TextItemNameWidget->SetText(bLocked ? FText::FromString(LockedItemNameString) : DisplayName);
-		TextItemNameWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 	}
 
 	if (TextPriceWidget)
 	{
 		TextPriceWidget->SetText(bLocked ? FText::FromString(TEXT("-")) : FText::AsNumber(GetUnitPrice()));
-		TextPriceWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 	}
 
 	if (TextStockWidget)
 	{
 		TextStockWidget->SetText(bLocked ? FText::FromString(TEXT("-")) : (Entry.Stock < 0 ? FText::FromString(TEXT("∞")) : FText::AsNumber(Entry.Stock)));
-		TextStockWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 	}
 
 	if (ButtonBuyWidget)
 	{
 		ButtonBuyWidget->SetIsEnabled(!bLocked);
-		ButtonBuyWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 	}
 
-	SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
+	if (TextRequiredTraderLevelWidget)
+	{
+		const bool bShowRequirementText = bLocked && bShowLockedRequirementText;
+		TextRequiredTraderLevelWidget->SetText(LockedRequirementText);
+		TextRequiredTraderLevelWidget->SetVisibility(bShowRequirementText ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+
+	if (bLocked)
+	{
+		SetToolTip(CreateLockedRequirementTooltipWidget(LockedRequirementText));
+	}
+}
+
+void UPDMarketItemWidget::ClearMarketTooltips()
+{
+	SetToolTip(nullptr);
+	SetToolTipText(FText::GetEmpty());
+
+	if (ImageItemIconWidget)
+	{
+		ImageItemIconWidget->SetToolTip(nullptr);
+		ImageItemIconWidget->SetToolTipText(FText::GetEmpty());
+	}
+
+	if (TextItemNameWidget)
+	{
+		TextItemNameWidget->SetToolTip(nullptr);
+		TextItemNameWidget->SetToolTipText(FText::GetEmpty());
+	}
+
+	if (TextPriceWidget)
+	{
+		TextPriceWidget->SetToolTip(nullptr);
+		TextPriceWidget->SetToolTipText(FText::GetEmpty());
+	}
+
+	if (TextStockWidget)
+	{
+		TextStockWidget->SetToolTip(nullptr);
+		TextStockWidget->SetToolTipText(FText::GetEmpty());
+	}
+
+	if (ButtonBuyWidget)
+	{
+		ButtonBuyWidget->SetToolTip(nullptr);
+		ButtonBuyWidget->SetToolTipText(FText::GetEmpty());
+	}
+}
+
+UUserWidget* UPDMarketItemWidget::CreateLockedRequirementTooltipWidget(const FText& RequirementText) const
+{
+	if (!LockedTooltipWidgetClass)
+	{
+		return nullptr;
+	}
+
+	UUserWidget* TooltipWidget = GetOwningPlayer()
+		? CreateWidget<UUserWidget>(GetOwningPlayer(), LockedTooltipWidgetClass)
+		: CreateWidget<UUserWidget>(GetWorld(), LockedTooltipWidgetClass);
+
+	if (!TooltipWidget || !TooltipWidget->WidgetTree)
+	{
+		return TooltipWidget;
+	}
+
+	if (UTextBlock* RequiredLevelText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(LockedTooltipRequiredLevelTextWidgetName)))
+	{
+		RequiredLevelText->SetText(RequirementText);
+	}
+
+	return TooltipWidget;
 }
 
 int32 UPDMarketItemWidget::GetUnitPrice() const

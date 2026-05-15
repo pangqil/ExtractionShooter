@@ -134,7 +134,7 @@ void UPDQuestWindowWidget::RefreshQuestDetail()
 
 		if (QuestData.Reward.RewardTraderReputationExp > 0)
 		{
-			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("상인 평판 경험치 +%d"), QuestData.Reward.RewardTraderReputationExp)));
+			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("마켓 경험치 +%d"), QuestData.Reward.RewardTraderReputationExp)));
 		}
 
 		for (const FPDItemData& ItemData : QuestData.Reward.RewardItems)

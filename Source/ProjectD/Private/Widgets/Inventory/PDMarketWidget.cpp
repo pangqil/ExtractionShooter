@@ -4,6 +4,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
+#include "Components/TextBlock.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDMarketComponent.h"
@@ -13,6 +14,7 @@ void UPDMarketWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	BindMarketChanged();
+	RefreshMarketInfo();
 	RefreshMarketGoods();
 }
 
@@ -30,7 +32,41 @@ void UPDMarketWidget::InitializeMarket(UPDMarketComponent* InMarketComponent)
 		MarketComponent->SyncTraderReputationFromSave();
 	}
 	BindMarketChanged();
+	RefreshMarketInfo();
 	RefreshMarketGoods();
+}
+
+
+void UPDMarketWidget::RefreshMarketInfo()
+{
+	ResolveMarketInfoTextBlocks();
+
+	const int32 CurrentLevel = MarketComponent ? FMath::Max(1, MarketComponent->TraderReputationLevel) : 1;
+	const int32 CurrentExp = MarketComponent ? MarketComponent->GetCurrentTraderLevelDisplayExp() : 0;
+	const int32 NextRequiredExp = MarketComponent ? MarketComponent->GetNextTraderLevelDisplayRequiredExp() : 0;
+
+	const bool bIsMaxMarketLevel = (NextRequiredExp <= 0);
+
+	if (TextMarketLevel)
+	{
+		TextMarketLevel->SetVisibility(bIsMaxMarketLevel ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+		if (!bIsMaxMarketLevel)
+		{
+			TextMarketLevel->SetText(FText::FromString(FString::Printf(TEXT("Lv.%d"), CurrentLevel)));
+		}
+	}
+
+	if (TextMarketExp)
+	{
+		if (bIsMaxMarketLevel)
+		{
+			TextMarketExp->SetText(FText::FromString(TEXT("MAX")));
+		}
+		else
+		{
+			TextMarketExp->SetText(FText::FromString(FString::Printf(TEXT("EXP %d / %d"), CurrentExp, NextRequiredExp)));
+		}
+	}
 }
 
 void UPDMarketWidget::RefreshMarketGoods()
@@ -82,6 +118,25 @@ void UPDMarketWidget::RefreshMarketGoods()
 	}
 }
 
+
+void UPDMarketWidget::ResolveMarketInfoTextBlocks()
+{
+	if (!WidgetTree)
+	{
+		return;
+	}
+
+	if (!TextMarketLevel && !MarketLevelTextWidgetName.IsNone())
+	{
+		TextMarketLevel = Cast<UTextBlock>(WidgetTree->FindWidget(MarketLevelTextWidgetName));
+	}
+
+	if (!TextMarketExp && !MarketExpTextWidgetName.IsNone())
+	{
+		TextMarketExp = Cast<UTextBlock>(WidgetTree->FindWidget(MarketExpTextWidgetName));
+	}
+}
+
 void UPDMarketWidget::ResolveMarketGridPanel()
 {
 	if (MarketGridPanel)
@@ -121,6 +176,13 @@ UPDInventoryComponent* UPDMarketWidget::FindInventoryComponent() const
 	return nullptr;
 }
 
+
+void UPDMarketWidget::HandleMarketReputationChanged(int32 NewLevel, int32 NewExp)
+{
+	RefreshMarketInfo();
+	RefreshMarketGoods();
+}
+
 void UPDMarketWidget::BindMarketChanged()
 {
 	if (BoundMarketComponent == MarketComponent)
@@ -135,6 +197,7 @@ void UPDMarketWidget::BindMarketChanged()
 	if (BoundMarketComponent)
 	{
 		BoundMarketComponent->OnMarketChanged.AddUniqueDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
+		BoundMarketComponent->OnTraderReputationChanged.AddUniqueDynamic(this, &UPDMarketWidget::HandleMarketReputationChanged);
 	}
 }
 
@@ -143,6 +206,7 @@ void UPDMarketWidget::UnbindMarketChanged()
 	if (BoundMarketComponent)
 	{
 		BoundMarketComponent->OnMarketChanged.RemoveDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
+		BoundMarketComponent->OnTraderReputationChanged.RemoveDynamic(this, &UPDMarketWidget::HandleMarketReputationChanged);
 		BoundMarketComponent = nullptr;
 	}
 }
