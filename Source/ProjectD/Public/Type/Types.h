@@ -4,6 +4,7 @@
 #include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
 #include "Templates/SubclassOf.h"
+#include "GameplayEffect.h"
 #include "Types.generated.h"
 
 class APDWeaponBase;
@@ -52,6 +53,7 @@ enum class EWeaponType : uint8
 	Shotgun UMETA(DisplayName = "Shotgun"),
 	Sniper  UMETA(DisplayName = "Sniper"),
 	Pistol  UMETA(DisplayName = "Pistol"),
+	Melee   UMETA(DisplayName = "Melee"),
 };
 
 USTRUCT(BlueprintType)
@@ -100,6 +102,9 @@ struct FPDItemData : public FTableRowBase
 	// 무기 아이템일 때 전투 타입을 지정. 장착 위치는 EquipmentSlotType으로 결정한다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EWeaponType WeaponType = EWeaponType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UGameplayEffect> UseEffect;
 };
 
 USTRUCT(BlueprintType)
