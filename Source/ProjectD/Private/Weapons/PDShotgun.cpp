@@ -31,8 +31,6 @@ void APDShotgun::Fire_Implementation()
     PlayFireEffects();
     PlayWeaponMontage(FireMontage);
     PostFire();
-
-    // 발사 직후 탄피 배출
     EjectShell();
 }
 
@@ -173,12 +171,14 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
     {
         FVector RandDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(SpreadAngle));
         FVector End = Start + RandDir * TraceLength;
+        
         FHitResult Hit;
-        if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params))
+        bool bHit = GetWorld()->LineTraceSingleByChannel(
+            Hit, Start, End, ECC_Pawn, Params);
+
+        if (bHit) OutHits.Add(Hit);
         {
-            OutHits.Add(Hit);
-            DrawDebugLine(GetWorld(), Start, Hit.Location, FColor::Red, false, 1.f, 0, 1.f);
+            SpawnTracerEffect(Start, bHit ? Hit.Location : End);
         }
-        else DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1.f, 0, 1.f);
     }
 }
