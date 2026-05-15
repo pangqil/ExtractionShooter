@@ -3,6 +3,8 @@
 #include "Animation/AnimMontage.h"
 #include "Engine/World.h"
 #include "Enemy/Components/PDCombatComponent.h"
+#include "Items/PDStashActor.h"
+#include "Items/PDStashComponent.h"
 #include "Weapons/PDWeaponBase.h"
 
 APDSoldier::APDSoldier()
@@ -27,12 +29,34 @@ void APDSoldier::OnEnterState_Dead()
 {
 	Super::OnEnterState_Dead();
 
-	// 사망 시 무기 떨굼 — Drop 처리는 무기 측 IsDropped 플래그가 있어 BP 디자이너가 후속 정책 결정.
-	if (EquippedWeapon)
+	if (!EquippedWeapon) return;
+
+	EquippedWeapon->OnUnequip();
+
+	// 베이스가 스폰한 시체 컨테이너가 Stash 류면 무기 데이터를 그 안으로 이전. 픽업은 LootBox 상호작용으로만.
+	bool bTransferred = false;
+	if (APDStashActor* Corpse = Cast<APDStashActor>(GetCorpseContainer()))
 	{
-		EquippedWeapon->OnUnequip();
-		EquippedWeapon->SetDropped(true);
+		if (UPDStashComponent* Stash = Corpse->GetStashComponent())
+		{
+			const FPDItemData& WeaponData = EquippedWeapon->GetCachedItemData();
+			if (!WeaponData.ItemID.IsNone())
+			{
+				Stash->AddItemPartial(WeaponData, 1);
+				bTransferred = true;
+			}
+		}
 	}
+
+	if (!bTransferred)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[%s] CorpseContainer 가 Stash 류가 아니거나 WeaponData 미지정 — 장착무기 소실."),
+			*GetName());
+	}
+
+	EquippedWeapon->Destroy();
+	EquippedWeapon = nullptr;
 }
 
 void APDSoldier::SpawnAndEquipDefaultWeapon()

@@ -45,7 +45,7 @@ uint8 APDEnemyBase::GetTeamID_Implementation() const
 
 EPDStaminaStatus APDEnemyBase::GetStaminaStatus_Implementation() const
 {
-	// 비-Biped 디폴트. Biped 자식 클래스가 StatComponent로부터 실제 상태 반환.
+	// 비-Biped 디폴트. Biped 자식 클래스가 AttributeSet 기반으로 실제 상태 반환.
 	return EPDStaminaStatus::None;
 }
 
@@ -203,22 +203,25 @@ void APDEnemyBase::DropLootOnDeath()
 	}
 }
 
-void APDEnemyBase::SpawnCorpseContainer()
+AActor* APDEnemyBase::SpawnCorpseContainer()
 {
-	if (!CorpseContainerClass) return;
+	if (!CorpseContainerClass) return nullptr;
 
 	UWorld* World = GetWorld();
-	if (!World) return;
+	if (!World) return nullptr;
 
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	Params.Owner = this;
 
-	World->SpawnActor<AActor>(
+	AActor* Spawned = World->SpawnActor<AActor>(
 		CorpseContainerClass,
 		GetActorLocation(),
 		GetActorRotation(),
 		Params);
+
+	CorpseContainerInstance = Spawned;
+	return Spawned;
 }
 
 void APDEnemyBase::SetAimTarget(AActor* Target)

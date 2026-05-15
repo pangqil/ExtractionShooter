@@ -83,9 +83,16 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
 	virtual void DropLootOnDeath();
 
-	/** 시체/박스 컨테이너 스폰. 비어있는 클래스면 즉시 return. */
+	/** 시체/박스 컨테이너 스폰. 비어있는 클래스면 nullptr. 결과는 CorpseContainerInstance 로도 보관. */
 	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
-	virtual void SpawnCorpseContainer();
+	virtual AActor* SpawnCorpseContainer();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Loot")
+	FORCEINLINE AActor* GetCorpseContainer() const { return CorpseContainerInstance.Get(); }
+
+	/** 사망 시 스폰된 컨테이너 — 자식 클래스가 장착무기 등 추가 아이템 이전 시 참조. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "PD|Loot")
+	TWeakObjectPtr<AActor> CorpseContainerInstance;
 
 	/** 디자이너가 BP에서 드랍 후 처리(VFX/사운드 등) 작성 가능. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Loot")
