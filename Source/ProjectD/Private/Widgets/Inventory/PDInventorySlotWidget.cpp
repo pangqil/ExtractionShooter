@@ -5,11 +5,13 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Input/Events.h"
+#include "Materials/MaterialInterface.h"
 
 void UPDInventorySlotWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 	ResolveTextWidgets();
+	ResolveOverlayWidgets();
 	RefreshVisuals();
 }
 
@@ -46,12 +48,22 @@ void UPDInventorySlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, con
 	{
 		OnSlotHovered.Broadcast(this, SlotIndex);
 	}
+
+	if (ImageHoverBorderWidget)
+	{
+		ImageHoverBorderWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
 }
 
 void UPDInventorySlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 {
 	Super::NativeOnMouseLeave(InMouseEvent);
 	OnSlotUnhovered.Broadcast(this, SlotIndex);
+
+	if (ImageHoverBorderWidget)
+	{
+		ImageHoverBorderWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 void UPDInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
@@ -80,6 +92,8 @@ void UPDInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, c
 
 bool UPDInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
+	ClearDropOverlays();
+
 	if (UPDInventoryDragDropOperation* DragOperation = Cast<UPDInventoryDragDropOperation>(InOperation))
 	{
 		if (DragOperation->IsValidPayload() && SlotIndex != INDEX_NONE && OnSlotItemDropped.IsBound())
@@ -92,11 +106,55 @@ bool UPDInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDr
 	return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 }
 
+/* --- 추가 Start--- */
+bool UPDInventorySlotWidget::NativeOnDragOver(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	const bool bSuperHandled = Super::NativeOnDragOver(InGeometry, InDragDropEvent, InOperation);
+
+	const bool bCanAccept = CanAcceptDrop(InOperation);
+
+	if (ImageDropValidWidget)
+	{
+		ImageDropValidWidget->SetVisibility(bCanAccept ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+
+	if (ImageDropInvalidWidget)
+	{
+		ImageDropInvalidWidget->SetVisibility(bCanAccept ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+	}
+
+	return bSuperHandled || bCanAccept;
+}
+
+void UPDInventorySlotWidget::NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	Super::NativeOnDragLeave(InDragDropEvent, InOperation);
+	ClearDropOverlays();
+}
+
+bool UPDInventorySlotWidget::CanAcceptDrop(UDragDropOperation* InOperation) const
+{
+	UPDInventoryDragDropOperation* DragOperation = Cast<UPDInventoryDragDropOperation>(InOperation);
+	if (!DragOperation || !DragOperation->IsValidPayload())
+	{
+		return false;
+	}
+
+	if (DragOperation->SourceContainerType == SlotContainerType && DragOperation->SourceSlotIndex == SlotIndex)
+	{
+		return false;
+	}
+
+	return true;
+}
+/* --- 추가 End--- */
+
 void UPDInventorySlotWidget::SetSlotData(const FPDInventorySlot& InSlotData, int32 InSlotIndex)
 {
 	SlotData = InSlotData;
 	SlotIndex = InSlotIndex;
 	ResolveTextWidgets();
+	ResolveOverlayWidgets();
 	RefreshVisuals();
 }
 
@@ -105,6 +163,7 @@ void UPDInventorySlotWidget::ClearSlotData(int32 InSlotIndex)
 	SlotData.Clear();
 	SlotIndex = InSlotIndex;
 	ResolveTextWidgets();
+	ResolveOverlayWidgets();
 	RefreshVisuals();
 }
 
@@ -136,9 +195,65 @@ void UPDInventorySlotWidget::ResolveTextWidgets()
 	}
 }
 
+/* --- 추가 Start--- */
+void UPDInventorySlotWidget::ResolveOverlayWidgets()
+{
+	if (!WidgetTree)
+	{
+		return;
+	}
+
+	if (!ImageSlotBGWidget && !ImageSlotBGWidgetName.IsNone())
+	{
+		ImageSlotBGWidget = Cast<UImage>(WidgetTree->FindWidget(ImageSlotBGWidgetName));
+	}
+
+	if (!ImageHoverBorderWidget && !ImageHoverBorderWidgetName.IsNone())
+	{
+		ImageHoverBorderWidget = Cast<UImage>(WidgetTree->FindWidget(ImageHoverBorderWidgetName));
+	}
+
+	if (!ImageDropValidWidget && !ImageDropValidWidgetName.IsNone())
+	{
+		ImageDropValidWidget = Cast<UImage>(WidgetTree->FindWidget(ImageDropValidWidgetName));
+	}
+
+	if (!ImageDropInvalidWidget && !ImageDropInvalidWidgetName.IsNone())
+	{
+		ImageDropInvalidWidget = Cast<UImage>(WidgetTree->FindWidget(ImageDropInvalidWidgetName));
+	}
+}
+
+void UPDInventorySlotWidget::ClearDropOverlays()
+{
+	if (ImageDropValidWidget)
+	{
+		ImageDropValidWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	if (ImageDropInvalidWidget)
+	{
+		ImageDropInvalidWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+/* --- 추가 End--- */
+
 void UPDInventorySlotWidget::RefreshVisuals()
 {
 	ResolveTextWidgets();
+	ResolveOverlayWidgets();
+
+	if (ImageSlotBGWidget)
+	{
+		UMaterialInterface* TargetMaterial = SlotData.IsEmpty()
+			? SlotBGMaterial_Empty.LoadSynchronous()
+			: SlotBGMaterial_Filled.LoadSynchronous();
+
+		if (TargetMaterial)
+		{
+			ImageSlotBGWidget->SetBrushFromMaterial(TargetMaterial);
+		}
+	}
 
 	if (SlotData.IsEmpty())
 	{
