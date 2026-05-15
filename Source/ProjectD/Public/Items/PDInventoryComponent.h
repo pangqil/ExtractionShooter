@@ -73,6 +73,9 @@ public:
 	int32 AddItemPartial(const FPDItemData& ItemData, int32 Quantity = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
+	int32 AddSlotPartial(const FPDInventorySlot& SourceSlot);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void InitializeInventory();
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
