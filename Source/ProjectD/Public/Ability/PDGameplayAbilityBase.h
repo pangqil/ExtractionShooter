@@ -9,9 +9,7 @@
 class UPDAttributeSet;
 class APDPlayerController;
 class APDCharacterBase;
-/**
- * 
- */
+
 UCLASS()
 class PROJECTD_API UPDGameplayAbilityBase : public UGameplayAbility
 {
@@ -19,15 +17,12 @@ class PROJECTD_API UPDGameplayAbilityBase : public UGameplayAbility
 public:
 	UPDGameplayAbilityBase();
 	
-	UPROPERTY(EditDefaultsOnly, Category="PD|Ability")
-	FGameplayTag StartupInputTag;
-	
 protected:
 	UFUNCTION(BlueprintCallable, Category="PD|Ability")
 	APDCharacterBase* GetPDCharacter() const;
 	
-	UFUNCTION(BlueprintCallable, Category="PD|Ability")
-	APDPlayerController* GetPDPlayerController() const;
+	// UFUNCTION(BlueprintCallable, Category="PD|Ability")
+	// APDPlayerController* GetPDPlayerController() const;
 
 	UFUNCTION(BlueprintCallable, Category="PD|Ability")
 	const UPDAttributeSet* GetAttributeSet() const;

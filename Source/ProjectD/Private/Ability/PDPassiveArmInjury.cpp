@@ -22,3 +22,5 @@ void UPDPassiveArmInjury::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		PlayAbilityMontage(InjuryMontage);
 	}
 }
+
+

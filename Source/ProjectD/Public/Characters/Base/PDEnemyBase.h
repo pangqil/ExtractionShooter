@@ -92,7 +92,9 @@ protected:
 	void OnLootDropped(const TArray<AActor*>& SpawnedItems);
 
 private:
-	// CombatComponent::OnTargetChanged → WeaponComponent::SetAimTarget 자동 연결
 	UFUNCTION()
 	void OnCombatTargetChanged(AActor* NewTarget);
+
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> DitherMaterials;
 };

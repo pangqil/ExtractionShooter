@@ -7,6 +7,7 @@
 #include "Types.generated.h"
 
 class APDWeaponBase;
+class UGameplayEffect;
 
 UENUM(BlueprintType)
 enum class EPDItemType : uint8
@@ -62,6 +63,7 @@ enum class EWeaponType : uint8
 	Shotgun UMETA(DisplayName = "Shotgun"),
 	Sniper  UMETA(DisplayName = "Sniper"),
 	Pistol  UMETA(DisplayName = "Pistol"),
+	Melee   UMETA(DisplayName = "Melee"),
 };
 
 USTRUCT(BlueprintType)
@@ -104,6 +106,9 @@ struct FPDItemData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EWeaponType WeaponType = EWeaponType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UGameplayEffect> UseEffect;
 };
 
 USTRUCT(BlueprintType)

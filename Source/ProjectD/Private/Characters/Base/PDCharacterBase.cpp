@@ -79,6 +79,7 @@ void APDCharacterBase::InitializeAttributes()
 		AttributeSet->SetMoveSpeed(AttributeSet->GetMaxMoveSpeed());
 		AttributeSet->SetHunger(AttributeSet->GetMaxHunger());
 		AttributeSet->SetThirst(AttributeSet->GetMaxThirst());
+		AttributeSet->SetGasMask(AttributeSet->GetMaxGasMask());
 		AttributeSet->bIsInitialized=true;
 	}
 }
