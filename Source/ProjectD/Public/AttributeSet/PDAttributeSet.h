@@ -109,6 +109,11 @@ public:
 	FGameplayAttributeData BleedingResistance;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, BleedingResistance)
 
+	// 초당 스태미나 회복량 (레벨/장비로 조정)
+	UPROPERTY(BlueprintReadOnly, Category="PD|Stamina")
+	FGameplayAttributeData StaminaRegenRate;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, StaminaRegenRate)
+
 	UPROPERTY(BlueprintReadOnly, Category="PD|GasMask")
 	FGameplayAttributeData GasMask;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, GasMask)

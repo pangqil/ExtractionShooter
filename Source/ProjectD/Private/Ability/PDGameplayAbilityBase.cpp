@@ -13,10 +13,10 @@ APDCharacterBase* UPDGameplayAbilityBase::GetPDCharacter() const
 	return Cast<APDCharacterBase>(GetAvatarActorFromActorInfo());
 }
 
-APDPlayerController* UPDGameplayAbilityBase::GetPDPlayerController() const
-{
-	return Cast<APDPlayerController>(GetActorInfo().PlayerController.Get());
-}
+// APDPlayerController* UPDGameplayAbilityBase::GetPDPlayerController() const
+// {
+// 	return Cast<APDPlayerController>(GetActorInfo().PlayerController.Get());
+// }
 
 const UPDAttributeSet* UPDGameplayAbilityBase::GetAttributeSet() const
 {

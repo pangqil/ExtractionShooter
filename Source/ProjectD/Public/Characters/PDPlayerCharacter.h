@@ -5,7 +5,8 @@
 #include "Interfaces/PDSurvivalSource.h"
 #include "Type/Types.h"
 #include "GameplayEffectTypes.h"
-#include "Component/PDCoverComponent.h"
+#include "ActiveGameplayEffectHandle.h"
+#include "Cover/PDCoverBase.h"
 #include "PDPlayerCharacter.generated.h"
 
 class APDWeaponBase;
@@ -51,15 +52,18 @@ private:
 	TObjectPtr<UPDInteractionComponent> InteractionComponent;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
-	TObjectPtr<UPDCoverComponent> CoverComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDQuickSlotComponent> QuickSlotComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDEquipmentComponent> EquipmentComponent;
 
 protected:
+	UPROPERTY(EditDefaultsOnly, Category="PD|Stamina")
+	TSubclassOf<UGameplayEffect> StaminaRegenEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Stamina")
+	TSubclassOf<UGameplayEffect> StaminaRegenBonusEffectClass;
+
 	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
 	TSubclassOf<UGameplayEffect> HungerDecayEffectClass;
 
@@ -71,6 +75,12 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
 	TSubclassOf<UGameplayEffect> DehydratedEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
+	TSubclassOf<UGameplayEffect> GasMaskDecayEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
+	TSubclassOf<UGameplayEffect> GasExposureEffectClass;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
 	TArray<TObjectPtr<APDWeaponBase>> WeaponSlots;
@@ -125,16 +135,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
 	void TryInteract();
 
-	UFUNCTION(BlueprintCallable, Category="PD|Cover")
-	void TryEnterCover() { CoverComponent->TryEnterCover(); }
+	//기지진입하면 모든 디버프, AS초기화
+	UFUNCTION(BlueprintCallable, Category="PD|Survival")
+	void ResetToBase();
 
-	UFUNCTION(BlueprintCallable, Category="PD|Cover")
-	void ExitCover() { CoverComponent->ExitCover(); }
-	
+	UFUNCTION(BlueprintPure, Category="PD|Cover")
+	APDCoverBase* GetCoverCandidate() const { return CoverCandidate.Get(); }
+	void SetCoverCandidate(APDCoverBase* Cover) { CoverCandidate = Cover; }
+
 	virtual TSubclassOf<UGameplayEffect> GetHungerDecayEffectClass()  const override { return HungerDecayEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetThirstDecayEffectClass()  const override { return ThirstDecayEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetStarvingEffectClass()     const override { return StarvingEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetDehydratedEffectClass()   const override { return DehydratedEffectClass; }
+	virtual TSubclassOf<UGameplayEffect> GetGasMaskDecayEffectClass() const override { return GasMaskDecayEffectClass; }
+	virtual TSubclassOf<UGameplayEffect> GetGasExposureEffectClass()  const override { return GasExposureEffectClass; }
 public:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Player|Animation")
 	TMap<FGameplayTag, TSubclassOf<UAnimInstance>> WeaponAnimLayerMap;
@@ -144,4 +158,10 @@ public:
 private:
 	void OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount);
 	void LinkDefaultAnimLayer();
+
+	FActiveGameplayEffectHandle HungerDecayHandle;
+	FActiveGameplayEffectHandle ThirstDecayHandle;
+	FActiveGameplayEffectHandle GasMaskDecayHandle;
+
+	TWeakObjectPtr<APDCoverBase> CoverCandidate;
 };
