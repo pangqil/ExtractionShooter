@@ -9,6 +9,8 @@
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/UniformGridPanel.h"
+#include "Components/SizeBox.h"
+#include "Components/SizeBoxSlot.h"
 #include "Components/UniformGridSlot.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDInventoryComponent.h"
@@ -25,6 +27,10 @@ void UPDStashWidget::NativeConstruct()
 	BindStashChanged();
 	BindTabButtons();
 	BindSortButtons();
+	if (Button_UpgradeStash)
+	{
+		Button_UpgradeStash->OnClicked.AddUniqueDynamic(this, &UPDStashWidget::HandleUpgradeStashClicked);
+	}
 	SetSortOptionsVisible(false);
 	RefreshStashGrid();
 	UpdateTabButtonStyle();
@@ -52,6 +58,11 @@ void UPDStashWidget::RefreshStashGrid()
 	}
 
 	StashGridPanel->ClearChildren();
+	// ScrollBox 안에서는 UniformGridPanel이 부모 높이에 맞춰 셀을 늘려 보일 수 있으므로,
+	// 패널 쪽 슬롯 기본값을 명확히 고정한다. Padding은 GridSlot이 아니라 Panel 속성이다.
+	StashGridPanel->SetSlotPadding(FMargin(0.f));
+	StashGridPanel->SetMinDesiredSlotWidth(StashSlotWidth);
+	StashGridPanel->SetMinDesiredSlotHeight(StashSlotHeight);
 
 	if (!StashSlotWidgetClass)
 	{
@@ -61,10 +72,9 @@ void UPDStashWidget::RefreshStashGrid()
 
 	UPDStashComponent* StashComponent = FindStashComponent();
 
-	// 화면 표시 칸 수는 WBP 설정값을 우선 사용한다.
-	// 실제 StashComponent 용량과 UI 표시 크기를 분리해 나중에 창고 용량을 늘려도 UI를 따로 조정할 수 있다.
-	const int32 Columns = FMath::Max(1, FallbackGridColumns);
-	const int32 Rows = FMath::Max(1, FallbackGridRows);
+	// 창고 업그레이드가 반영되도록 실제 컴포넌트의 열/행을 우선 사용한다.
+	const int32 Columns = FMath::Max(1, StashComponent ? StashComponent->GridColumns : FallbackGridColumns);
+	const int32 Rows = FMath::Max(1, StashComponent ? StashComponent->GridRows : FallbackGridRows);
 	const int32 SlotCount = Columns * Rows;
 
 	TArray<int32> DisplaySlotIndices;
@@ -125,11 +135,31 @@ void UPDStashWidget::RefreshStashGrid()
 			}
 		}
 
-		UUniformGridSlot* GridSlot = StashGridPanel->AddChildToUniformGrid(CreatedSlotWidget, DisplayIndex / Columns, DisplayIndex % Columns);
+		USizeBox* SlotSizeBox = WidgetTree ? WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass()) : nullptr;
+		if (SlotSizeBox)
+		{
+			SlotSizeBox->SetWidthOverride(StashSlotWidth);
+			SlotSizeBox->SetHeightOverride(StashSlotHeight);
+			SlotSizeBox->SetMinDesiredWidth(StashSlotWidth);
+			SlotSizeBox->SetMinDesiredHeight(StashSlotHeight);
+
+			if (USizeBoxSlot* SizeBoxSlot = Cast<USizeBoxSlot>(SlotSizeBox->AddChild(CreatedSlotWidget)))
+			{
+				// 슬롯 BP를 120x120 셀 중앙에 작은 DesiredSize로 배치하지 말고, 셀을 꽉 채우게 한다.
+				SizeBoxSlot->SetHorizontalAlignment(HAlign_Fill);
+				SizeBoxSlot->SetVerticalAlignment(VAlign_Fill);
+				SizeBoxSlot->SetPadding(FMargin(0.f));
+			}
+		}
+
+		UWidget* GridChildWidget = SlotSizeBox ? static_cast<UWidget*>(SlotSizeBox) : static_cast<UWidget*>(CreatedSlotWidget);
+		UUniformGridSlot* GridSlot = StashGridPanel->AddChildToUniformGrid(GridChildWidget, DisplayIndex / Columns, DisplayIndex % Columns);
 		if (GridSlot)
 		{
-			GridSlot->SetHorizontalAlignment(HAlign_Center);
-			GridSlot->SetVerticalAlignment(VAlign_Center);
+			// Fill로 두면 ScrollBox/UniformGridPanel의 남는 높이를 받아 슬롯이 세로로 늘어날 수 있다.
+			// SizeBox가 가진 120x120 크기만 사용하도록 좌상단 정렬로 고정한다.
+			GridSlot->SetHorizontalAlignment(HAlign_Left);
+			GridSlot->SetVerticalAlignment(VAlign_Top);
 		}
 	}
 
@@ -260,8 +290,9 @@ int32 UPDStashWidget::CountOccupiedStashSlotsByType(EPDItemType ItemType) const
 
 int32 UPDStashWidget::GetStashDisplaySlotCount() const
 {
-	const int32 Columns = FMath::Max(1, FallbackGridColumns);
-	const int32 Rows = FMath::Max(1, FallbackGridRows);
+	const UPDStashComponent* StashComponent = FindStashComponent();
+	const int32 Columns = FMath::Max(1, StashComponent ? StashComponent->GridColumns : FallbackGridColumns);
+	const int32 Rows = FMath::Max(1, StashComponent ? StashComponent->GridRows : FallbackGridRows);
 	return Columns * Rows;
 }
 
@@ -391,6 +422,37 @@ void UPDStashWidget::HandleSortByNameClicked()
 void UPDStashWidget::HandleSortByTypeClicked()
 {
 	SetStashSortMode(EPDItemSortMode::Type);
+}
+
+void UPDStashWidget::HandleUpgradeStashClicked()
+{
+	RequestStashUpgrade();
+}
+
+EPDStashUpgradeResult UPDStashWidget::RequestStashUpgrade()
+{
+	UPDStashComponent* StashComponent = FindStashComponent();
+	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+
+	if (!StashComponent)
+	{
+		BP_OnStashUpgradeFailed(EPDStashUpgradeResult::InvalidConfig);
+		return EPDStashUpgradeResult::InvalidConfig;
+	}
+
+	const EPDStashUpgradeResult Result = StashComponent->UpgradeStash(InventoryComponent);
+	if (Result == EPDStashUpgradeResult::Success)
+	{
+		RefreshStashGrid();
+		UpdateTabButtonStyle();
+		BP_OnStashUpgradeSucceeded(StashComponent->CurrentUpgradeLevel, StashComponent->GridRows);
+	}
+	else
+	{
+		BP_OnStashUpgradeFailed(Result);
+	}
+
+	return Result;
 }
 
 void UPDStashWidget::ResolveStashGridPanel()
@@ -554,7 +616,7 @@ void UPDStashWidget::TakeStashSlotQuantity(int32 SlotIndex, int32 Quantity)
 		{
 			if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwningPlayerPawn()))
 			{
-				if (PlayerCharacter->TryAutoEquipWeaponItem(SourceSlot->ItemData))
+				if (PlayerCharacter->TryAutoEquipWeaponSlot(*SourceSlot))
 				{
 					StashComponent->StashItems[SlotIndex].Quantity -= 1;
 					if (StashComponent->StashItems[SlotIndex].Quantity <= 0)

@@ -80,6 +80,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Reward")
 	TArray<FPDItemData> RewardItems;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Reward")
+	int32 RewardTraderReputationExp = 0;
 };
 
 USTRUCT(BlueprintType)

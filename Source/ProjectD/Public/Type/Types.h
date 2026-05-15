@@ -17,6 +17,16 @@ enum class EPDItemType : uint8
 };
 
 UENUM(BlueprintType)
+enum class EPDItemGrade : uint8
+{
+	Grade1 UMETA(DisplayName = "Grade 1"),
+	Grade2 UMETA(DisplayName = "Grade 2"),
+	Grade3 UMETA(DisplayName = "Grade 3"),
+	Grade4 UMETA(DisplayName = "Grade 4"),
+	Grade5 UMETA(DisplayName = "Grade 5"),
+};
+
+UENUM(BlueprintType)
 enum class EPDItemFilterTab : uint8
 {
 	Equipment  UMETA(DisplayName = "Equipment"),
@@ -69,16 +79,13 @@ struct FPDItemData : public FTableRowBase
 	EPDItemType ItemType = EPDItemType::Misc;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDItemGrade ItemGrade = EPDItemGrade::Grade1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bIsQuestItem = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<UTexture2D> Icon = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 BuyPrice = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 SellPrice = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Price = 0;
@@ -89,15 +96,12 @@ struct FPDItemData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText Description;
 
-	// 장비 아이템일 때 어느 장비 슬롯에 들어갈지 지정. WeaponType은 전투 타입 구분용으로만 사용.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EPDEquipmentSlotType EquipmentSlotType = EPDEquipmentSlotType::None;
 
-	// 무기 아이템일 때만 설정. nullptr이면 비-무기 아이템(소비/잡템).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<APDWeaponBase> WeaponClass;
 
-	// 무기 아이템일 때 전투 타입을 지정. 장착 위치는 EquipmentSlotType으로 결정한다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EWeaponType WeaponType = EWeaponType::None;
 };
@@ -116,6 +120,9 @@ struct FPDInventorySlot
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bIsEmpty = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 ModificationLevel = 0;
+
 	bool IsEmpty() const
 	{
 		return bIsEmpty || Quantity <= 0 || ItemData.ItemID.IsNone();
@@ -126,7 +133,108 @@ struct FPDInventorySlot
 		ItemData = FPDItemData();
 		Quantity = 0;
 		bIsEmpty = true;
+		ModificationLevel = 0;
 	}
+};
+
+USTRUCT(BlueprintType)
+struct FPDModificationMaterialRequirement
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName RequiredItemID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Quantity = 0;
+};
+
+UENUM(BlueprintType)
+enum class EPDModificationBoostType : uint8
+{
+	None UMETA(DisplayName = "None"),
+	Low UMETA(DisplayName = "Low"),
+	Mid UMETA(DisplayName = "Mid"),
+	High UMETA(DisplayName = "High"),
+};
+
+USTRUCT(BlueprintType)
+struct FPDModificationRecipeData : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 TargetLevel = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 GoldCost = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName RequiredItemID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Quantity = 1;
+
+};
+
+USTRUCT(BlueprintType)
+struct FPDModificationBoostData : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDModificationBoostType BoostType = EPDModificationBoostType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName BoostItemID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Quantity = 1;
+};
+
+USTRUCT(BlueprintType)
+struct FPDModificationPreview
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 CurrentModificationLevel = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 TargetModificationLevel = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 TargetGasLevel = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 GoldCost = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SuccessRate = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float BaseSuccessRate = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float BoostSuccessRate = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDModificationBoostType SelectedBoostType = EPDModificationBoostType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName BoostItemID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 BoostItemQuantity = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float AttackBonus = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float DefenseBonus = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FPDModificationMaterialRequirement> RequiredMaterials;
 };
 
 
@@ -143,6 +251,15 @@ struct FPDPlayerData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FPDInventorySlot> StashItems;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 StashUpgradeLevel = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 TraderReputationExp = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 TraderReputationLevel = 1;
 };
 
 USTRUCT(BlueprintType)
@@ -186,8 +303,6 @@ struct FPDDamageInfo
 	FHitResult HitResult;
 };
 
-// EPDEnemyState 은 Enemy 시스템 전용 enum 으로 분리되어
-// Public/Enemy/Types/EnemyTypes.h 로 이동.
 
 UENUM(BlueprintType)
 enum class EBodyPart : uint8
@@ -222,11 +337,7 @@ enum class ERaidState : uint8
 	Ended
 };
 
-// ─── 무기 시스템 ────────────────────────────────────────────────
-// EWeaponType은 FPDItemData보다 위에 정의됨(FPDItemData::WeaponType 기본값에서 사용).
 
-// 슬롯 인덱스: Slot1_Rifle=0, Slot2_Shotgun=1, Slot3_Sniper=2, Slot4_Pistol=3 (배열 인덱스로 직접 사용)
-// None=4 은 "선택 없음" 센티넬. 인덱스로 쓰기 전에 None 체크 필수.
 UENUM(BlueprintType)
 enum class EWeaponSlot : uint8
 {

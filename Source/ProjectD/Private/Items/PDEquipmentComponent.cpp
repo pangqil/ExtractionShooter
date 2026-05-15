@@ -47,8 +47,6 @@ EPDEquipmentSlotType UPDEquipmentComponent::ResolveEquipmentSlotType(const FPDIt
 		return ItemData.EquipmentSlotType;
 	}
 
-	// Legacy safety: old weapon rows may have EquipmentSlotType=None and WeaponType set.
-	// New data table rows should explicitly use EquipmentSlotType=Weapon.
 	if (ItemData.WeaponType != EWeaponType::None)
 	{
 		return EPDEquipmentSlotType::Weapon;
@@ -97,7 +95,7 @@ bool UPDEquipmentComponent::EquipItemFromInventory(UPDInventoryComponent* Invent
 		return false;
 	}
 
-	if (!ApplyCharacterEquipSideEffects(InventorySlot.ItemData))
+	if (!ApplyCharacterEquipSideEffects(InventorySlot))
 	{
 		return false;
 	}
@@ -113,6 +111,7 @@ bool UPDEquipmentComponent::EquipItemFromInventory(UPDInventoryComponent* Invent
 
 	InventoryComponent->RemoveItemFromSlot(InventorySlotIndex, 1);
 	BroadcastSlotChanged(TargetSlotType);
+	BroadcastModificationApplied(TargetSlotType, EquippedSlot);
 	return true;
 }
 
@@ -130,41 +129,38 @@ bool UPDEquipmentComponent::UnequipItemToInventory(UPDInventoryComponent* Invent
 	}
 
 	const FPDInventorySlot ItemToReturn = EquippedItem->ItemSlot;
-	const int32 AddedQuantity = InventoryComponent->AddItemPartial(ItemToReturn.ItemData, ItemToReturn.Quantity);
+	const int32 AddedQuantity = InventoryComponent->AddSlotPartial(ItemToReturn);
 	if (AddedQuantity != ItemToReturn.Quantity)
 	{
-		// 공간이 부족하면 장착 상태를 유지한다. AddItemPartial이 부분 추가한 경우는 되돌릴 수 없으므로
-		// 장비는 해제하지 않는다. 장비 아이템 MaxStack은 1로 두는 것을 권장한다.
 		return false;
 	}
 
-	RemoveCharacterEquipSideEffects(ItemToReturn.ItemData);
+	RemoveCharacterEquipSideEffects(ItemToReturn);
 	EquippedItem->ItemSlot.Clear();
 	BroadcastSlotChanged(SlotType);
 	return true;
 }
 
-bool UPDEquipmentComponent::ApplyCharacterEquipSideEffects(const FPDItemData& ItemData) const
+bool UPDEquipmentComponent::ApplyCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const
 {
-	// APDWeaponBase 직접 참조를 피하기 위해 WeaponClass를 여기서 검사하지 않는다.
-	// 무기 여부는 데이터의 WeaponType으로만 판단하고, 실제 WeaponClass 유효성은
-	// APDPlayerCharacter::TryAutoEquipWeaponItem 내부에서 처리한다.
+	const FPDItemData& ItemData = ItemSlot.ItemData;
+
 	if (ItemData.WeaponType == EWeaponType::None)
 	{
-		// 방어구/가방 등은 현재 데이터 저장까지만 처리. 능력치/GAS 효과는 추후 연동.
 		return true;
 	}
 
 	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwner()))
 	{
-		return PlayerCharacter->TryAutoEquipWeaponItem(ItemData);
+		return PlayerCharacter->TryAutoEquipWeaponSlot(ItemSlot);
 	}
 
 	return false;
 }
 
-void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDItemData& ItemData) const
+void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const
 {
+	const FPDItemData& ItemData = ItemSlot.ItemData;
 	if (ItemData.WeaponType == EWeaponType::None)
 	{
 		return;
@@ -174,6 +170,17 @@ void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDItemData& I
 	{
 		PlayerCharacter->RemoveEquippedWeaponItem(ItemData);
 	}
+}
+
+int32 UPDEquipmentComponent::ConvertModificationLevelToGasLevel(int32 ModificationLevel) const
+{
+	return FMath::Max(1, ModificationLevel + 1);
+}
+
+void UPDEquipmentComponent::BroadcastModificationApplied(EPDEquipmentSlotType SlotType, const FPDInventorySlot& EquippedSlot)
+{
+	const int32 GasLevel = ConvertModificationLevelToGasLevel(EquippedSlot.ModificationLevel);
+	OnEquipmentModificationApplied.Broadcast(SlotType, EquippedSlot, GasLevel);
 }
 
 void UPDEquipmentComponent::BroadcastSlotChanged(EPDEquipmentSlotType SlotType)

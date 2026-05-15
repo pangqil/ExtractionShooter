@@ -210,6 +210,12 @@ void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		QuestWindowWidgetInstance = nullptr;
 	}
 
+	if (EquipmentModificationWidgetInstance)
+	{
+		EquipmentModificationWidgetInstance->RemoveFromParent();
+		EquipmentModificationWidgetInstance = nullptr;
+	}
+
 	if (HUDInstance)
 	{
 		HUDInstance->Deactivate();
@@ -378,6 +384,11 @@ void APDPlayerController::OpenMarketInterface(UPDMarketComponent* MarketComponen
 		CloseStashInterface();
 	}
 
+	if (IsEquipmentModificationInterfaceOpen())
+	{
+		CloseEquipmentModificationInterface();
+	}
+
 	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
 	{
 		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
@@ -419,7 +430,7 @@ void APDPlayerController::CloseMarketInterface()
 	}
 	InventoryWidgetInstance = nullptr;
 
-	if (!IsStashInterfaceOpen() && !IsQuestInterfaceOpen())
+	if (!IsStashInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
 	}
@@ -453,6 +464,11 @@ void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
 	if (IsMarketInterfaceOpen())
 	{
 		CloseMarketInterface();
+	}
+
+	if (IsEquipmentModificationInterfaceOpen())
+	{
+		CloseEquipmentModificationInterface();
 	}
 
 	ActiveStashComponent = StashSource;
@@ -505,7 +521,7 @@ void APDPlayerController::CloseStashInterface()
 
 	ActiveStashComponent.Reset();
 
-	if (!IsMarketInterfaceOpen() && !IsQuestInterfaceOpen())
+	if (!IsMarketInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
 	}
@@ -540,6 +556,85 @@ bool APDPlayerController::SellInventorySlotToActiveMarket(int32 SlotIndex, int32
 }
 
 
+void APDPlayerController::OpenEquipmentModificationInterface()
+{
+	if (IsEquipmentModificationInterfaceOpen())
+	{
+		return;
+	}
+
+	if (IsStashInterfaceOpen())
+	{
+		CloseStashInterface();
+	}
+
+	if (IsMarketInterfaceOpen())
+	{
+		CloseMarketInterface();
+	}
+
+	if (IsQuestInterfaceOpen())
+	{
+		CloseQuestInterface();
+	}
+
+	if (!InventoryWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
+		return;
+	}
+
+	if (!EquipmentModificationWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("EquipmentModificationWidgetClass is not set."));
+		return;
+	}
+
+	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
+		if (InventoryWidgetInstance)
+		{
+			InventoryWidgetInstance->AddToViewport();
+		}
+	}
+
+	EquipmentModificationWidgetInstance = CreateWidget<UUserWidget>(this, EquipmentModificationWidgetClass);
+	if (!EquipmentModificationWidgetInstance)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Failed to create equipment modification widget."));
+		return;
+	}
+
+	EquipmentModificationWidgetInstance->AddToViewport();
+	SetGameplayInputBlockedByModalUI(true, EquipmentModificationWidgetInstance);
+}
+
+void APDPlayerController::CloseEquipmentModificationInterface()
+{
+	if (EquipmentModificationWidgetInstance && EquipmentModificationWidgetInstance->IsInViewport())
+	{
+		EquipmentModificationWidgetInstance->RemoveFromParent();
+	}
+	EquipmentModificationWidgetInstance = nullptr;
+
+	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance->RemoveFromParent();
+	}
+	InventoryWidgetInstance = nullptr;
+
+	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen() && !IsQuestInterfaceOpen())
+	{
+		SetGameplayInputBlockedByModalUI(false);
+	}
+}
+
+bool APDPlayerController::IsEquipmentModificationInterfaceOpen() const
+{
+	return EquipmentModificationWidgetInstance && EquipmentModificationWidgetInstance->IsInViewport();
+}
+
 void APDPlayerController::OpenQuestInterface()
 {
 	if (IsQuestInterfaceOpen())
@@ -555,6 +650,11 @@ void APDPlayerController::OpenQuestInterface()
 	if (IsMarketInterfaceOpen())
 	{
 		CloseMarketInterface();
+	}
+
+	if (IsEquipmentModificationInterfaceOpen())
+	{
+		CloseEquipmentModificationInterface();
 	}
 
 	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
@@ -595,7 +695,7 @@ void APDPlayerController::CloseQuestInterface()
 	}
 	QuestWindowWidgetInstance = nullptr;
 
-	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen())
+	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
 	}
@@ -634,6 +734,12 @@ void APDPlayerController::ToggleInventory()
 	if (IsMarketInterfaceOpen())
 	{
 		CloseMarketInterface();
+		return;
+	}
+
+	if (IsEquipmentModificationInterfaceOpen())
+	{
+		CloseEquipmentModificationInterface();
 		return;
 	}
 

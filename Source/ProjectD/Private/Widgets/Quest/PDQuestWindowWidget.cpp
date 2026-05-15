@@ -132,6 +132,11 @@ void UPDQuestWindowWidget::RefreshQuestDetail()
 			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("골드 +%d"), QuestData.Reward.RewardGold)));
 		}
 
+		if (QuestData.Reward.RewardTraderReputationExp > 0)
+		{
+			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("마켓 경험치 +%d"), QuestData.Reward.RewardTraderReputationExp)));
+		}
+
 		for (const FPDItemData& ItemData : QuestData.Reward.RewardItems)
 		{
 			AddDetailLine(VB_Rewards, !ItemData.DisplayName.IsEmpty() ? ItemData.DisplayName : FText::FromName(ItemData.ItemID));
