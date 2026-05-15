@@ -20,7 +20,7 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Input_Reload, "Input.Reload")
 
 	// Input 무기
-	UE_DEFINE_GAMEPLAY_TAG(Input_Zoom, "Input.Zoom")
+	UE_DEFINE_GAMEPLAY_TAG(Input_Aim, "Input.Aim")
 	UE_DEFINE_GAMEPLAY_TAG(Input_ToggleFireMode, "Input.ToggleFireMode")
 	UE_DEFINE_GAMEPLAY_TAG(Input_SwitchSlot1, "Input.SwitchSlot1")
 	UE_DEFINE_GAMEPLAY_TAG(Input_SwitchSlot2, "Input.SwitchSlot2")
@@ -34,8 +34,9 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_ArmDamaged,  "State.Debuff.ArmDamaged")
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_ArmCrippled, "State.Debuff.ArmCrippled")
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Bleeding,    "State.Debuff.Bleeding")
-	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Starving,    "State.Debuff.Starving")
-	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Dehydrated,  "State.Debuff.Dehydrated")
+	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Starving,     "State.Debuff.Starving")
+	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Dehydrated,   "State.Debuff.Dehydrated")
+	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_GasExposure,  "State.Debuff.GasExposure")
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_Fear,        "State.Debuff.Fear")
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_HeadInjury,  "State.Debuff.HeadInjury")
 
@@ -45,6 +46,7 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Shotgun, "Weapon.Type.Shotgun")
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Sniper,  "Weapon.Type.Sniper")
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Pistol,  "Weapon.Type.Pistol")
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Melee,   "Weapon.Type.Melee")
 	UE_DEFINE_GAMEPLAY_TAG(State_Aiming, "State.Aiming")
 
 	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_EquipEnd,      "Anim.Notify.EquipEnd")
@@ -56,6 +58,7 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_State_Reloading, "Weapon.State.Reloading")
 	
 	UE_DEFINE_GAMEPLAY_TAG(Cover_Active, "Cover.Active")
+	UE_DEFINE_GAMEPLAY_TAG(State_CoverAim, "State.CoverAim")
 
 	UE_DEFINE_GAMEPLAY_TAG(State_Rolling, "State.Rolling")
 	UE_DEFINE_GAMEPLAY_TAG(Input_Roll,    "Input.Roll")

@@ -5,6 +5,8 @@
 #include "Items/PDStashComponent.h"
 
 #include "GameFramework/Actor.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 
 UPDQuickSlotComponent::UPDQuickSlotComponent()
 {
@@ -422,7 +424,21 @@ bool UPDQuickSlotComponent::UseQuickSlot(int32 SlotIndex)
 		return false;
 	}
 
-	return InventoryComponent->RemoveItem(Slot.ItemData.ItemID, 1);
+	const bool bRemoved=InventoryComponent->RemoveItem(Slot.ItemData.ItemID, 1);
+	if (!bRemoved) return false;
+
+	if (Slot.ItemData.UseEffect)
+	{
+		UAbilitySystemComponent* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+		if (ASC)
+		{
+			FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
+			Context.AddSourceObject(GetOwner());
+			ASC->ApplyGameplayEffectToSelf(Slot.ItemData.UseEffect->GetDefaultObject<UGameplayEffect>(), 1.f, Context);
+		}
+	}
+
+	return true;
 }
 
 bool UPDQuickSlotComponent::HasItem(FName ItemID, int32 Quantity) const

@@ -42,12 +42,25 @@ void UPDVisionComponent::EndPlay(EEndPlayReason::Type Reason)
 void UPDVisionComponent::BindToAttributeSet(UAbilitySystemComponent* ASC)
 {
 	if (!ASC) return;
+
 	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetVisionRangeAttribute())
 		.AddUObject(this, &UPDVisionComponent::OnVisionRangeChanged);
 	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetVisionAngleAttribute())
 		.AddUObject(this, &UPDVisionComponent::OnVisionAngleChanged);
 	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetVisionUpdateIntervalAttribute())
 		.AddUObject(this, &UPDVisionComponent::OnVisionUpdateIntervalChanged);
+	
+	if (const UPDAttributeSet* AS = ASC->GetSet<UPDAttributeSet>())
+	{
+		if (AS->GetVisionRange() > 0.f)
+			VisionRange = AS->GetVisionRange();
+		if (AS->GetVisionAngle() > 0.f)
+			VisionAngle = AS->GetVisionAngle();
+		if (AS->GetVisionUpdateInterval() > 0.f)
+			UpdateInterval = AS->GetVisionUpdateInterval();
+
+		UpdateFogOfWarMPC_Vision();
+	}
 }
 
 void UPDVisionComponent::SetVisionAngleOverride(float Angle)
@@ -109,8 +122,10 @@ void UPDVisionComponent::PerformVisionUpdate()
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(Owner);
 	
+	const float EffectiveRange = VisionRange * StaminaScale;
+
 	GetWorld()->OverlapMultiByChannel(Overlaps, CurrentLocation, FQuat::Identity,
-		ECC_Pawn, FCollisionShape::MakeSphere(VisionRange), Params);
+		ECC_Pawn, FCollisionShape::MakeSphere(EffectiveRange), Params);
 	
 	TSet<AActor*> NewVisible;
 	for (const FOverlapResult& Result:Overlaps)
@@ -137,8 +152,9 @@ void UPDVisionComponent::PerformVisionUpdate()
 
 float UPDVisionComponent::CalcExposure(AActor* Target) const
 {
+	const float EffectiveRange = VisionRange * StaminaScale;
 	const float Distance=FVector::Dist(GetOwner()->GetActorLocation(), Target->GetActorLocation());
-	const float Linear=FMath::Clamp(1.f-(Distance/VisionRange), 0.f, 1.f);
+	const float Linear=FMath::Clamp(1.f-(Distance/EffectiveRange), 0.f, 1.f);
 	return Linear*Linear;
 }
 

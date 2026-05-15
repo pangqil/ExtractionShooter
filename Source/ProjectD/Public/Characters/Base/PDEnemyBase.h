@@ -103,7 +103,9 @@ protected:
 	float CorpseDespawnDelay = 10.f;
 
 private:
-	// CombatComponent::OnTargetChanged → WeaponComponent::SetAimTarget 자동 연결
 	UFUNCTION()
 	void OnCombatTargetChanged(AActor* NewTarget);
+
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> DitherMaterials;
 };

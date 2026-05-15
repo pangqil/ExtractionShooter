@@ -19,10 +19,11 @@ APDPlayerCharacter::APDPlayerCharacter()
 	bUseControllerRotationYaw=false;
 	bUseControllerRotationRoll=false;
 
-	GetCharacterMovement()->bOrientRotationToMovement=true;
+	GetCharacterMovement()->bOrientRotationToMovement=false;
 	GetCharacterMovement()->RotationRate=FRotator(0.f, 640.f, 0.f);
 	GetCharacterMovement()->bConstrainToPlane=true;
 	GetCharacterMovement()->bSnapToPlaneAtStart=true;
+	GetCharacterMovement()->GravityScale=2.f;
 
 	CameraBoom=CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -37,8 +38,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 
 	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
 	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
-	CoverComponent=CreateDefaultSubobject<UPDCoverComponent>(TEXT("CoverComponent"));
-	
+
 	QuickSlotComponent=CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
 	EquipmentComponent=CreateDefaultSubobject<UPDEquipmentComponent>(TEXT("EquipmentComponent"));
 	EquipmentModificationComponent=CreateDefaultSubobject<UPDEquipmentModificationComponent>(TEXT("EquipmentModificationComponent"));
@@ -47,6 +47,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 	PrimaryActorTick.bStartWithTickEnabled=true;
 	WeaponSlots.SetNum(4);
 
+	
 	// Player 팀. AI 의 GetTeamAttitudeTowards 에서 적대 판정의 기준이 됨.
 	TeamID = 1;
 }
@@ -62,25 +63,29 @@ void APDPlayerCharacter::BeginPlay()
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Pistol,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
         }
 	LinkDefaultAnimLayer();
-
+	GetCharacterMovement()->bAllowPhysicsRotationDuringAnimRootMotion = false;
 }
 
 void APDPlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	if (CameraBoom)
+		CameraBoom->SetWorldRotation(FRotator(-60.f, 0.f, 0.f));
 }
 
 void APDPlayerCharacter::InitAbilitySystem()
 {
 	Super::InitAbilitySystem();
 
-	auto ApplyInfiniteGE=[&](TSubclassOf<UGameplayEffect> GEClass)
+	auto ApplyGE=[&](TSubclassOf<UGameplayEffect> GEClass) -> FActiveGameplayEffectHandle
 	{
-		if (!GEClass) return;
+		if (!GEClass) return FActiveGameplayEffectHandle();
 		FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
 		FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(GEClass, 1.f, Context);
 		if (Spec.IsValid())
-			ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+			return ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+		return FActiveGameplayEffectHandle();
 	};
 
 	if (UPDVisionComponent* Vision=FindComponentByClass<UPDVisionComponent>())
@@ -91,8 +96,12 @@ void APDPlayerCharacter::InitAbilitySystem()
 	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetStaminaAttribute())
 		.AddUObject(this, &APDPlayerCharacter::OnStaminaChanged);
 
-	ApplyInfiniteGE(HungerDecayEffectClass);
-	ApplyInfiniteGE(ThirstDecayEffectClass);
+	ApplyGE(StaminaRegenEffectClass);
+	ApplyGE(StaminaRegenBonusEffectClass);
+
+	HungerDecayHandle  = ApplyGE(HungerDecayEffectClass);
+	ThirstDecayHandle  = ApplyGE(ThirstDecayEffectClass);
+	GasMaskDecayHandle = ApplyGE(GasMaskDecayEffectClass);
 }
 
 void APDPlayerCharacter::OnStaminaChanged(const FOnAttributeChangeData& Data)
@@ -274,6 +283,57 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 	}
 
 	return true;
+}
+
+void APDPlayerCharacter::ResetToBase()
+{
+	if (!ASC || !AttributeSet) return;
+	
+	ASC->RemoveActiveGameplayEffect(HungerDecayHandle);
+	ASC->RemoveActiveGameplayEffect(ThirstDecayHandle);
+	ASC->RemoveActiveGameplayEffect(GasMaskDecayHandle);
+	
+	auto RemoveDebuff = [&](const FGameplayTag& Tag)
+	{
+		FGameplayTagContainer Tags;
+		Tags.AddTag(Tag);
+		ASC->RemoveActiveEffectsWithTags(Tags);
+	};
+	
+	RemoveDebuff(PDGameplayTags::State_Debuff_Starving);
+	RemoveDebuff(PDGameplayTags::State_Debuff_Dehydrated);
+	RemoveDebuff(PDGameplayTags::State_Debuff_GasExposure);
+	
+	RemoveDebuff(PDGameplayTags::State_Debuff_Bleeding);
+	RemoveDebuff(PDGameplayTags::State_Debuff_LegDamaged);
+	RemoveDebuff(PDGameplayTags::State_Debuff_LegCrippled);
+	RemoveDebuff(PDGameplayTags::State_Debuff_ArmDamaged);
+	RemoveDebuff(PDGameplayTags::State_Debuff_ArmCrippled);
+	
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetHeadHPAttribute(),  AttributeSet->GetMaxHeadHP());
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetTorsoHPAttribute(), AttributeSet->GetMaxTorsoHP());
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetArmLHPAttribute(),  AttributeSet->GetMaxArmLHP());
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetArmRHPAttribute(),  AttributeSet->GetMaxArmRHP());
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetLegLHPAttribute(),  AttributeSet->GetMaxLegLHP());
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetLegRHPAttribute(),  AttributeSet->GetMaxLegRHP());
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetStaminaAttribute(), AttributeSet->GetMaxStamina());
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetHungerAttribute(),  AttributeSet->GetMaxHunger());
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetThirstAttribute(),  AttributeSet->GetMaxThirst());
+	ASC->SetNumericAttributeBase(UPDAttributeSet::GetGasMaskAttribute(), AttributeSet->GetMaxGasMask());
+
+	auto ApplyGE = [&](TSubclassOf<UGameplayEffect> GEClass) -> FActiveGameplayEffectHandle
+	{
+		if (!GEClass) return FActiveGameplayEffectHandle();
+		FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+		FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(GEClass, 1.f, Context);
+		if (Spec.IsValid())
+			return ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+		return FActiveGameplayEffectHandle();
+	};
+	
+	HungerDecayHandle=ApplyGE(HungerDecayEffectClass);
+	ThirstDecayHandle=ApplyGE(ThirstDecayEffectClass);
+	GasMaskDecayHandle=ApplyGE(GasMaskDecayEffectClass);
 }
 
 void APDPlayerCharacter::TryInteract()
