@@ -61,6 +61,9 @@ public:
     virtual bool DoesSupportWorldType(EWorldType::Type WorldType) const override;
 
 private:
+    //최대 마커 개수
+    static constexpr int32 MaxActiveMarkers = 5;
+    
     //모든 마커의 DisplayIndex를 MarkerId순으로 1부터 재계산
     void RecalculateDisplayIndices();
 

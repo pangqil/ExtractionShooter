@@ -1185,6 +1185,8 @@ void APDPlayerController::OnToggleWorldMap()
 	{
 		WorldMapInstance->RemoveFromParent();
 		WorldMapInstance = nullptr;
+		
+		bShowMouseCursor = false;
 		return;
 	}
 
@@ -1195,5 +1197,7 @@ void APDPlayerController::OnToggleWorldMap()
 	if (WorldMapInstance)
 	{
 		WorldMapInstance->AddToViewport(10);
+		
+		bShowMouseCursor = true;
 	}
 }

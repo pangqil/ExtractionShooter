@@ -1,5 +1,7 @@
 #include "Widgets/HUD/PDWorldMapWidget.h"
 #include "Data/PDWorldMapDataAsset.h"
+#include "Widgets/HUD/PDMapMarkerWidget.h"
+#include "Ping/PDMapMarkerSubsystem.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Components/CanvasPanel.h"
@@ -11,21 +13,56 @@ void UPDWorldMapWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    //DataAsset에서 현재 레벨에 맞는 맵 정보 가져와 적용
     if (WorldMapData)
     {
         const FPDWorldMapEntry Entry = WorldMapData->GetEntryForWorld(GetWorld());
-
         MapWorldCenter = Entry.WorldCenter;
         MapWorldSize = Entry.WorldSize;
         PlayerArrowAngleOffset = Entry.PlayerArrowAngleOffset;
 
-        //맵 배경 텍스처 적용
         if (MapBackground && Entry.MapTexture)
         {
             MapBackground->SetBrushFromTexture(Entry.MapTexture);
         }
     }
+
+    //마커 Subsystem 구독
+    if (UWorld* World = GetWorld())
+    {
+        if (UPDMapMarkerSubsystem* Sub = World->GetSubsystem<UPDMapMarkerSubsystem>())
+        {
+            Sub->OnMarkerAdded.AddDynamic(this, &UPDWorldMapWidget::HandleMarkerAdded);
+            Sub->OnMarkerRemoved.AddDynamic(this, &UPDWorldMapWidget::HandleMarkerRemoved);
+
+            //위젯 열린 시점에 이미 있는 마커들 그리기
+            TArray<FPDMapMarker> Existing;
+            Sub->GetActiveMarkers(Existing);
+            for (const FPDMapMarker& M : Existing)
+            {
+                HandleMarkerAdded(M);
+            }
+        }
+    }
+}
+
+void UPDWorldMapWidget::NativeDestruct()
+{
+    if (UWorld* World = GetWorld())
+    {
+        if (UPDMapMarkerSubsystem* Sub = World->GetSubsystem<UPDMapMarkerSubsystem>())
+        {
+            Sub->OnMarkerAdded.RemoveDynamic(this, &UPDWorldMapWidget::HandleMarkerAdded);
+            Sub->OnMarkerRemoved.RemoveDynamic(this, &UPDWorldMapWidget::HandleMarkerRemoved);
+        }
+    }
+
+    for (auto& Pair : MarkerWidgets)
+    {
+        if (Pair.Value) Pair.Value->RemoveFromParent();
+    }
+    MarkerWidgets.Empty();
+
+    Super::NativeDestruct();
 }
 
 void UPDWorldMapWidget::NativeTick(const FGeometry& Geo, float DeltaTime)
@@ -40,32 +77,130 @@ void UPDWorldMapWidget::NativeTick(const FGeometry& Geo, float DeltaTime)
     const FVector PlayerLoc = Pawn->GetActorLocation();
     const float PlayerYaw = Pawn->GetActorRotation().Yaw;
 
-    //플레이어 화살표 위치 갱신
     if (UCanvasPanelSlot* PlayerSlot = Cast<UCanvasPanelSlot>(PlayerArrow->Slot))
     {
         PlayerSlot->SetPosition(WorldToMap(PlayerLoc));
     }
-
-    //화살표 회전
     PlayerArrow->SetRenderTransformAngle(PlayerYaw + PlayerArrowAngleOffset);
+}
+
+FReply UPDWorldMapWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton && MapCanvas)
+    {
+        //클릭 화면 좌표 => MapCanvas 로컬 좌표 => 중앙 기준 상대 좌표 => 월드 좌표
+        const FVector2D ScreenPos = InMouseEvent.GetScreenSpacePosition();
+        const FGeometry CanvasGeo = MapCanvas->GetCachedGeometry();
+        const FVector2D CanvasLocal = CanvasGeo.AbsoluteToLocal(ScreenPos);
+        const FVector2D CanvasSize = CanvasGeo.GetLocalSize();
+  
+        // 캔버스 영역 밖 우클릭은 무시 (어두운 배경 클릭 등)
+        if (CanvasLocal.X < 0.f || CanvasLocal.X > CanvasSize.X ||
+            CanvasLocal.Y < 0.f || CanvasLocal.Y > CanvasSize.Y)
+        {
+            return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+        }
+        
+        const FVector2D Centered(CanvasLocal.X - CanvasSize.X * 0.5f, CanvasLocal.Y - CanvasSize.Y * 0.5f);
+        const FVector WorldPos = LocalToWorld(Centered);
+
+        if (UWorld* World = GetWorld())
+        {
+            if (UPDMapMarkerSubsystem* Sub = World->GetSubsystem<UPDMapMarkerSubsystem>())
+            {
+                Sub->AddMarker(WorldPos);
+            }
+        }
+        return FReply::Handled();
+    }
+
+    return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+void UPDWorldMapWidget::HandleMarkerAdded(const FPDMapMarker& Marker)
+{
+    if (!MapCanvas || !MapMarkerWidgetClass) return;
+    if (MarkerWidgets.Contains(Marker.MarkerId)) return;
+
+    UPDMapMarkerWidget* Widget = CreateWidget<UPDMapMarkerWidget>(this, MapMarkerWidgetClass);
+    if (!Widget) return;
+
+    Widget->MarkerId = Marker.MarkerId;
+    Widget->WorldLocation = Marker.WorldLocation;
+    Widget->SetDisplayIndex(Marker.DisplayIndex);
+
+    if (UCanvasPanelSlot* PanelSlot = MapCanvas->AddChildToCanvas(Widget))
+    {
+        PanelSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+        PanelSlot->SetAlignment(FVector2D(0.5f, 0.833f));
+        PanelSlot->SetSize(FVector2D(32.f, 45.f));
+        PanelSlot->SetPosition(WorldToMap(Marker.WorldLocation));
+    }
+
+    MarkerWidgets.Add(Marker.MarkerId, Widget);
+}
+
+void UPDWorldMapWidget::HandleMarkerRemoved(int32 MarkerId)
+{
+    TObjectPtr<UPDMapMarkerWidget> Widget;
+    if (MarkerWidgets.RemoveAndCopyValue(MarkerId, Widget))
+    {
+        if (Widget) Widget->RemoveFromParent();
+    }
+
+    //남은 마커들의 DisplayIndex 재적용
+    RefreshAllMarkers();
+}
+
+void UPDWorldMapWidget::RefreshAllMarkers()
+{
+    UWorld* World = GetWorld();
+    if (!World) return;
+    UPDMapMarkerSubsystem* Sub = World->GetSubsystem<UPDMapMarkerSubsystem>();
+    if (!Sub) return;
+
+    TArray<FPDMapMarker> Markers;
+    Sub->GetActiveMarkers(Markers);
+
+    for (const FPDMapMarker& M : Markers)
+    {
+        if (TObjectPtr<UPDMapMarkerWidget>* WidgetPtr = MarkerWidgets.Find(M.MarkerId))
+        {
+            if (*WidgetPtr)
+            {
+                (*WidgetPtr)->SetDisplayIndex(M.DisplayIndex);
+            }
+        }
+    }
 }
 
 FVector2D UPDWorldMapWidget::WorldToMap(const FVector& WorldPos) const
 {
     if (!MapCanvas || MapWorldSize <= 0.f) return FVector2D::ZeroVector;
 
-    //맵 중심 기준 상대 좌표
     const FVector2D Delta(WorldPos.X - MapWorldCenter.X, WorldPos.Y - MapWorldCenter.Y);
-
     const FVector2D CanvasSize = MapCanvas->GetCachedGeometry().GetLocalSize();
     const float HalfX = CanvasSize.X * 0.5f;
     const float HalfY = CanvasSize.Y * 0.5f;
-
-    //World X(Forward/North)
-    //World Y(Right/East)
     const float HalfWorld = MapWorldSize * 0.5f;
+
     const float ScreenX = (Delta.Y / HalfWorld) * HalfX;
     const float ScreenY = -(Delta.X / HalfWorld) * HalfY;
 
     return FVector2D(ScreenX, ScreenY);
+}
+
+FVector UPDWorldMapWidget::LocalToWorld(const FVector2D& LocalPos) const
+{
+    if (!MapCanvas || MapWorldSize <= 0.f) return FVector::ZeroVector;
+
+    const FVector2D CanvasSize = MapCanvas->GetCachedGeometry().GetLocalSize();
+    const float HalfX = CanvasSize.X * 0.5f;
+    const float HalfY = CanvasSize.Y * 0.5f;
+    const float HalfWorld = MapWorldSize * 0.5f;
+    
+    const float WorldY = (LocalPos.X / HalfX) * HalfWorld;
+    const float WorldX = -(LocalPos.Y / HalfY) * HalfWorld;
+
+    return FVector(MapWorldCenter.X + WorldX, MapWorldCenter.Y + WorldY, 0.f);
 }
