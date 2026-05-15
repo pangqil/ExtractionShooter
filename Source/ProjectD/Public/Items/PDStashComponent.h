@@ -54,8 +54,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
 	int32 CurrentUpgradeLevel = 0;
 
-	// Index 0 = 1st upgrade, Index 1 = 2nd upgrade, ...
-	// Cost and AddedRows can differ per upgrade. Default max is 3 upgrades.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
 	TArray<FPDStashUpgradeData> UpgradeData;
 

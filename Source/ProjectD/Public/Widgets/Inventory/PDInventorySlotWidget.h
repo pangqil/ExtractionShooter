@@ -136,6 +136,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
 	FName TooltipDescriptionWidgetName = TEXT("Text_Description");
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
+	FName TooltipWeightWidgetName = TEXT("Text_Weight");
+
 private:
 	void ResolveTextWidgets();
 	/* --- 추가 Start--- */

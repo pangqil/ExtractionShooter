@@ -37,8 +37,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void SetInventorySortMode(EPDItemSortMode NewSortMode);
 
-	// Stash 인터페이스가 함께 열릴 때 어느 박스를 대상으로 할지 PC가 주입.
-	// nullptr이면 stash 동작 비활성(단독 인벤토리 모드).
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void SetActiveStashComponent(UPDStashComponent* InStashComponent);
 
@@ -61,6 +59,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	FName GoldTextWidgetName = TEXT("Text_Gold");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
+	FName InventoryWeightTextWidgetName = TEXT("Text_InventoryWeight");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	TSubclassOf<UPDQuantityPopupWidget> QuantityPopupWidgetClass;
@@ -134,6 +135,9 @@ protected:
 	UFUNCTION()
 	void HandleInventorySlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 TargetSlotIndex, UPDInventoryDragDropOperation* DragOperation);
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Inventory|Weight")
+	void BP_OnInventoryWeightLimitExceeded(float CurrentWeight, float MaxWeight);
+
 	UFUNCTION()
 	void HandleContextMenuUseClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex);
 
@@ -170,6 +174,9 @@ protected:
 	UFUNCTION()
 	void HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType);
 
+	UFUNCTION()
+	void HandleEquipmentSlotItemDropped(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType, UPDInventoryDragDropOperation* DragOperation);
+
 private:
 	void ResolveInventoryGridPanel();
 	void BindTabButtons();
@@ -190,6 +197,7 @@ private:
 	void SetSortOptionsVisible(bool bVisible);
 	void ToggleSortOptions();
 	void RefreshGoldText();
+	void RefreshInventoryWeightText();
 	void ExecuteInventoryQuickAction(int32 SlotIndex, int32 Quantity);
 	void ExecuteInventorySlotTransfer(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 	void OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex);
@@ -211,6 +219,12 @@ private:
 
 	UFUNCTION()
 	void HandleEquipmentChanged();
+
+	UFUNCTION()
+	void HandleInventoryWeightLimitExceeded(float CurrentWeight, float MaxWeight);
+
+	UFUNCTION()
+	void HandleInventoryMessage(const FText& Message);
 	void BindInventoryChanged();
 	void UnbindInventoryChanged();
 
@@ -222,12 +236,14 @@ private:
 
 	TMap<EPDEquipmentSlotType, TWeakObjectPtr<UPDEquipmentSlotWidget>> EquipmentSlotWidgets;
 
-	// PC가 stash 인터페이스 열 때 주입하는 박스 컴포넌트.
 	UPROPERTY(Transient)
 	TObjectPtr<UPDStashComponent> ActiveStashComponent;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> GoldTextWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> InventoryWeightTextWidget;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDQuantityPopupWidget> ActiveQuantityPopup;

@@ -84,19 +84,63 @@ bool UPDEquipmentComponent::EquipItemFromInventory(UPDInventoryComponent* Invent
 	}
 
 	const FPDInventorySlot InventorySlot = InventoryComponent->Items[InventorySlotIndex];
-	if (InventorySlot.IsEmpty() || InventorySlot.ItemData.ItemType != EPDItemType::Equipment)
+	if (InventorySlot.IsEmpty())
 	{
 		return false;
 	}
 
-	const EPDEquipmentSlotType TargetSlotType = ResolveEquipmentSlotType(InventorySlot.ItemData);
-	if (TargetSlotType == EPDEquipmentSlotType::None || IsSlotOccupied(TargetSlotType))
+	return EquipItemFromInventoryToSlot(InventoryComponent, InventorySlotIndex, ResolveEquipmentSlotType(InventorySlot.ItemData));
+}
+
+bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDEquipmentSlotType TargetSlotType)
+{
+	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(InventorySlotIndex) || TargetSlotType == EPDEquipmentSlotType::None)
 	{
 		return false;
+	}
+
+	const FPDInventorySlot InventorySlot = InventoryComponent->Items[InventorySlotIndex];
+	if (InventorySlot.IsEmpty() || InventorySlot.ItemData.ItemType != EPDItemType::Equipment || InventorySlot.Quantity != 1)
+	{
+		return false;
+	}
+
+	if (ResolveEquipmentSlotType(InventorySlot.ItemData) != TargetSlotType)
+	{
+		return false;
+	}
+
+	FPDEquippedItem* CurrentEquippedItem = EquippedItems.Find(TargetSlotType);
+	FPDInventorySlot PreviousEquippedSlot;
+	const bool bHadPreviousItem = CurrentEquippedItem && !CurrentEquippedItem->ItemSlot.IsEmpty();
+	if (bHadPreviousItem)
+	{
+		PreviousEquippedSlot = CurrentEquippedItem->ItemSlot;
+	}
+
+	const float NewBagCapacityWeight = TargetSlotType == EPDEquipmentSlotType::Bag ? FMath::Max(0.f, InventorySlot.ItemData.BagCapacityWeight) : [&]()
+	{
+		const FPDInventorySlot CurrentBagSlot = GetEquippedSlot(EPDEquipmentSlotType::Bag);
+		return CurrentBagSlot.IsEmpty() ? 0.f : FMath::Max(0.f, CurrentBagSlot.ItemData.BagCapacityWeight);
+	}();
+
+	if (!InventoryComponent->CanFitWeightAfterEquipmentChange(InventorySlot, PreviousEquippedSlot, NewBagCapacityWeight))
+	{
+		InventoryComponent->BroadcastWeightLimitExceeded();
+		return false;
+	}
+
+	if (bHadPreviousItem)
+	{
+		RemoveCharacterEquipSideEffects(PreviousEquippedSlot);
 	}
 
 	if (!ApplyCharacterEquipSideEffects(InventorySlot))
 	{
+		if (bHadPreviousItem)
+		{
+			ApplyCharacterEquipSideEffects(PreviousEquippedSlot);
+		}
 		return false;
 	}
 
@@ -104,14 +148,55 @@ bool UPDEquipmentComponent::EquipItemFromInventory(UPDInventoryComponent* Invent
 	EquippedSlot.Quantity = 1;
 	EquippedSlot.bIsEmpty = false;
 
-	FPDEquippedItem EquippedItem;
-	EquippedItem.SlotType = TargetSlotType;
-	EquippedItem.ItemSlot = EquippedSlot;
-	EquippedItems.Add(TargetSlotType, EquippedItem);
+	FPDEquippedItem NewEquippedItem;
+	NewEquippedItem.SlotType = TargetSlotType;
+	NewEquippedItem.ItemSlot = EquippedSlot;
+	EquippedItems.Add(TargetSlotType, NewEquippedItem);
 
-	InventoryComponent->RemoveItemFromSlot(InventorySlotIndex, 1);
+	if (bHadPreviousItem)
+	{
+		InventoryComponent->Items[InventorySlotIndex] = PreviousEquippedSlot;
+		InventoryComponent->Items[InventorySlotIndex].Quantity = FMath::Max(1, InventoryComponent->Items[InventorySlotIndex].Quantity);
+		InventoryComponent->Items[InventorySlotIndex].bIsEmpty = false;
+	}
+	else
+	{
+		InventoryComponent->Items[InventorySlotIndex].Clear();
+	}
+
+	InventoryComponent->OnInventoryChanged.Broadcast();
 	BroadcastSlotChanged(TargetSlotType);
 	BroadcastModificationApplied(TargetSlotType, EquippedSlot);
+	return true;
+}
+
+
+bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData)
+{
+	const EPDEquipmentSlotType TargetSlotType = ResolveEquipmentSlotType(ItemData);
+	if (TargetSlotType == EPDEquipmentSlotType::None || IsSlotOccupied(TargetSlotType))
+	{
+		return false;
+	}
+
+	FPDInventorySlot NewSlot;
+	NewSlot.ItemData = ItemData;
+	NewSlot.Quantity = 1;
+	NewSlot.bIsEmpty = false;
+	NewSlot.ModificationLevel = 0;
+
+	if (!ApplyCharacterEquipSideEffects(NewSlot))
+	{
+		return false;
+	}
+
+	FPDEquippedItem NewEquippedItem;
+	NewEquippedItem.SlotType = TargetSlotType;
+	NewEquippedItem.ItemSlot = NewSlot;
+	EquippedItems.Add(TargetSlotType, NewEquippedItem);
+
+	BroadcastSlotChanged(TargetSlotType);
+	BroadcastModificationApplied(TargetSlotType, NewSlot);
 	return true;
 }
 
@@ -129,6 +214,18 @@ bool UPDEquipmentComponent::UnequipItemToInventory(UPDInventoryComponent* Invent
 	}
 
 	const FPDInventorySlot ItemToReturn = EquippedItem->ItemSlot;
+	const float NewBagCapacityWeight = SlotType == EPDEquipmentSlotType::Bag ? 0.f : [&]()
+	{
+		const FPDInventorySlot CurrentBagSlot = GetEquippedSlot(EPDEquipmentSlotType::Bag);
+		return CurrentBagSlot.IsEmpty() ? 0.f : FMath::Max(0.f, CurrentBagSlot.ItemData.BagCapacityWeight);
+	}();
+
+	if (!InventoryComponent->CanFitWeightAfterEquipmentChange(FPDInventorySlot(), ItemToReturn, NewBagCapacityWeight))
+	{
+		InventoryComponent->BroadcastWeightLimitExceeded();
+		return false;
+	}
+
 	const int32 AddedQuantity = InventoryComponent->AddSlotPartial(ItemToReturn);
 	if (AddedQuantity != ItemToReturn.Quantity)
 	{

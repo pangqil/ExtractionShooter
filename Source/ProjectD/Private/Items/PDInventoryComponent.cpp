@@ -2,6 +2,7 @@
 
 #include "Data/PDQuestComponent.h"
 #include "Items/PDItemSlotTransfer.h"
+#include "Items/PDEquipmentComponent.h"
 
 UPDInventoryComponent::UPDInventoryComponent()
 {
@@ -116,7 +117,6 @@ bool UPDInventoryComponent::UseItemFromSlot(int32 SlotIndex)
 		return false;
 	}
 
-	// TODO: Apply the item's GameplayEffectClass here when consumable effects are added to FPDItemData.
 	return RemoveItemFromSlot(SlotIndex, 1);
 }
 
@@ -171,6 +171,93 @@ bool UPDInventoryComponent::SpendGold(int32 Amount)
 	return true;
 }
 
+float UPDInventoryComponent::GetCurrentWeight() const
+{
+	float TotalWeight = 0.f;
+
+	for (const FPDInventorySlot& Slot : Items)
+	{
+		if (Slot.IsEmpty())
+		{
+			continue;
+		}
+
+		TotalWeight += FMath::Max(0.f, Slot.ItemData.Weight) * FMath::Max(0, Slot.Quantity);
+	}
+
+	return TotalWeight;
+}
+
+float UPDInventoryComponent::GetMaxWeight() const
+{
+	float MaxWeight = FMath::Max(0.f, BaseCarryWeight);
+
+	if (const UPDEquipmentComponent* EquipmentComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDEquipmentComponent>() : nullptr)
+	{
+		const FPDInventorySlot EquippedBagSlot = EquipmentComponent->GetEquippedSlot(EPDEquipmentSlotType::Bag);
+		if (!EquippedBagSlot.IsEmpty())
+		{
+			MaxWeight += FMath::Max(0.f, EquippedBagSlot.ItemData.BagCapacityWeight);
+		}
+	}
+
+	return MaxWeight;
+}
+
+bool UPDInventoryComponent::CanAddWeight(const FPDItemData& ItemData, int32 Quantity) const
+{
+	if (Quantity <= 0)
+	{
+		return true;
+	}
+
+	const float AddWeight = FMath::Max(0.f, ItemData.Weight) * Quantity;
+	return GetCurrentWeight() + AddWeight <= GetMaxWeight() + KINDA_SMALL_NUMBER;
+}
+
+bool UPDInventoryComponent::CanAddSlotWeight(const FPDInventorySlot& SourceSlot, int32 Quantity) const
+{
+	if (SourceSlot.IsEmpty() || Quantity <= 0)
+	{
+		return true;
+	}
+
+	const int32 ClampedQuantity = FMath::Min(Quantity, SourceSlot.Quantity);
+	return CanAddWeight(SourceSlot.ItemData, ClampedQuantity);
+}
+
+bool UPDInventoryComponent::CanFitWeightAfterEquipmentChange(const FPDInventorySlot& ItemLeavingInventory, const FPDInventorySlot& ItemEnteringInventory, float NewBagCapacityWeight) const
+{
+	float ExpectedWeight = GetCurrentWeight();
+
+	if (!ItemLeavingInventory.IsEmpty())
+	{
+		ExpectedWeight -= FMath::Max(0.f, ItemLeavingInventory.ItemData.Weight) * FMath::Max(0, ItemLeavingInventory.Quantity);
+	}
+
+	if (!ItemEnteringInventory.IsEmpty())
+	{
+		ExpectedWeight += FMath::Max(0.f, ItemEnteringInventory.ItemData.Weight) * FMath::Max(0, ItemEnteringInventory.Quantity);
+	}
+
+	const float ExpectedMaxWeight = FMath::Max(0.f, BaseCarryWeight) + FMath::Max(0.f, NewBagCapacityWeight);
+	return ExpectedWeight <= ExpectedMaxWeight + KINDA_SMALL_NUMBER;
+}
+
+void UPDInventoryComponent::BroadcastInventoryMessage(const FText& Message)
+{
+	if (!Message.IsEmpty())
+	{
+		OnInventoryMessage.Broadcast(Message);
+	}
+}
+
+void UPDInventoryComponent::BroadcastWeightLimitExceeded()
+{
+	OnInventoryWeightLimitExceeded.Broadcast(GetCurrentWeight(), GetMaxWeight());
+	BroadcastInventoryMessage(FText::FromString(TEXT("무게가 초과되었습니다.")));
+}
+
 int32 UPDInventoryComponent::FindEmptySlot() const
 {
 	for (int32 i = 0; i < Items.Num(); i++)
@@ -194,6 +281,12 @@ int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 
 	if (!Items.IsValidIndex(TargetSlotIndex))
 	{
+		return 0;
+	}
+
+	if (!CanAddWeight(ItemData, Quantity))
+	{
+		BroadcastWeightLimitExceeded();
 		return 0;
 	}
 
@@ -246,6 +339,40 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 	int32 RemainingQuantity = Quantity;
 	int32 AddedQuantity = 0;
 
+	if (ItemData.ItemType == EPDItemType::Equipment)
+	{
+		if (UPDEquipmentComponent* EquipmentComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDEquipmentComponent>() : nullptr)
+		{
+			if (EquipmentComponent->TryEquipNewItem(ItemData))
+			{
+				RemainingQuantity -= 1;
+				AddedQuantity += 1;
+			}
+		}
+	}
+
+	if (RemainingQuantity <= 0)
+	{
+		OnInventoryChanged.Broadcast();
+
+		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
+		{
+			QuestComponent->ReportItemAcquired(ItemData.ItemID, AddedQuantity);
+			if (ItemData.bIsQuestItem)
+			{
+				QuestComponent->ReportQuestItemAcquired(ItemData.ItemID, AddedQuantity);
+			}
+		}
+
+		return AddedQuantity;
+	}
+
+	if (!CanAddWeight(ItemData, RemainingQuantity))
+	{
+		BroadcastWeightLimitExceeded();
+		return AddedQuantity;
+	}
+
 	const int32 MaxStack = FMath::Max(1, ItemData.MaxStack);
 
 	if (MaxStack > 1)
@@ -287,6 +414,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 		if (EmptySlot == INDEX_NONE)
 		{
+			BroadcastInventoryMessage(FText::FromString(TEXT("인벤토리가 가득 찼습니다.")));
 			break;
 		}
 
@@ -325,17 +453,23 @@ int32 UPDInventoryComponent::AddSlotPartial(const FPDInventorySlot& SourceSlot)
 		return 0;
 	}
 
+	if (!CanAddSlotWeight(SourceSlot, SourceSlot.Quantity))
+	{
+		BroadcastWeightLimitExceeded();
+		return 0;
+	}
+
 	if (Items.Num() != GetMaxSlotCount())
 	{
 		InitializeInventory();
 	}
 
-	// 상태가 붙는 장비는 스택 병합하지 않고 빈 슬롯에 그대로 복사한다.
 	if (SourceSlot.ItemData.ItemType == EPDItemType::Equipment || SourceSlot.ModificationLevel > 0 || SourceSlot.ItemData.MaxStack <= 1)
 	{
 		const int32 EmptySlot = FindEmptySlot();
 		if (EmptySlot == INDEX_NONE)
 		{
+			BroadcastInventoryMessage(FText::FromString(TEXT("인벤토리가 가득 찼습니다.")));
 			return 0;
 		}
 

@@ -344,6 +344,11 @@ void UPDInventorySlotWidget::ApplyTooltipTextToWidget(UUserWidget* TooltipWidget
 	{
 		TooltipDescriptionText->SetText(Description);
 	}
+
+	if (UTextBlock* TooltipWeightText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(TooltipWeightWidgetName)))
+	{
+		TooltipWeightText->SetText(FText::FromString(FString::Printf(TEXT("Weight: %.1f"), FMath::Max(0.f, SlotData.ItemData.Weight))));
+	}
 }
 
 void UPDInventorySlotWidget::ClearTooltip()

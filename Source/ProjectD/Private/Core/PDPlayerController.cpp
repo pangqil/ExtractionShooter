@@ -29,6 +29,7 @@
 #include "Widgets/HUD/PDHUDWidget.h"
 #include "Widgets/PDActivatableBase.h"
 #include "Widgets/PDRootLayout.h"
+#include "Widgets/PDNotificationWidget.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
 #include "Blueprint/UserWidget.h"
 
@@ -84,7 +85,7 @@ void APDPlayerController::SetupInputComponent()
 
 	if (!InputConfig)
 	{
-		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &APDPlayerController::ToggleInventory);
+		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APDPlayerController::ToggleInventory);
 		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
 		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
@@ -106,7 +107,7 @@ void APDPlayerController::SetupInputComponent()
 	}
 	else
 	{
-		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &APDPlayerController::ToggleInventory);
+		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APDPlayerController::ToggleInventory);
 	}
 
 	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Quest))
@@ -190,6 +191,7 @@ void APDPlayerController::BeginPlay()
 		Ch->OnWeaponSwapped.AddDynamic(this, &APDPlayerController::OnWeaponChanged);
 
 	CreateAndAddHUDWidget();
+	BindInventoryNotifications();
 	
 	if (RootLayoutClass)
 	{
@@ -208,10 +210,17 @@ void APDPlayerController::BeginPlay()
 
 void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UnbindInventoryNotifications();
 	if (QuestWindowWidgetInstance)
 	{
 		QuestWindowWidgetInstance->RemoveFromParent();
 		QuestWindowWidgetInstance = nullptr;
+	}
+
+	if (NotificationWidgetInstance)
+	{
+		NotificationWidgetInstance->RemoveFromParent();
+		NotificationWidgetInstance = nullptr;
 	}
 
 	if (EquipmentModificationWidgetInstance)
@@ -244,6 +253,7 @@ void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void APDPlayerController::OnPossess(APawn* InPawn)
 {
+	UnbindInventoryNotifications();
 	Super::OnPossess(InPawn);
 
 	if (HUDInstance)
@@ -253,10 +263,13 @@ void APDPlayerController::OnPossess(APawn* InPawn)
 			: nullptr;
 		HUDInstance->RebindToASC(ASC);
 	}
+
+	BindInventoryNotifications();
 }
 
 void APDPlayerController::OnUnPossess()
 {
+	UnbindInventoryNotifications();
 	if (HUDInstance)
 	{
 		HUDInstance->RebindToASC(nullptr);
@@ -326,7 +339,7 @@ void APDPlayerController::ApplyEffectiveUIState(EWidgetInputMode Mode)
 
 void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 {
-	if (IsGameplayInputBlockedByModalUI()) return;
+	if (IsGameplayInputBlockedByModalUI() && !ShouldAllowMovementWhileUIOpen()) return;
 
 	UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
@@ -652,6 +665,71 @@ bool APDPlayerController::IsEquipmentModificationInterfaceOpen() const
 	return EquipmentModificationWidgetInstance && EquipmentModificationWidgetInstance->IsInViewport();
 }
 
+
+void APDPlayerController::BindInventoryNotifications()
+{
+	UnbindInventoryNotifications();
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return;
+	}
+
+	UPDInventoryComponent* InventoryComponent = ControlledPawn->FindComponentByClass<UPDInventoryComponent>();
+	if (!InventoryComponent)
+	{
+		return;
+	}
+
+	BoundInventoryNotificationComponent = InventoryComponent;
+	BoundInventoryNotificationComponent->OnInventoryMessage.AddUniqueDynamic(this, &APDPlayerController::HandleInventoryMessage);
+}
+
+void APDPlayerController::UnbindInventoryNotifications()
+{
+	if (BoundInventoryNotificationComponent)
+	{
+		BoundInventoryNotificationComponent->OnInventoryMessage.RemoveDynamic(this, &APDPlayerController::HandleInventoryMessage);
+		BoundInventoryNotificationComponent = nullptr;
+	}
+}
+
+void APDPlayerController::HandleInventoryMessage(const FText& Message)
+{
+	ShowNotification(Message);
+}
+
+void APDPlayerController::ShowNotification(const FText& Message, float Duration)
+{
+	if (Message.IsEmpty())
+	{
+		return;
+	}
+
+	if (!NotificationWidgetClass)
+	{
+		return;
+	}
+
+	if (!NotificationWidgetInstance)
+	{
+		NotificationWidgetInstance = CreateWidget<UPDNotificationWidget>(this, NotificationWidgetClass);
+	}
+
+	if (!NotificationWidgetInstance)
+	{
+		return;
+	}
+
+	if (!NotificationWidgetInstance->IsInViewport())
+	{
+		NotificationWidgetInstance->AddToViewport(NotificationZOrder);
+	}
+
+	NotificationWidgetInstance->ShowNotification(Message, Duration > 0.f ? Duration : NotificationDuration);
+}
+
 void APDPlayerController::OpenQuestInterface()
 {
 	if (IsQuestInterfaceOpen())
@@ -785,6 +863,7 @@ void APDPlayerController::ToggleInventory()
 	InventoryWidgetInstance->AddToViewport();
 
 	SetGameplayInputBlockedByModalUI(true, InventoryWidgetInstance);
+	SetIgnoreMoveInput(false);
 }
 
 void APDPlayerController::TryInteract()
@@ -800,6 +879,15 @@ bool APDPlayerController::IsGameplayInputBlockedByModalUI() const
 	return bIsGameplayInputBlockedByModalUI;
 }
 
+bool APDPlayerController::ShouldAllowMovementWhileUIOpen() const
+{
+	return InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport()
+		&& !IsStashInterfaceOpen()
+		&& !IsMarketInterfaceOpen()
+		&& !IsEquipmentModificationInterfaceOpen()
+		&& !IsQuestInterfaceOpen();
+}
+
 void APDPlayerController::SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus)
 {
 	if (bBlocked)
@@ -812,14 +900,19 @@ void APDPlayerController::SetGameplayInputBlockedByModalUI(bool bBlocked, UUserW
 		}
 
 		bIsGameplayInputBlockedByModalUI = true;
-		SetIgnoreMoveInput(true);
+		OnFireReleased();
+		const bool bAllowMovement = ShouldAllowMovementWhileUIOpen();
+		SetIgnoreMoveInput(!bAllowMovement);
 		SetIgnoreLookInput(true);
 
-		if (APawn* ControlledPawn = GetPawn())
+		if (!bAllowMovement)
 		{
-			if (UPawnMovementComponent* MovementComponent = ControlledPawn->GetMovementComponent())
+			if (APawn* ControlledPawn = GetPawn())
 			{
-				MovementComponent->StopMovementImmediately();
+				if (UPawnMovementComponent* MovementComponent = ControlledPawn->GetMovementComponent())
+				{
+					MovementComponent->StopMovementImmediately();
+				}
 			}
 		}
 
@@ -1020,7 +1113,13 @@ void APDPlayerController::OnInteract()
 }
 
 void APDPlayerController::OnFirePressed()
-{	
+{
+	if (IsGameplayInputBlockedByModalUI())
+	{
+		OnFireReleased();
+		return;
+	}
+
 	if (UPDPingSubsystem* PingSys = GetWorld()->GetSubsystem<UPDPingSubsystem>())
 	{
 		if (PingSys->IsPingActive()) return;

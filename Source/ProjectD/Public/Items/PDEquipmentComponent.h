@@ -32,6 +32,12 @@ public:
 	bool EquipItemFromInventory(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment")
+	bool EquipItemFromInventoryToSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDEquipmentSlotType TargetSlotType);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Equipment")
+	bool TryEquipNewItem(const FPDItemData& ItemData);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Equipment")
 	bool UnequipItemToInventory(UPDInventoryComponent* InventoryComponent, EPDEquipmentSlotType SlotType);
 
 	UFUNCTION(BlueprintPure, Category = "PD|Equipment")

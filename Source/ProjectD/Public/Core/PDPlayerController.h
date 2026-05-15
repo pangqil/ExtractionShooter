@@ -21,6 +21,8 @@ class APDPlayerCharacter;
 class UPDHUDWidget;
 class UPDActivatableBase;
 class UUserWidget;
+class UPDNotificationWidget;
+class UPDInventoryComponent;
 class APDWeaponBase;
 class APDRifle;
 class UPDRootLayout;
@@ -75,6 +77,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Equipment Modification")
 	bool IsEquipmentModificationInterfaceOpen() const;
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Notification")
+	void ShowNotification(const FText& Message, float Duration = 2.f);
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Quest")
 	void OpenQuestInterface();
 
@@ -121,6 +126,15 @@ protected:
 	TSubclassOf<UUserWidget> EquipmentModificationWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDNotificationWidget> NotificationWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI", meta = (ClampMin = "0.1"))
+	float NotificationDuration = 2.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	int32 NotificationZOrder = 50;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
 
 	virtual void SetupInputComponent() override;
@@ -145,6 +159,7 @@ private:
 	void OnToggleWorldMap();
 
 	bool IsGameplayInputBlockedByModalUI() const;
+	bool ShouldAllowMovementWhileUIOpen() const;
 	void SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus = nullptr);
 
 	UPROPERTY(Transient)
@@ -158,6 +173,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> EquipmentModificationWidgetInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDNotificationWidget> NotificationWidgetInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDInventoryComponent> BoundInventoryNotificationComponent;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDQuestWindowWidget> QuestWindowWidgetInstance;
@@ -201,4 +222,10 @@ private:
 
 	UFUNCTION()
 	void OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot);
+
+	void BindInventoryNotifications();
+	void UnbindInventoryNotifications();
+
+	UFUNCTION()
+	void HandleInventoryMessage(const FText& Message);
 };

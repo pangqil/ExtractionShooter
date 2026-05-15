@@ -73,6 +73,7 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 
 	InventoryGridPanel->ClearChildren();
 	RefreshGoldText();
+	RefreshInventoryWeightText();
 
 	if (!InventorySlotWidgetClass)
 	{
@@ -89,8 +90,6 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 	TArray<int32> DisplaySlotIndices;
 	if (InventoryComponent)
 	{
-		// 현재 탭 아이템을 먼저 모아 보여주고, 남는 칸은 실제 빈 슬롯 인덱스로 매핑한다.
-		// 그래야 빈 칸에 드롭해도 INDEX_NONE이 아니라 실제 인벤토리 슬롯으로 이동된다.
 		for (int32 RealSlotIndex = 0; RealSlotIndex < InventoryComponent->Items.Num(); ++RealSlotIndex)
 		{
 			const FPDInventorySlot& InventorySlotData = InventoryComponent->Items[RealSlotIndex];
@@ -447,6 +446,7 @@ void UPDInventoryWidget::RegisterEquipmentSlotWidget(EPDEquipmentSlotType SlotTy
 
 	EquipmentSlotWidget->InitializeEquipmentSlot(SlotType);
 	EquipmentSlotWidget->OnEquipmentSlotRightClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotRightClicked);
+			EquipmentSlotWidget->OnEquipmentSlotItemDropped.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotItemDropped);
 	EquipmentSlotWidgets.Add(SlotType, EquipmentSlotWidget);
 }
 
@@ -516,6 +516,41 @@ void UPDInventoryWidget::HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget*
 	}
 }
 
+
+void UPDInventoryWidget::HandleEquipmentSlotItemDropped(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType, UPDInventoryDragDropOperation* DragOperation)
+{
+	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
+
+	if (!SlotWidget || !DragOperation || !InventoryComponent || !EquipmentComponent)
+	{
+		return;
+	}
+
+	if (DragOperation->SourceContainerType != EPDItemContainerType::Inventory)
+	{
+		return;
+	}
+
+	const FPDInventorySlot* SourceSlot = FindInventorySlot(DragOperation->SourceSlotIndex);
+	if (!SourceSlot || SourceSlot->IsEmpty())
+	{
+		return;
+	}
+
+	if (EquipmentComponent->ResolveEquipmentSlotType(SourceSlot->ItemData) != SlotType)
+	{
+		return;
+	}
+
+	if (EquipmentComponent->EquipItemFromInventoryToSlot(InventoryComponent, DragOperation->SourceSlotIndex, SlotType))
+	{
+		RefreshEquipmentSlots();
+		RefreshInventoryGrid();
+	}
+}
+
+
 void UPDInventoryWidget::ResolveInventoryGridPanel()
 {
 	if (InventoryGridPanel)
@@ -559,7 +594,25 @@ void UPDInventoryWidget::RefreshGoldText()
 	}
 
 	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
-	GoldTextWidget->SetText(FText::AsNumber(InventoryComponent ? InventoryComponent->GetGold() : 0));
+	GoldTextWidget->SetText(FText::FromString(FString::Printf(TEXT("Gold : %d"), InventoryComponent ? InventoryComponent->GetGold() : 0)));
+}
+
+void UPDInventoryWidget::RefreshInventoryWeightText()
+{
+	if (!InventoryWeightTextWidget && WidgetTree && !InventoryWeightTextWidgetName.IsNone())
+	{
+		InventoryWeightTextWidget = Cast<UTextBlock>(WidgetTree->FindWidget(InventoryWeightTextWidgetName));
+	}
+
+	if (!InventoryWeightTextWidget)
+	{
+		return;
+	}
+
+	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	const float CurrentWeight = InventoryComponent ? InventoryComponent->GetCurrentWeight() : 0.f;
+	const float MaxWeight = InventoryComponent ? InventoryComponent->GetMaxWeight() : 0.f;
+	InventoryWeightTextWidget->SetText(FText::FromString(FString::Printf(TEXT("Weight %.1f / %.1f"), CurrentWeight, MaxWeight)));
 }
 
 UPDInventoryComponent* UPDInventoryWidget::FindInventoryComponent() const
@@ -574,7 +627,6 @@ UPDInventoryComponent* UPDInventoryWidget::FindInventoryComponent() const
 
 UPDStashComponent* UPDInventoryWidget::FindStashComponent() const
 {
-	// stash 인터페이스가 열렸을 때만 유효. 단독 인벤토리 모드에선 nullptr.
 	return ActiveStashComponent;
 }
 
@@ -607,6 +659,15 @@ void UPDInventoryWidget::HandleEquipmentChanged()
 {
 	RefreshEquipmentSlots();
 	RefreshInventoryGrid();
+}
+
+void UPDInventoryWidget::HandleInventoryWeightLimitExceeded(float CurrentWeight, float MaxWeight)
+{
+	BP_OnInventoryWeightLimitExceeded(CurrentWeight, MaxWeight);
+}
+
+void UPDInventoryWidget::HandleInventoryMessage(const FText&)
+{
 }
 
 const FPDInventorySlot* UPDInventoryWidget::FindInventorySlot(int32 SlotIndex) const
@@ -1111,6 +1172,7 @@ void UPDInventoryWidget::BindInventoryChanged()
 	if (BoundInventoryComponent)
 	{
 		BoundInventoryComponent->OnInventoryChanged.AddUniqueDynamic(this, &UPDInventoryWidget::RefreshInventoryGrid);
+		BoundInventoryComponent->OnInventoryWeightLimitExceeded.AddUniqueDynamic(this, &UPDInventoryWidget::HandleInventoryWeightLimitExceeded);
 	}
 }
 
@@ -1119,6 +1181,7 @@ void UPDInventoryWidget::UnbindInventoryChanged()
 	if (BoundInventoryComponent)
 	{
 		BoundInventoryComponent->OnInventoryChanged.RemoveDynamic(this, &UPDInventoryWidget::RefreshInventoryGrid);
+		BoundInventoryComponent->OnInventoryWeightLimitExceeded.RemoveDynamic(this, &UPDInventoryWidget::HandleInventoryWeightLimitExceeded);
 		BoundInventoryComponent = nullptr;
 	}
 }
