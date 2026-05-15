@@ -178,9 +178,10 @@ private:
 	void OnSwitchSlot2();
 	void OnSwitchSlot3();
 	void OnUseQuickSlot4();
-	void OnZoom();
 	void OnToggleFireMode();
 	void OnDropWeapon();
+	void OnCoverPressed();
+	void OnAimPressed();
 	void UpdateCrosshair();
 
 	UFUNCTION()

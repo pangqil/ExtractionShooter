@@ -27,6 +27,7 @@ struct FPDAnimInstanceCache
 	float  LeftHandIKAlpha=0.f;
 
 	bool bIsInCover=false;
+	bool bIsCoverAiming=false;
 };
 
 UCLASS()
@@ -68,6 +69,9 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category="Animation")
 	bool bIsInCover=false;
+
+	UPROPERTY(BlueprintReadOnly, Category="Animation")
+	bool bIsCoverAiming=false;
 
 private:
 	UPROPERTY()
