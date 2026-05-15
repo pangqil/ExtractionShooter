@@ -143,6 +143,9 @@ struct FPDPlayerData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FPDInventorySlot> StashItems;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 StashUpgradeLevel = 0;
 };
 
 USTRUCT(BlueprintType)

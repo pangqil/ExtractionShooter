@@ -24,6 +24,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	const TArray<FPDInventorySlot>& GetStashItems() const;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
+	void SetStashUpgradeLevel(int32 InUpgradeLevel);
+
+	UFUNCTION(BlueprintPure, Category = "PD|Stash")
+	int32 GetStashUpgradeLevel() const;
 	
 	UFUNCTION(BlueprintCallable, Category = "PD|Save")
 	void SaveToDisk();

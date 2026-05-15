@@ -6,6 +6,19 @@
 UPDStashComponent::UPDStashComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+
+	GridColumns = 5;
+	BaseGridRows = 4;
+	GridRows = BaseGridRows;
+	CurrentUpgradeLevel = 0;
+
+	UpgradeData.SetNum(3);
+	UpgradeData[0].Cost = 1000;
+	UpgradeData[0].AddedRows = 1;
+	UpgradeData[1].Cost = 2500;
+	UpgradeData[1].AddedRows = 1;
+	UpgradeData[2].Cost = 5000;
+	UpgradeData[2].AddedRows = 1;
 }
 
 void UPDStashComponent::BeginPlay()
@@ -21,6 +34,11 @@ void UPDStashComponent::LoadFromGameInstance()
 	if (GI)
 	{
 		StashItems = GI->GetStashItems();
+		SetStashUpgradeLevel(GI->GetStashUpgradeLevel());
+	}
+	else
+	{
+		SetStashUpgradeLevel(CurrentUpgradeLevel);
 	}
 
 	InitializeStash();
@@ -35,6 +53,83 @@ void UPDStashComponent::SaveToGameInstance()
 	}
 
 	GI->SetStashItems(StashItems);
+	GI->SetStashUpgradeLevel(CurrentUpgradeLevel);
+}
+
+
+int32 UPDStashComponent::GetNextUpgradeCost() const
+{
+	return UpgradeData.IsValidIndex(CurrentUpgradeLevel) ? FMath::Max(0, UpgradeData[CurrentUpgradeLevel].Cost) : 0;
+}
+
+int32 UPDStashComponent::GetNextUpgradeAddedRows() const
+{
+	return UpgradeData.IsValidIndex(CurrentUpgradeLevel) ? FMath::Max(0, UpgradeData[CurrentUpgradeLevel].AddedRows) : 0;
+}
+
+EPDStashUpgradeResult UPDStashComponent::CanUpgradeStash(const UPDInventoryComponent* SourceInventory) const
+{
+	if (!SourceInventory)
+	{
+		return EPDStashUpgradeResult::InvalidInventory;
+	}
+
+	if (IsMaxUpgradeLevel())
+	{
+		return EPDStashUpgradeResult::AlreadyMaxLevel;
+	}
+
+	const int32 UpgradeCost = GetNextUpgradeCost();
+	const int32 AddedRows = GetNextUpgradeAddedRows();
+	if (UpgradeCost <= 0 || AddedRows <= 0)
+	{
+		return EPDStashUpgradeResult::InvalidConfig;
+	}
+
+	if (SourceInventory->GetGold() < UpgradeCost)
+	{
+		return EPDStashUpgradeResult::NotEnoughGold;
+	}
+
+	return EPDStashUpgradeResult::Success;
+}
+
+EPDStashUpgradeResult UPDStashComponent::UpgradeStash(UPDInventoryComponent* SourceInventory)
+{
+	const EPDStashUpgradeResult Result = CanUpgradeStash(SourceInventory);
+	if (Result != EPDStashUpgradeResult::Success)
+	{
+		OnStashUpgradeFailed.Broadcast(Result);
+		return Result;
+	}
+
+	const int32 UpgradeCost = GetNextUpgradeCost();
+	const int32 AddedRows = GetNextUpgradeAddedRows();
+
+	if (!SourceInventory->SpendGold(UpgradeCost))
+	{
+		OnStashUpgradeFailed.Broadcast(EPDStashUpgradeResult::NotEnoughGold);
+		return EPDStashUpgradeResult::NotEnoughGold;
+	}
+
+	++CurrentUpgradeLevel;
+	GridRows += AddedRows;
+
+	InitializeStash();
+	SaveToGameInstance();
+	OnStashUpgraded.Broadcast(CurrentUpgradeLevel, GridRows);
+	return EPDStashUpgradeResult::Success;
+}
+
+void UPDStashComponent::SetStashUpgradeLevel(int32 NewUpgradeLevel)
+{
+	CurrentUpgradeLevel = FMath::Clamp(NewUpgradeLevel, 0, GetMaxUpgradeLevel());
+
+	GridRows = FMath::Max(1, BaseGridRows);
+	for (int32 Index = 0; Index < CurrentUpgradeLevel && UpgradeData.IsValidIndex(Index); ++Index)
+	{
+		GridRows += FMath::Max(0, UpgradeData[Index].AddedRows);
+	}
 }
 
 int32 UPDStashComponent::FindEmptySlot() const

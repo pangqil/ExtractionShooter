@@ -23,6 +23,16 @@ const TArray<FPDInventorySlot>& UPDGameInstance::GetStashItems() const
 	return PlayerData.StashItems;
 }
 
+void UPDGameInstance::SetStashUpgradeLevel(int32 InUpgradeLevel)
+{
+	PlayerData.StashUpgradeLevel = FMath::Max(0, InUpgradeLevel);
+}
+
+int32 UPDGameInstance::GetStashUpgradeLevel() const
+{
+	return FMath::Max(0, PlayerData.StashUpgradeLevel);
+}
+
 void UPDGameInstance::SaveToDisk()
 {
 	UPDSaveGame* SaveObject=Cast<UPDSaveGame>(UGameplayStatics::CreateSaveGameObject(UPDSaveGame::StaticClass()));
