@@ -65,4 +65,7 @@ namespace PDGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Input_Cover,   "Input.Cover")
 
+	UE_DEFINE_GAMEPLAY_TAG(State_MeleeAttacking, "State.MeleeAttacking")
+	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_MeleeHit, "Anim.Notify.MeleeHit")
+
 }
