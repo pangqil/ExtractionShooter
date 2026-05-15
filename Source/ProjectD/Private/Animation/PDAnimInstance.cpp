@@ -31,6 +31,7 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Cache.AimYaw=0.f;
 	Cache.AimPitch=0.f;
 	Cache.bIsInCover=CachedASC->HasMatchingGameplayTag(PDGameplayTags::Cover_Active);
+	Cache.bIsCoverAiming=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_CoverAim);
 
 	if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Rifle))
 		Cache.WeaponType=EWeaponType::Rifle;
@@ -38,6 +39,10 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		Cache.WeaponType=EWeaponType::Shotgun;
 	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Sniper))
 		Cache.WeaponType=EWeaponType::Sniper;
+	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Pistol))
+		Cache.WeaponType=EWeaponType::Pistol;
+	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Melee))
+		Cache.WeaponType=EWeaponType::Melee;
 	else
 		Cache.WeaponType=EWeaponType::None;
 
@@ -72,4 +77,5 @@ void UPDAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 	LeftHandIKTarget=Cache.LeftHandIKTarget;
 	LeftHandIKAlpha=Cache.LeftHandIKAlpha;
 	bIsInCover=Cache.bIsInCover;
+	bIsCoverAiming=Cache.bIsCoverAiming;
 }

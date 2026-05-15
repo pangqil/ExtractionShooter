@@ -43,6 +43,8 @@ DEFINE_LOG_CATEGORY(LogPDCharacter);
 #include "Ping/PDPingSubsystem.h"
 #include "Ping/PDPingInputComponent.h"
 #include "Widgets/HUD/PDWorldMapWidget.h"
+#include "Ability/PDCoverAbility.h"
+#include "Ability/PDCoverAimAbility.h"
 
 APDPlayerController::APDPlayerController()
 {
@@ -145,8 +147,10 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot3,
 		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot3);
 	
-	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Zoom,
-		ETriggerEvent::Started, this, &APDPlayerController::OnZoom);
+	InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed,
+		this, &APDPlayerController::OnAimPressed);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Cover,
+		ETriggerEvent::Started, this, &APDPlayerController::OnCoverPressed);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_ToggleFireMode,
 		ETriggerEvent::Started, this, &APDPlayerController::OnToggleFireMode);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_DropWeapon,
@@ -318,10 +322,23 @@ void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 {
 	if (IsGameplayInputBlockedByModalUI()) return;
 
-	APawn* ControlledPawn =GetPawn();
-	if (!ControlledPawn) return;
+	UAbilitySystemComponent* ASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
 
-	const FVector2D MoveInput=Value.Get<FVector2D>();
+	if (ASC && (ASC->HasMatchingGameplayTag(PDGameplayTags::Cover_Active) ||
+	            ASC->HasMatchingGameplayTag(PDGameplayTags::State_CoverAim)))
+	{
+		TArray<FGameplayAbilitySpecHandle> ToCancel;
+		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+			if (Spec.IsActive()) ToCancel.Add(Spec.Handle);
+		for (const FGameplayAbilitySpecHandle& Handle : ToCancel)
+			ASC->CancelAbilityHandle(Handle);
+		return;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn) return;
+	const FVector2D MoveInput = Value.Get<FVector2D>();
 	ControlledPawn->AddMovementInput(FVector::ForwardVector, MoveInput.Y);
 	ControlledPawn->AddMovementInput(FVector::RightVector, MoveInput.X);
 }
@@ -797,12 +814,36 @@ void APDPlayerController::OnUseQuickSlot4()
 	UseQuickSlot(3);
 }
 
-void APDPlayerController::OnZoom()
+void APDPlayerController::OnCoverPressed()
 {
-	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
-			if (APDSniper* Sniper = Cast<APDSniper>(Weapon))
-				Sniper->ToggleZoom();
+	UAbilitySystemComponent* ASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
+	if (!ASC) return;
+
+	// 조준 중이면 → 조준만 해제 (커버 유지)
+	if (ASC->HasMatchingGameplayTag(PDGameplayTags::State_CoverAim))
+	{
+		TArray<FGameplayAbilitySpecHandle> ToCancel;
+		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+			if (Spec.IsActive() && Spec.Ability &&
+			    Spec.Ability->IsA<UPDCoverAimAbility>())
+				ToCancel.Add(Spec.Handle);
+		for (const FGameplayAbilitySpecHandle& Handle : ToCancel)
+			ASC->CancelAbilityHandle(Handle);
+		return;
+	}
+
+	// 그 외: GAS에 위임 (진입 or 해제)
+	ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Cover));
+}
+
+void APDPlayerController::OnAimPressed()
+{
+	if (UAbilitySystemComponent* ASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+	{
+		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Aim));
+	}
 }
 
 void APDPlayerController::OnToggleFireMode()
