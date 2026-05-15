@@ -1,18 +1,27 @@
 #include "Cover/PDCoverBase.h"
-#include "Component/PDCoverComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Characters/PDPlayerCharacter.h"
 
 APDCoverBase::APDCoverBase()
 {
 	CoverMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CoverMesh"));
 	SetRootComponent(CoverMesh);
 	CoverMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+	ValidZone = CreateDefaultSubobject<UBoxComponent>(TEXT("ValidZone"));
+	ValidZone->SetupAttachment(RootComponent);
+	ValidZone->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	ValidZone->SetCollisionResponseToAllChannels(ECR_Ignore);
+	ValidZone->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 }
 
 void APDCoverBase::BeginPlay()
 {
 	Super::BeginPlay();
 	CurrentHP = MaxHP;
+
+	ValidZone->OnComponentBeginOverlap.AddDynamic(this, &APDCoverBase::OnValidZoneBeginOverlap);
+	ValidZone->OnComponentEndOverlap.AddDynamic(this, &APDCoverBase::OnValidZoneEndOverlap);
 }
 
 FVector APDCoverBase::GetSnapLocation(AActor* Requester) const
@@ -39,10 +48,9 @@ FVector APDCoverBase::GetSnapLocation(AActor* Requester) const
 FRotator APDCoverBase::GetSnapRotation(AActor* Requester) const
 {
 	if (!Requester) return GetActorRotation();
-	
-	FVector OutDir = (Requester->GetActorLocation() - GetActorLocation());
-	OutDir.Z = 0.f;
-	return OutDir.GetSafeNormal().Rotation();
+	FVector TowardWall = (GetActorLocation() - Requester->GetActorLocation());
+	TowardWall.Z = 0.f;
+	return TowardWall.GetSafeNormal().Rotation();
 }
 
 bool APDCoverBase::TryOccupy(AActor* Requester)
@@ -79,10 +87,22 @@ void APDCoverBase::SetCoverState(ECoverState NewState)
 
 void APDCoverBase::OnDestroyed_Internal()
 {
-	if (!Occupant.IsValid()) return;
-
-	if (UPDCoverComponent* CoverComp = Occupant->FindComponentByClass<UPDCoverComponent>())
-		CoverComp->ForceExitCover();
-
+	OnCoverDestroyed.ExecuteIfBound();
 	Occupant = nullptr;
+}
+
+void APDCoverBase::OnValidZoneBeginOverlap(UPrimitiveComponent* OverlappedComp,
+    AActor* OtherActor, UPrimitiveComponent* OtherComp,
+    int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(OtherActor))
+		Player->SetCoverCandidate(this);
+}
+
+void APDCoverBase::OnValidZoneEndOverlap(UPrimitiveComponent* OverlappedComp,
+    AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if (APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(OtherActor))
+		if (Player->GetCoverCandidate() == this)
+			Player->SetCoverCandidate(nullptr);
 }

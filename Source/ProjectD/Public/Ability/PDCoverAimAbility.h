@@ -2,18 +2,15 @@
 
 #include "CoreMinimal.h"
 #include "Ability/PDGameplayAbilityBase.h"
-#include "ActiveGameplayEffectHandle.h"
-#include "PDCoverAbility.generated.h"
-
-class APDCoverBase;
+#include "PDCoverAimAbility.generated.h"
 
 UCLASS()
-class PROJECTD_API UPDCoverAbility : public UPDGameplayAbilityBase
+class PROJECTD_API UPDCoverAimAbility : public UPDGameplayAbilityBase
 {
     GENERATED_BODY()
 
 public:
-    UPDCoverAbility();
+    UPDCoverAimAbility();
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         const FGameplayAbilityActorInfo* ActorInfo,
@@ -26,27 +23,12 @@ public:
         bool bReplicateEndAbility, bool bWasCancelled) override;
 
     UFUNCTION(BlueprintImplementableEvent, Category="PD|Cover")
-    void BP_OnEnterCover(APDCoverBase* CoverActor, FVector SnapLocation, FRotator SnapRotation);
+    void BP_OnStartAim(FVector AimPosition, FRotator AimRotation);
 
     UFUNCTION(BlueprintImplementableEvent, Category="PD|Cover")
-    void BP_OnExitCover();
-
-    // BP에서 보간 완료 후 호출 -> Cover_Active 태그 부여
-    UFUNCTION(BlueprintCallable, Category="PD|Cover")
-    void FinishEnterCover();
-
-    // 이동키 등 외부 종료 요청
-    UFUNCTION(BlueprintCallable, Category="PD|Cover")
-    void NotifyExitCover();
+    void BP_OnReturnToCover(FVector CoverPosition, FRotator CoverRotation);
 
 protected:
     UPROPERTY(EditDefaultsOnly, Category="PD|Cover")
-    TSubclassOf<UGameplayEffect> CoverBuffGE;
-
-private:
-    void ApplyCoverBuff();
-    void RemoveCoverBuff();
-
-    TWeakObjectPtr<APDCoverBase> CurrentCover;
-    FActiveGameplayEffectHandle CoverBuffHandle;
+    float PeekOffset = 60.f;
 };
