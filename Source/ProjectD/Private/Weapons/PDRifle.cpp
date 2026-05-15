@@ -129,6 +129,9 @@ bool APDRifle::PerformLineTrace(FHitResult& OutHit)
     Params.bTraceComplex = true;
 
     const bool bHit = GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, ECC_Pawn, Params);
+   
+    SpawnTracerEffect(Start, bHit ? OutHit.Location : End);
+
     DrawDebugLine(GetWorld(), Start, bHit ? OutHit.Location : End,
         bHit ? FColor::Red : FColor::Green, false, 1.f, 0, 1.f);
 

@@ -8,8 +8,10 @@
 class UImage;
 class UTextBlock;
 class UPDEquipmentSlotWidget;
+class UPDInventoryDragDropOperation;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnEquipmentSlotRightClicked, UPDEquipmentSlotWidget*, SlotWidget, EPDEquipmentSlotType, SlotType);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPDOnEquipmentSlotItemDropped, UPDEquipmentSlotWidget*, SlotWidget, EPDEquipmentSlotType, SlotType, UPDInventoryDragDropOperation*, DragOperation);
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDEquipmentSlotWidget : public UUserWidget
@@ -35,9 +37,13 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "PD|Equipment|Slot|Event")
 	FPDOnEquipmentSlotRightClicked OnEquipmentSlotRightClicked;
 
+	UPROPERTY(BlueprintAssignable, Category = "PD|Equipment|Slot|Event")
+	FPDOnEquipmentSlotItemDropped OnEquipmentSlotItemDropped;
+
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Equipment|Slot")
 	EPDEquipmentSlotType SlotType = EPDEquipmentSlotType::None;

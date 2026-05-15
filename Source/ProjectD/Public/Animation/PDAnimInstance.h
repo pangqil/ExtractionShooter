@@ -28,6 +28,7 @@ struct FPDAnimInstanceCache
 
 	bool bIsInCover=false;
 	bool bIsCoverAiming=false;
+	bool bIsMeleeEquipped=false;
 };
 
 UCLASS()
@@ -72,6 +73,9 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category="Animation")
 	bool bIsCoverAiming=false;
+
+	UPROPERTY(BlueprintReadOnly, Category="Animation")
+	bool bIsMeleeEquipped=false;
 
 private:
 	UPROPERTY()

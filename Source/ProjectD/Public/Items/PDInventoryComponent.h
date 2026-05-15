@@ -6,6 +6,8 @@
 #include "PDInventoryComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnInventoryChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnInventoryWeightLimitExceeded, float, CurrentWeight, float, MaxWeight);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnInventoryMessage, const FText&, Message);
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTD_API UPDInventoryComponent : public UActorComponent
@@ -27,8 +29,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	int32 Gold = 0;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory", meta = (ClampMin = "0.0"))
+	float BaseCarryWeight = 10.f;
+
 	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory")
 	FPDOnInventoryChanged OnInventoryChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory")
+	FPDOnInventoryWeightLimitExceeded OnInventoryWeightLimitExceeded;
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory")
+	FPDOnInventoryMessage OnInventoryMessage;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	bool AddItem(const FPDItemData& ItemData, int32 Quantity = 1);
@@ -59,6 +70,27 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Inventory")
 	int32 GetMaxSlotCount() const { return GridColumns * GridRows; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Inventory|Weight")
+	float GetCurrentWeight() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Inventory|Weight")
+	float GetMaxWeight() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Inventory|Weight")
+	bool CanAddWeight(const FPDItemData& ItemData, int32 Quantity = 1) const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Inventory|Weight")
+	bool CanAddSlotWeight(const FPDInventorySlot& SourceSlot, int32 Quantity = 1) const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Inventory|Weight")
+	bool CanFitWeightAfterEquipmentChange(const FPDInventorySlot& ItemLeavingInventory, const FPDInventorySlot& ItemEnteringInventory, float NewBagCapacityWeight) const;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
+	void BroadcastInventoryMessage(const FText& Message);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory|Weight")
+	void BroadcastWeightLimitExceeded();
 
 	UFUNCTION(BlueprintPure, Category = "PD|Inventory")
 	int32 FindEmptySlot() const;

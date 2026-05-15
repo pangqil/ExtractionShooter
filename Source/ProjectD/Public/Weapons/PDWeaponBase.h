@@ -16,6 +16,7 @@ class APDMagazineActor;
 class USphereComponent;
 class UNiagaraSystem;
 class UDataTable;
+class UPDInventoryComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponFired, APDWeaponBase*, Weapon);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponLevelChanged, APDWeaponBase*, Weapon, int32, NewLevel);
@@ -129,6 +130,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Item")
 	FPDItemData CachedItemData;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Ammo")
+	FName AmmoItemID;
+
 
 	// Recoil 설정
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Recoil")
@@ -261,14 +266,19 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Weapon|Recoil")
 	FORCEINLINE float GetCurrentRecoilSpread() const { return CurrentRecoilSpread; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Weapon|Ammo")
+	int32 GetAvailableAmmoCount() const;
 	
 	void FinishReload();
 
 protected:
 	bool CanFire() const;
+	bool HasAmmoToReload() const;
 	void ApplyDamage(AActor* HitActor, float DamageAmount);
 	void PostFire();
 	void ResetFireCooldown();
+	void SpawnTracerEffect(const FVector& Start, const FVector& End);
 
 	void PlayWeaponMontage(UAnimMontage* Montage, FName StartSection = NAME_None);
 	bool IsPlayingMontage(UAnimMontage* Montage) const;
@@ -290,6 +300,8 @@ protected:
 	void TickMeshRecoilRecovery();
 
 	FVector GetAimDirectionFromOwner(const FVector& StartLocation) const;
+	
+	UPDInventoryComponent* GetOwnerInventory() const;
 
 private:
 	UFUNCTION()

@@ -124,10 +124,11 @@ void APDWeaponBase::Reload_Implementation()
 {
     if (bIsReloading) return;
     if (CurrentAmmo >= GetCurrentStats().MaxAmmo) return;
+    if (!HasAmmoToReload()) return;
 
     bIsReloading = true;
 
-    if (ReloadMontage)
+    if (ReloadMontage && WeaponMesh && WeaponMesh->GetAnimInstance())
     {
         PlayWeaponMontage(ReloadMontage);
         BindMontageEndedForReload(ReloadMontage);
@@ -289,7 +290,25 @@ void APDWeaponBase::ResetFireCooldown()
 
 void APDWeaponBase::FinishReload()
 {
-    CurrentAmmo = GetCurrentStats().MaxAmmo;
+    const int32 MaxAmmo = GetCurrentStats().MaxAmmo;
+    const int32 Needed = MaxAmmo - CurrentAmmo;
+
+    if (!AmmoItemID.IsNone())
+    {
+        UPDInventoryComponent* Inv = GetOwnerInventory();
+        if (Inv)
+        {
+            const int32 ToAdd = FMath::Min(Needed, GetAvailableAmmoCount());
+            if (ToAdd > 0)
+            {
+                Inv->RemoveItem(AmmoItemID, ToAdd);
+                CurrentAmmo += ToAdd;
+            }
+        }
+        else { CurrentAmmo = MaxAmmo; }
+    }
+    else { CurrentAmmo = MaxAmmo; }
+
     bIsReloading = false;
     OnWeaponReloaded.Broadcast(this);
 }
@@ -448,4 +467,49 @@ void APDWeaponBase::PlayFireEffects()
             WeaponMesh,
             MuzzleSocketName);
     }
+}
+
+void APDWeaponBase::SpawnTracerEffect(const FVector& Start, const FVector& End)
+{
+    if (!TracerEffect || !GetWorld()) return;
+
+    FVector Dir = (End - Start).GetSafeNormal();
+    float Distance = FVector::Dist(Start, End);
+    float Speed = Distance / 0.05f;  // 0.05초 만에 도달
+
+    UParticleSystemComponent* PSC = UGameplayStatics::SpawnEmitterAtLocation(
+        GetWorld(), TracerEffect, Start, Dir.Rotation());
+
+    if (PSC)
+    {
+        // 파티클 속도 강제 설정
+        PSC->SetVectorParameter(FName("InitialVelocity"), Dir * Speed);
+        PSC->SetFloatParameter(FName("InitialSpeed"), Speed);
+    }
+}
+
+UPDInventoryComponent* APDWeaponBase::GetOwnerInventory() const
+{
+    if (!WeaponOwner.IsValid()) return nullptr;
+    return WeaponOwner->FindComponentByClass<UPDInventoryComponent>();
+}
+
+bool APDWeaponBase::HasAmmoToReload() const
+{
+    if (AmmoItemID.IsNone()) return true;
+    UPDInventoryComponent* Inv = GetOwnerInventory();
+    if (!Inv) return true;
+    return Inv->HasItem(AmmoItemID, 1);
+}
+
+int32 APDWeaponBase::GetAvailableAmmoCount() const
+{
+    if (AmmoItemID.IsNone()) return INT32_MAX;
+    UPDInventoryComponent* Inv = GetOwnerInventory();
+    if (!Inv) return INT32_MAX;
+    int32 Total = 0;
+    for (const FPDInventorySlot& Slot : Inv->Items)
+        if (!Slot.IsEmpty() && Slot.ItemData.ItemID == AmmoItemID)
+            Total += Slot.Quantity;
+    return Total;
 }

@@ -4,6 +4,7 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Input/Events.h"
+#include "Widgets/Inventory/PDInventoryDragDropOperation.h"
 
 void UPDEquipmentSlotWidget::NativeOnInitialized()
 {
@@ -21,6 +22,21 @@ FReply UPDEquipmentSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeomet
 	}
 
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+
+bool UPDEquipmentSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	if (UPDInventoryDragDropOperation* DragOperation = Cast<UPDInventoryDragDropOperation>(InOperation))
+	{
+		if (DragOperation->IsValidPayload() && OnEquipmentSlotItemDropped.IsBound())
+		{
+			OnEquipmentSlotItemDropped.Broadcast(this, SlotType, DragOperation);
+			return true;
+		}
+	}
+
+	return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 }
 
 void UPDEquipmentSlotWidget::InitializeEquipmentSlot(EPDEquipmentSlotType InSlotType)

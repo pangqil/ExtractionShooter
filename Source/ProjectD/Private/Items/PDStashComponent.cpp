@@ -473,6 +473,13 @@ bool UPDStashComponent::TakeStashSlotQuantityToInventorySlot(UPDInventoryCompone
 		return false;
 	}
 
+	const FPDInventorySlot& SourceSlot = StashItems[StashSlotIndex];
+	if (!TargetInventory->CanAddSlotWeight(SourceSlot, Quantity))
+	{
+		TargetInventory->BroadcastWeightLimitExceeded();
+		return false;
+	}
+
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(StashItems[StashSlotIndex], TargetInventory->Items[TargetInventorySlotIndex], Quantity);
 	if (bMoved)
 	{

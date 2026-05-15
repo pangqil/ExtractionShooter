@@ -71,5 +71,8 @@ namespace PDGameplayTags
 	// Cover
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Cover)
 
+	// Melee
+	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_MeleeAttacking)
+	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Anim_Notify_MeleeHit)
 
 }

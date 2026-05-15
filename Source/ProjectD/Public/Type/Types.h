@@ -93,6 +93,12 @@ struct FPDItemData : public FTableRowBase
 	int32 Price = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Weight = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float BagCapacityWeight = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxStack = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

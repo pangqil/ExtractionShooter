@@ -8,6 +8,7 @@
 
 class UTextBlock;
 class UImage;
+class UMaterialInterface;
 class UPDInventorySlotWidget;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnInventorySlotClicked, UPDInventorySlotWidget*, SlotWidget, int32, SlotIndex);
@@ -72,6 +73,12 @@ protected:
 	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
+	/* --- 추가 Start--- */
+	virtual bool NativeOnDragOver(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
+	virtual void NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
+
+	virtual bool CanAcceptDrop(UDragDropOperation* InOperation) const;
+	/* --- 추가 End--- */
 
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Inventory")
 	FPDInventorySlot SlotData;
@@ -97,6 +104,26 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
 	FName ImageItemIconWidgetName = TEXT("Image_ItemIcon");
 
+	/* --- 추가 Start--- */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
+	FName ImageSlotBGWidgetName = TEXT("Image_SlotBG");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
+	FName ImageHoverBorderWidgetName = TEXT("Image_HoverBorder");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
+	FName ImageDropValidWidgetName = TEXT("Image_DropValid");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
+	FName ImageDropInvalidWidgetName = TEXT("Image_DropInvalid");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
+	TSoftObjectPtr<UMaterialInterface> SlotBGMaterial_Empty;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
+	TSoftObjectPtr<UMaterialInterface> SlotBGMaterial_Filled;
+	/* --- 추가 End--- */
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UUserWidget> TooltipWidgetClass;
 
@@ -109,8 +136,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
 	FName TooltipDescriptionWidgetName = TEXT("Text_Description");
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
+	FName TooltipWeightWidgetName = TEXT("Text_Weight");
+
 private:
 	void ResolveTextWidgets();
+	/* --- 추가 Start--- */
+	void ResolveOverlayWidgets();
+	void ClearDropOverlays();
+	/* --- 추가 End--- */
 	void RefreshVisuals();
 	void ApplyTooltip(const FText& DisplayName, const FText& Description);
 	void ClearTooltip();
@@ -123,4 +157,17 @@ private:
 	TObjectPtr<UTextBlock> TextItemNameWidget = nullptr;
 	TObjectPtr<UTextBlock> TextQuantityWidget = nullptr;
 	TObjectPtr<UImage> ImageItemIconWidget = nullptr;
+	/* --- 추가 Start--- */
+	UPROPERTY(Transient)
+	TObjectPtr<UImage> ImageSlotBGWidget = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UImage> ImageHoverBorderWidget = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UImage> ImageDropValidWidget = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UImage> ImageDropInvalidWidget = nullptr;
+	/* --- 추가 End--- */
 };
