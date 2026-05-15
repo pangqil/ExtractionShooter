@@ -8,6 +8,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Items/PDQuickSlotComponent.h"
 #include "Items/PDEquipmentComponent.h"
+#include "Items/PDEquipmentModificationComponent.h"
 #include "Weapons/PDWeaponBase.h"
 
 APDPlayerCharacter::APDPlayerCharacter()
@@ -40,6 +41,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 
 	QuickSlotComponent=CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
 	EquipmentComponent=CreateDefaultSubobject<UPDEquipmentComponent>(TEXT("EquipmentComponent"));
+	EquipmentModificationComponent=CreateDefaultSubobject<UPDEquipmentModificationComponent>(TEXT("EquipmentModificationComponent"));
 
 	PrimaryActorTick.bCanEverTick=true;
 	PrimaryActorTick.bStartWithTickEnabled=true;
@@ -207,6 +209,17 @@ EWeaponSlot APDPlayerCharacter::GetSlotForWeaponType(EWeaponType Type) const
 
 bool APDPlayerCharacter::TryAutoEquipWeaponItem(const FPDItemData& ItemData)
 {
+	FPDInventorySlot TempSlot;
+	TempSlot.ItemData = ItemData;
+	TempSlot.Quantity = 1;
+	TempSlot.bIsEmpty = false;
+	TempSlot.ModificationLevel = 0;
+	return TryAutoEquipWeaponSlot(TempSlot);
+}
+
+bool APDPlayerCharacter::TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot)
+{
+	const FPDItemData& ItemData = ItemSlot.ItemData;
 	if (!ItemData.WeaponClass) return false;
 
 	const EWeaponSlot TargetSlot = GetSlotForWeaponType(ItemData.WeaponType);
@@ -227,6 +240,8 @@ bool APDPlayerCharacter::TryAutoEquipWeaponItem(const FPDItemData& ItemData)
 		ItemData.WeaponClass, GetActorTransform(), SpawnParams);
 	if (!SpawnedWeapon) return false;
 
+	// 기존 무기/GAS 레벨 시스템은 1부터 시작하므로 +0 개조는 Lv.1로 매핑한다.
+	SpawnedWeapon->SetLevel(FMath::Max(1, ItemSlot.ModificationLevel + 1));
 	PickupWeapon(SpawnedWeapon);
 	return true;
 }

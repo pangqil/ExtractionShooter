@@ -1,20 +1,23 @@
 #include "Data/PDWorldMapDataAsset.h"
 #include "Engine/World.h"
+#include "UObject/Package.h"
 
 FPDWorldMapEntry UPDWorldMapDataAsset::GetEntryForWorld(const UWorld* InWorld) const
 {
-	if (!InWorld) return DefaultEntry;
+    if (!InWorld) return DefaultEntry;
 
-	//현재 월드 에셋 path로 매핑 찾기
-	const FSoftObjectPath CurrentWorldPath(InWorld);
+    
+    FString CurrentPath = InWorld->GetPackage()->GetName();
+    UWorld::RemovePIEPrefix(CurrentPath);
 
-	for (const TPair<TSoftObjectPtr<UWorld>, FPDWorldMapEntry>& Pair : LevelMaps)
-	{
-		if (Pair.Key.ToSoftObjectPath() == CurrentWorldPath)
-		{
-			return Pair.Value;
-		}
-	}
+    for (const TPair<TSoftObjectPtr<UWorld>, FPDWorldMapEntry>& Pair : LevelMaps)
+    {
+        const FString KeyPath = Pair.Key.ToSoftObjectPath().GetLongPackageName();
+        if (CurrentPath == KeyPath)
+        {
+            return Pair.Value;
+        }
+    }
 
-	return DefaultEntry;
+    return DefaultEntry;
 }

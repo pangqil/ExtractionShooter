@@ -317,6 +317,38 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 	return AddedQuantity;
 }
 
+
+int32 UPDInventoryComponent::AddSlotPartial(const FPDInventorySlot& SourceSlot)
+{
+	if (SourceSlot.IsEmpty() || SourceSlot.Quantity <= 0)
+	{
+		return 0;
+	}
+
+	if (Items.Num() != GetMaxSlotCount())
+	{
+		InitializeInventory();
+	}
+
+	// 상태가 붙는 장비는 스택 병합하지 않고 빈 슬롯에 그대로 복사한다.
+	if (SourceSlot.ItemData.ItemType == EPDItemType::Equipment || SourceSlot.ModificationLevel > 0 || SourceSlot.ItemData.MaxStack <= 1)
+	{
+		const int32 EmptySlot = FindEmptySlot();
+		if (EmptySlot == INDEX_NONE)
+		{
+			return 0;
+		}
+
+		Items[EmptySlot] = SourceSlot;
+		Items[EmptySlot].Quantity = FMath::Max(1, SourceSlot.Quantity);
+		Items[EmptySlot].bIsEmpty = false;
+		OnInventoryChanged.Broadcast();
+		return Items[EmptySlot].Quantity;
+	}
+
+	return AddItemPartial(SourceSlot.ItemData, SourceSlot.Quantity);
+}
+
 void UPDInventoryComponent::InitializeInventory()
 {
 	const int32 MaxSlotCount = GetMaxSlotCount();

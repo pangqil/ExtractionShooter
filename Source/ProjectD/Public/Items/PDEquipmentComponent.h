@@ -9,6 +9,7 @@ class UPDInventoryComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnEquipmentSlotChanged, EPDEquipmentSlotType, SlotType, FPDInventorySlot, EquippedSlot);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnEquipmentChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPDOnEquipmentModificationApplied, EPDEquipmentSlotType, SlotType, FPDInventorySlot, EquippedSlot, int32, GasLevel);
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTD_API UPDEquipmentComponent : public UActorComponent
@@ -23,6 +24,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "PD|Equipment")
 	FPDOnEquipmentSlotChanged OnEquipmentSlotChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Equipment|GAS")
+	FPDOnEquipmentModificationApplied OnEquipmentModificationApplied;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment")
 	bool EquipItemFromInventory(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex);
@@ -49,8 +53,10 @@ protected:
 
 private:
 	void InitializeDefaultSlots();
-	bool ApplyCharacterEquipSideEffects(const FPDItemData& ItemData) const;
-	void RemoveCharacterEquipSideEffects(const FPDItemData& ItemData) const;
+	bool ApplyCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const;
+	void RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const;
+	int32 ConvertModificationLevelToGasLevel(int32 ModificationLevel) const;
+	void BroadcastModificationApplied(EPDEquipmentSlotType SlotType, const FPDInventorySlot& EquippedSlot);
 	void BroadcastSlotChanged(EPDEquipmentSlotType SlotType);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Equipment", meta = (AllowPrivateAccess = "true"))

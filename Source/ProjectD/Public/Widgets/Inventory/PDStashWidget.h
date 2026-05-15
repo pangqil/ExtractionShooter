@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Widgets/PDActivatableBase.h"
 #include "Widgets/Inventory/PDInventoryDragDropOperation.h"
+#include "Items/PDStashComponent.h"
 #include "PDStashWidget.generated.h"
 
 class UUniformGridPanel;
@@ -14,6 +15,7 @@ class UUserWidget;
 class UPDQuantityPopupWidget;
 class UButton;
 class UWidget;
+class USizeBox;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDStashWidget : public UPDActivatableBase
@@ -34,6 +36,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void SetStashSortMode(EPDItemSortMode NewSortMode);
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
+	EPDStashUpgradeResult RequestStashUpgrade();
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
@@ -42,13 +47,20 @@ protected:
 	TSubclassOf<UUserWidget> StashSlotWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Stash")
-	int32 FallbackGridColumns = 10;
+	int32 FallbackGridColumns = 5;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Stash")
-	int32 FallbackGridRows = 8;
+	int32 FallbackGridRows = 4;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Stash")
 	FName StashGridWidgetName = TEXT("UniformGridPanel_StashGrid");
+
+	// ScrollBox 안에서도 Stash 슬롯이 부모 레이아웃에 의해 세로/가로로 늘어나지 않도록 고정 크기로 감싼다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Stash")
+	float StashSlotWidth = 120.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Stash")
+	float StashSlotHeight = 120.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Stash")
 	TSubclassOf<UPDQuantityPopupWidget> QuantityPopupWidgetClass;
@@ -79,6 +91,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Sort")
 	TObjectPtr<UButton> Button_SortTab_Type;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash")
+	TObjectPtr<UButton> Button_UpgradeStash;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Stash|Sort")
 	TObjectPtr<UWidget> Panel_SortOptions;
@@ -115,6 +130,15 @@ protected:
 
 	UFUNCTION()
 	void HandleSortByTypeClicked();
+
+	UFUNCTION()
+	void HandleUpgradeStashClicked();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Stash")
+	void BP_OnStashUpgradeSucceeded(int32 NewUpgradeLevel, int32 NewGridRows);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Stash")
+	void BP_OnStashUpgradeFailed(EPDStashUpgradeResult Result);
 
 private:
 	void ResolveStashGridPanel();

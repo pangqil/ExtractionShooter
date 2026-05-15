@@ -5,7 +5,31 @@
 #include "Items/PDInventoryComponent.h"
 #include "PDStashComponent.generated.h"
 
+UENUM(BlueprintType)
+enum class EPDStashUpgradeResult : uint8
+{
+	Success UMETA(DisplayName = "Success"),
+	InvalidInventory UMETA(DisplayName = "Invalid Inventory"),
+	AlreadyMaxLevel UMETA(DisplayName = "Already Max Level"),
+	NotEnoughGold UMETA(DisplayName = "Not Enough Gold"),
+	InvalidConfig UMETA(DisplayName = "Invalid Config")
+};
+
+USTRUCT(BlueprintType)
+struct FPDStashUpgradeData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
+	int32 Cost = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
+	int32 AddedRows = 1;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnStashChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnStashUpgradeFailed, EPDStashUpgradeResult, Result);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnStashUpgraded, int32, NewUpgradeLevel, int32, NewGridRows);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class PROJECTD_API UPDStashComponent : public UActorComponent
@@ -19,16 +43,54 @@ public:
 	TArray<FPDInventorySlot> StashItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
-	int32 GridColumns = 10;
+	int32 GridColumns = 5;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
-	int32 GridRows = 8;
+	int32 GridRows = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
+	int32 BaseGridRows = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
+	int32 CurrentUpgradeLevel = 0;
+
+	// Index 0 = 1st upgrade, Index 1 = 2nd upgrade, ...
+	// Cost and AddedRows can differ per upgrade. Default max is 3 upgrades.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
+	TArray<FPDStashUpgradeData> UpgradeData;
 
 	UPROPERTY(BlueprintAssignable, Category="PD|Stash")
 	FPDOnStashChanged OnStashChanged;
 
+	UPROPERTY(BlueprintAssignable, Category="PD|Stash")
+	FPDOnStashUpgraded OnStashUpgraded;
+
+	UPROPERTY(BlueprintAssignable, Category="PD|Stash")
+	FPDOnStashUpgradeFailed OnStashUpgradeFailed;
+
 	UFUNCTION(BlueprintPure, Category="PD|Stash")
 	int32 GetMaxSlotCount() const { return GridColumns * GridRows; }
+
+	UFUNCTION(BlueprintPure, Category="PD|Stash")
+	int32 GetMaxUpgradeLevel() const { return FMath::Min(3, UpgradeData.Num()); }
+
+	UFUNCTION(BlueprintPure, Category="PD|Stash")
+	bool IsMaxUpgradeLevel() const { return CurrentUpgradeLevel >= GetMaxUpgradeLevel(); }
+
+	UFUNCTION(BlueprintPure, Category="PD|Stash")
+	int32 GetNextUpgradeCost() const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Stash")
+	int32 GetNextUpgradeAddedRows() const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Stash")
+	EPDStashUpgradeResult CanUpgradeStash(const UPDInventoryComponent* SourceInventory) const;
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	EPDStashUpgradeResult UpgradeStash(UPDInventoryComponent* SourceInventory);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	void SetStashUpgradeLevel(int32 NewUpgradeLevel);
 
 	UFUNCTION(BlueprintPure, Category="PD|Stash")
 	int32 FindEmptySlot() const;

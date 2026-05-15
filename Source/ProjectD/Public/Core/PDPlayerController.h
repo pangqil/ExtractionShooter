@@ -66,6 +66,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	bool SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity = 1);
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
+	void OpenEquipmentModificationInterface();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
+	void CloseEquipmentModificationInterface();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Equipment Modification")
+	bool IsEquipmentModificationInterfaceOpen() const;
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Quest")
 	void OpenQuestInterface();
 
@@ -109,6 +118,9 @@ protected:
 	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UUserWidget> EquipmentModificationWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
 
 	virtual void SetupInputComponent() override;
@@ -143,6 +155,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketWidget> MarketWidgetInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> EquipmentModificationWidgetInstance;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDQuestWindowWidget> QuestWindowWidgetInstance;

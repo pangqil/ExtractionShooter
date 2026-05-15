@@ -14,6 +14,7 @@ class UPDVisionComponent;
 class UPDInteractionComponent;
 class UPDQuickSlotComponent;
 class UPDEquipmentComponent;
+class UPDEquipmentModificationComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -56,6 +57,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDEquipmentComponent> EquipmentComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDEquipmentModificationComponent> EquipmentModificationComponent;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Stamina")
@@ -108,6 +112,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	bool TryAutoEquipWeaponItem(const FPDItemData& ItemData);
 
+	// 개조 레벨 등 개별 슬롯 상태를 유지하면서 무기를 장착한다.
+	// 장착된 무기의 기존 레벨 시스템에는 ModificationLevel + 1을 전달한다.
+	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
+	bool TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot);
+
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	bool RemoveEquippedWeaponItem(const FPDItemData& ItemData, bool bDestroyWeaponActor = true);
 
@@ -131,6 +140,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|Equipment")
 	UPDEquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent; }
+
+	UFUNCTION(BlueprintPure, Category="PD|Equipment")
+	UPDEquipmentModificationComponent* GetEquipmentModificationComponent() const { return EquipmentModificationComponent; }
 
 	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
 	void TryInteract();
