@@ -65,8 +65,9 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		}
 	}
 	
-	if (Data.EvaluatedData.Attribute == GetHungerAttribute() ||
-		Data.EvaluatedData.Attribute == GetThirstAttribute())
+	if (Data.EvaluatedData.Attribute == GetHungerAttribute()  ||
+		Data.EvaluatedData.Attribute == GetThirstAttribute()  ||
+		Data.EvaluatedData.Attribute == GetGasMaskAttribute())
 	{
 		if (!bIsInitialized) return;
 		AActor* OwnerActor=GetOwningActor();
@@ -92,7 +93,8 @@ void UPDAttributeSet::HandleAttributeClamp(const FGameplayAttribute& Attribute, 
 	else if (Attribute==GetMoveSpeedAttribute()) NewValue=FMath::Clamp(NewValue, GetMaxMoveSpeed()*0.2f, GetMaxMoveSpeed());
 	else if (Attribute==GetThirstAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxThirst());
 	else if (Attribute==GetHungerAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxHunger());
-	
+	else if (Attribute==GetGasMaskAttribute()) NewValue=FMath::Clamp(NewValue, 0.f, GetMaxGasMask());
+
 }
 
 FGameplayAttribute UPDAttributeSet::GetAttributeByPart(EBodyPart Part) const
@@ -213,6 +215,9 @@ void UPDAttributeSet::CheckAndApplySurvivalEffects(UAbilitySystemComponent* ASC,
 
 	TryApplyOrRemoveSurvivalEffect(ASC, Source->GetDehydratedEffectClass(),
 		PDGameplayTags::State_Debuff_Dehydrated, GetThirst() <= 0.f);
+
+	TryApplyOrRemoveSurvivalEffect(ASC, Source->GetGasExposureEffectClass(),
+		PDGameplayTags::State_Debuff_GasExposure, GetGasMask() <= 0.f);
 }
 
 void UPDAttributeSet::TryApplyOrRemoveSurvivalEffect(UAbilitySystemComponent* ASC,

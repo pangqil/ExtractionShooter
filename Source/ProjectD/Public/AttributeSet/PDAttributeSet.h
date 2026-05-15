@@ -108,6 +108,13 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "PD|StatusEffect")
 	FGameplayAttributeData BleedingResistance;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, BleedingResistance)
+
+	UPROPERTY(BlueprintReadOnly, Category="PD|GasMask")
+	FGameplayAttributeData GasMask;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, GasMask)
+	UPROPERTY(BlueprintReadOnly, Category="PD|GasMask")
+	FGameplayAttributeData MaxGasMask;
+	ATTRIBUTE_ACCESSORS(UPDAttributeSet, MaxGasMask)
 	
 	//Meta Attribute
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Meta")
