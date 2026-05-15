@@ -203,6 +203,15 @@ bool UPDQuestComponent::GiveReward(FName QuestID, UPDInventoryComponent* Invento
 	}
 
 	InventoryComponent->AddGold(QuestProgress->QuestData.Reward.RewardGold);
+
+	if (QuestProgress->QuestData.Reward.RewardTraderReputationExp > 0)
+	{
+		if (UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr)
+		{
+			GI->SetTraderReputationExp(GI->GetTraderReputationExp() + QuestProgress->QuestData.Reward.RewardTraderReputationExp);
+		}
+	}
+
 	const EPDQuestState PreviousState = QuestProgress->State;
 	QuestProgress->State = EPDQuestState::Rewarded;
 

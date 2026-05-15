@@ -95,6 +95,9 @@ protected:
 	float ShellEjectSpeed = 200.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Effects")
+	TObjectPtr<UParticleSystem> TracerEffect;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Effects")
 	TObjectPtr<UParticleSystem> MuzzleFlashEffect;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Effects")
