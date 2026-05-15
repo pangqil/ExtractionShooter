@@ -4,10 +4,10 @@
 #include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
 #include "Templates/SubclassOf.h"
-#include "GameplayEffect.h"
 #include "Types.generated.h"
 
 class APDWeaponBase;
+class UGameplayEffect;
 
 UENUM(BlueprintType)
 enum class EPDItemType : uint8
