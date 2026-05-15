@@ -38,6 +38,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
 	FName ButtonBuyWidgetName = TEXT("Button_Buy");
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
+	FString LockedItemNameString = TEXT("????");
+
 private:
 	UFUNCTION()
 	void HandleBuyClicked();
@@ -45,6 +48,8 @@ private:
 	void ResolveWidgets();
 	void RefreshVisuals();
 	int32 GetUnitPrice() const;
+	bool IsLocked() const;
+	int32 GetRequiredTraderLevel() const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketComponent> MarketComponent;

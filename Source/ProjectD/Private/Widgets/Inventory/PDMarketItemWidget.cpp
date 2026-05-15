@@ -68,32 +68,58 @@ void UPDMarketItemWidget::RefreshVisuals()
 		MarketComponent->ResolveEntryItemData(Entry, ItemData);
 	}
 
+	const bool bLocked = IsLocked();
+	const int32 RequiredLevel = GetRequiredTraderLevel();
+	const FText LockedToolTip = FText::FromString(FString::Printf(TEXT("상인 평판 레벨 %d 필요"), RequiredLevel));
+
 	if (ImageItemIconWidget)
 	{
-		ImageItemIconWidget->SetBrushFromTexture(ItemData.Icon);
-		ImageItemIconWidget->SetVisibility(ItemData.Icon ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+		ImageItemIconWidget->SetBrushFromTexture(bLocked ? nullptr : ItemData.Icon);
+		ImageItemIconWidget->SetVisibility(!bLocked && ItemData.Icon ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+		ImageItemIconWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 	}
 
 	if (TextItemNameWidget)
 	{
 		const FText DisplayName = ItemData.DisplayName.IsEmpty() ? FText::FromName(ItemData.ItemID) : ItemData.DisplayName;
-		TextItemNameWidget->SetText(DisplayName);
+		TextItemNameWidget->SetText(bLocked ? FText::FromString(LockedItemNameString) : DisplayName);
+		TextItemNameWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 	}
 
 	if (TextPriceWidget)
 	{
-		TextPriceWidget->SetText(FText::AsNumber(GetUnitPrice()));
+		TextPriceWidget->SetText(bLocked ? FText::FromString(TEXT("-")) : FText::AsNumber(GetUnitPrice()));
+		TextPriceWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 	}
 
 	if (TextStockWidget)
 	{
-		TextStockWidget->SetText(Entry.Stock < 0 ? FText::FromString(TEXT("∞")) : FText::AsNumber(Entry.Stock));
+		TextStockWidget->SetText(bLocked ? FText::FromString(TEXT("-")) : (Entry.Stock < 0 ? FText::FromString(TEXT("∞")) : FText::AsNumber(Entry.Stock)));
+		TextStockWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 	}
+
+	if (ButtonBuyWidget)
+	{
+		ButtonBuyWidget->SetIsEnabled(!bLocked);
+		ButtonBuyWidget->SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
+	}
+
+	SetToolTipText(bLocked ? LockedToolTip : FText::GetEmpty());
 }
 
 int32 UPDMarketItemWidget::GetUnitPrice() const
 {
 	return MarketComponent ? MarketComponent->GetEntryUnitPrice(Entry) : 0;
+}
+
+bool UPDMarketItemWidget::IsLocked() const
+{
+	return MarketComponent && !MarketComponent->CanBuyEntry(EntryIndex);
+}
+
+int32 UPDMarketItemWidget::GetRequiredTraderLevel() const
+{
+	return MarketComponent ? MarketComponent->GetRequiredTraderLevelForEntry(EntryIndex) : 1;
 }
 
 void UPDMarketItemWidget::HandleBuyClicked()

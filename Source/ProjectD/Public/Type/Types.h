@@ -17,6 +17,16 @@ enum class EPDItemType : uint8
 };
 
 UENUM(BlueprintType)
+enum class EPDItemGrade : uint8
+{
+	Grade1 UMETA(DisplayName = "Grade 1"),
+	Grade2 UMETA(DisplayName = "Grade 2"),
+	Grade3 UMETA(DisplayName = "Grade 3"),
+	Grade4 UMETA(DisplayName = "Grade 4"),
+	Grade5 UMETA(DisplayName = "Grade 5"),
+};
+
+UENUM(BlueprintType)
 enum class EPDItemFilterTab : uint8
 {
 	Equipment  UMETA(DisplayName = "Equipment"),
@@ -68,18 +78,17 @@ struct FPDItemData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EPDItemType ItemType = EPDItemType::Misc;
 
+	// 상인 평판 레벨에 따라 마켓에서 구매 가능 여부를 판단하는 등급.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDItemGrade ItemGrade = EPDItemGrade::Grade1;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bIsQuestItem = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<UTexture2D> Icon = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 BuyPrice = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 SellPrice = 0;
-
+	// 마켓 구매 기준가. 판매가는 마켓 컴포넌트의 판매 비율로 계산한다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Price = 0;
 
@@ -146,6 +155,12 @@ struct FPDPlayerData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 StashUpgradeLevel = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 TraderReputationExp = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 TraderReputationLevel = 1;
 };
 
 USTRUCT(BlueprintType)

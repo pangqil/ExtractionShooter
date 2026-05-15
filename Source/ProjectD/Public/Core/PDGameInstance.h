@@ -30,6 +30,21 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	int32 GetStashUpgradeLevel() const;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Market")
+	void SetTraderReputation(int32 InLevel, int32 InExp);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Market")
+	void SetTraderReputationExp(int32 InExp);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Market")
+	void SetTraderReputationLevel(int32 InLevel);
+
+	UFUNCTION(BlueprintPure, Category = "PD|Market")
+	int32 GetTraderReputationExp() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Market")
+	int32 GetTraderReputationLevel() const;
 	
 	UFUNCTION(BlueprintCallable, Category = "PD|Save")
 	void SaveToDisk();

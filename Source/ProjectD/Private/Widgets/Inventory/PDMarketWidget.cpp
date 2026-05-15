@@ -25,6 +25,10 @@ void UPDMarketWidget::NativeDestruct()
 void UPDMarketWidget::InitializeMarket(UPDMarketComponent* InMarketComponent)
 {
 	MarketComponent = InMarketComponent;
+	if (MarketComponent)
+	{
+		MarketComponent->SyncTraderReputationFromSave();
+	}
 	BindMarketChanged();
 	RefreshMarketGoods();
 }
@@ -49,8 +53,14 @@ void UPDMarketWidget::RefreshMarketGoods()
 	UPDInventoryComponent* BuyerInventory = FindInventoryComponent();
 	const int32 Columns = FMath::Max(1, MarketGridColumns);
 
+	int32 VisibleIndex = 0;
 	for (int32 Index = 0; Index < MarketComponent->Goods.Num(); ++Index)
 	{
+		if (!MarketComponent->ShouldShowEntry(Index))
+		{
+			continue;
+		}
+
 		UUserWidget* CreatedWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), MarketItemWidgetClass);
 		if (!CreatedWidget)
 		{
@@ -62,7 +72,8 @@ void UPDMarketWidget::RefreshMarketGoods()
 			MarketItemWidget->SetMarketEntry(MarketComponent, BuyerInventory, MarketComponent->Goods[Index], Index);
 		}
 
-		UUniformGridSlot* GridSlot = MarketGridPanel->AddChildToUniformGrid(CreatedWidget, Index / Columns, Index % Columns);
+		UUniformGridSlot* GridSlot = MarketGridPanel->AddChildToUniformGrid(CreatedWidget, VisibleIndex / Columns, VisibleIndex % Columns);
+		++VisibleIndex;
 		if (GridSlot)
 		{
 			GridSlot->SetHorizontalAlignment(HAlign_Center);
