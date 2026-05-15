@@ -35,6 +35,15 @@ void APDEnemyBase::BeginPlay()
 
 	if (UPDCombatComponent* Combat = FindComponentByClass<UPDCombatComponent>())
 		Combat->OnTargetChanged.AddDynamic(this, &APDEnemyBase::OnCombatTargetChanged);
+
+	if (USkeletalMeshComponent* SkelMesh=GetMesh())
+	{
+		for (int32 i=0; i<SkelMesh->GetNumMaterials(); i++)
+		{
+			UMaterialInstanceDynamic* DynMat=SkelMesh->CreateAndSetMaterialInstanceDynamic(i);
+			if (DynMat) DitherMaterials.Add(DynMat);
+		}
+	}
 }
 
 
@@ -157,6 +166,10 @@ void APDEnemyBase::HandleDeath(AActor* Killer)
 
 void APDEnemyBase::OnVisionExposureChanged_Implementation(AActor* Observer, float Exposure)
 {
+	for (UMaterialInstanceDynamic* Mat : DitherMaterials)
+	{
+		if (Mat) Mat->SetScalarParameterValue(TEXT("Exposure"), Exposure);
+	}
 }
 
 void APDEnemyBase::DropLootOnDeath()
