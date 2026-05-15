@@ -128,7 +128,7 @@ void APDWeaponBase::Reload_Implementation()
 
     bIsReloading = true;
 
-    if (ReloadMontage)
+    if (ReloadMontage && WeaponMesh && WeaponMesh->GetAnimInstance())
     {
         PlayWeaponMontage(ReloadMontage);
         BindMontageEndedForReload(ReloadMontage);
@@ -473,11 +473,19 @@ void APDWeaponBase::SpawnTracerEffect(const FVector& Start, const FVector& End)
 {
     if (!TracerEffect || !GetWorld()) return;
 
+    FVector Dir = (End - Start).GetSafeNormal();
+    float Distance = FVector::Dist(Start, End);
+    float Speed = Distance / 0.05f;  // 0.05초 만에 도달
+
     UParticleSystemComponent* PSC = UGameplayStatics::SpawnEmitterAtLocation(
-        GetWorld(), TracerEffect, Start, (End - Start).Rotation());
+        GetWorld(), TracerEffect, Start, Dir.Rotation());
 
     if (PSC)
-        PSC->SetBeamEndPoint(0, End);
+    {
+        // 파티클 속도 강제 설정
+        PSC->SetVectorParameter(FName("InitialVelocity"), Dir * Speed);
+        PSC->SetFloatParameter(FName("InitialSpeed"), Speed);
+    }
 }
 
 UPDInventoryComponent* APDWeaponBase::GetOwnerInventory() const
