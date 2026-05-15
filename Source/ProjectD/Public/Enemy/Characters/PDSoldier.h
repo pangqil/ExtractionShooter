@@ -46,10 +46,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	bool bAutoFireOnAttackRequested = true;
 
-	/** 발사 시 재생할 어택 몽타주 (선택). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
-	TObjectPtr<UAnimMontage> AttackMontage;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	TObjectPtr<APDWeaponBase> EquippedWeapon;
 

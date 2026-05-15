@@ -33,10 +33,6 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	/** 공격 모션. BP 디자이너가 지정. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Melee")
-	TObjectPtr<UAnimMontage> AttackMontage;
-
 	/** 트레이스 시작 소켓 (캐릭터 메시). 손/머리/입 등 공격 부위. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Melee")
 	FName MeleeSocketName = TEXT("hand_r");

@@ -109,10 +109,5 @@ void APDSoldier::HandleAttackRequested(AActor* /*Target*/)
 	if (!bAutoFireOnAttackRequested) return;
 	if (!EquippedWeapon) return;
 
-	if (AttackMontage)
-	{
-		PlayAnimMontage(AttackMontage);
-	}
-
 	EquippedWeapon->Fire();
 }

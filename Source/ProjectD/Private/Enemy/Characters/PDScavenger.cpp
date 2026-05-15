@@ -30,10 +30,6 @@ void APDScavenger::HandleAttackRequested(AActor* Target)
 	CachedAttackTarget = Target;
 
 	if (!bAutoPlayMontageOnAttackRequested) return;
-	if (!AttackMontage) return;
-
-	PlayAnimMontage(AttackMontage);
-	// 실제 데미지 인가는 AttackMontage 의 AnimNotify 가 PerformMeleeTrace() 를 호출하여 발생.
 }
 
 void APDScavenger::PerformMeleeTrace()
