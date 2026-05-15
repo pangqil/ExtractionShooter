@@ -616,7 +616,7 @@ void UPDStashWidget::TakeStashSlotQuantity(int32 SlotIndex, int32 Quantity)
 		{
 			if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwningPlayerPawn()))
 			{
-				if (PlayerCharacter->TryAutoEquipWeaponItem(SourceSlot->ItemData))
+				if (PlayerCharacter->TryAutoEquipWeaponSlot(*SourceSlot))
 				{
 					StashComponent->StashItems[SlotIndex].Quantity -= 1;
 					if (StashComponent->StashItems[SlotIndex].Quantity <= 0)
