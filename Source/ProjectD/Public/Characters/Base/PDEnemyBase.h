@@ -98,6 +98,10 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Loot")
 	void OnLootDropped(const TArray<AActor*>& SpawnedItems);
 
+	/** 사망 후 본체(메시) 소멸까지 대기 시간(초). 0 이하면 LifeSpan 미설정(영구). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|AI|Death", meta = (ClampMin = "0.0"))
+	float CorpseDespawnDelay = 10.f;
+
 private:
 	// CombatComponent::OnTargetChanged → WeaponComponent::SetAimTarget 자동 연결
 	UFUNCTION()

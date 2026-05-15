@@ -127,6 +127,12 @@ void APDEnemyBase::OnEnterState_Dead()
 	// 사망 시 드랍 + 시체 컨테이너. 디자이너가 BP 에서 추가 VFX/사운드는 OnLootDropped 로 확장.
 	DropLootOnDeath();
 	SpawnCorpseContainer();
+
+	// 0 이하면 영구 보존(시체 컨테이너로 대체되는 시나리오 등) — 그 외에는 LifeSpan 예약.
+	if (CorpseDespawnDelay > 0.f)
+	{
+		SetLifeSpan(CorpseDespawnDelay);
+	}
 }
 
 void APDEnemyBase::HandleDeath(AActor* Killer)

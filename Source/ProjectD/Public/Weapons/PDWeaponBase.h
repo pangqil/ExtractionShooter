@@ -248,7 +248,7 @@ public:
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
 
 	UFUNCTION(BlueprintPure, Category = "PD|Weapon|Item")
-	FORCEINLINE const FPDItemData& GetCachedItemData() const { return CachedItemData; }
+	FORCEINLINE FPDItemData GetCachedItemData() const { return CachedItemData; }
 
 	UFUNCTION(BlueprintPure, Category="PD|Weapon|GAS")
 	FORCEINLINE FGameplayTag GetWeaponTypeTag() const { return WeaponTypeTag; }
