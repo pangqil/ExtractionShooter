@@ -1,5 +1,9 @@
-﻿#include "Weapons/PDMeleeWeapon.h"
+#include "Weapons/PDMeleeWeapon.h"
 #include "Components/BoxComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 
 APDMeleeWeapon::APDMeleeWeapon()
 {
@@ -60,4 +64,14 @@ void APDMeleeWeapon::OnAttackOverlap(UPrimitiveComponent* OverlappedComp,
 
 	AlreadyHitActors.Add(OtherActor);
 	ApplyDamage(OtherActor, AttackDamage);
+}
+
+void APDMeleeWeapon::ApplyDamage(AActor* TargetActor, float DamageAmount)
+{
+	if (!TargetActor || DamageAmount <= 0.f)
+	{
+		return;
+	}
+
+	UGameplayStatics::ApplyDamage(TargetActor, DamageAmount, nullptr, this, nullptr);
 }

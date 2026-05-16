@@ -8,6 +8,8 @@
 
 class APDWeaponBase;
 class UGameplayEffect;
+class AActor;
+class UDamageType;
 
 UENUM(BlueprintType)
 enum class EPDItemType : uint8
