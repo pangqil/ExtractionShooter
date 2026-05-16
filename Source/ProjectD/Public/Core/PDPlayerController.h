@@ -143,7 +143,25 @@ protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 
+public:
+	/**
+	 * 무기 발사 시 호출. 에임 Yaw 오프셋을 누적시켜 캐릭터가 커서 방향에서 밀리게 함.
+	 * YawDelta > 0 → 우측, < 0 → 좌측. 무기에서 랜덤 부호 결정 후 넘겨줌.
+	 */
+	void AddRecoilOffset(float YawDelta);
+
+	FORCEINLINE float GetRecoilYawOffset() const { return RecoilYawOffset; }
+
 private:
+	/** 현재 누적된 에임 Yaw 오프셋 (도). UpdateAimRotation에서 회전에 더해짐. */
+	float RecoilYawOffset = 0.f;
+
+	/** 초당 회복 속도 (도/초). BP_PlayerController 디테일에서 조정. */
+	UPROPERTY(EditDefaultsOnly, Category="PD|Recoil", meta=(ClampMin="0.0"))
+	float RecoilRecoverySpeed = 10.f;
+
+	void TickRecoilRecovery(float DeltaTime);
+
 	void UseQuickSlot(int32 SlotIndex);
 
 	void OnMove(const struct FInputActionValue& Value);

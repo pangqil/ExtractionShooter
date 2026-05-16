@@ -39,6 +39,7 @@ void APDRaidEntryPortal::EnterRaid(APlayerController* PC)
 	
 	const FPDPlayerData& Data = GI->GetPlayerData();
 	GI->ConfirmRaidLoadout(Data.StashItems, Data.Gold);
-	
+
+	// 연출
 	OnRaidEntryTriggered(PC);
 }

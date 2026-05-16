@@ -37,6 +37,7 @@ void APDGameMode::EndRaid(bool bSuccess)
 	}
 	if (GI) GI->SaveToDisk();
 
+	// BP 연출 훅 — BP에서 결과 UI + OpenLevel 처리
 	OnRaidEnded(bSuccess);
 }
 

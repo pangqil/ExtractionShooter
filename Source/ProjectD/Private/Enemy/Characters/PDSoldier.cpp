@@ -5,6 +5,7 @@
 #include "Enemy/Components/PDCombatComponent.h"
 #include "Items/PDStashActor.h"
 #include "Items/PDStashComponent.h"
+#include "TimerManager.h"
 #include "Weapons/Base/PDWeaponBase.h"
 
 APDSoldier::APDSoldier()
@@ -18,15 +19,17 @@ void APDSoldier::BeginPlay()
 
 	SpawnAndEquipDefaultWeapon();
 
-	// CombatComponent.OnAttackRequested 는 "공격 의도" 신호 — 무기에게 Fire 위임.
+	// 타겟 획득/상실에 맞춰 풀오토 루프 on/off.
 	if (UPDCombatComponent* Combat = GetCombatComponent())
 	{
-		Combat->OnAttackRequested.AddDynamic(this, &APDSoldier::HandleAttackRequested);
+		Combat->OnTargetChanged.AddDynamic(this, &APDSoldier::HandleTargetChanged);
 	}
 }
 
 void APDSoldier::OnEnterState_Dead()
 {
+	StopContinuousFire();
+
 	Super::OnEnterState_Dead();
 
 	if (!EquippedWeapon) return;
@@ -103,10 +106,66 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 	}
 }
 
-void APDSoldier::HandleAttackRequested(AActor* /*Target*/)
+void APDSoldier::HandleTargetChanged(AActor* NewTarget)
 {
 	if (!bAutoFireOnAttackRequested) return;
-	if (!EquippedWeapon) return;
+
+	if (NewTarget && EquippedWeapon)
+	{
+		StartContinuousFire();
+	}
+	else
+	{
+		StopContinuousFire();
+	}
+}
+
+void APDSoldier::StartContinuousFire()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+	if (World->GetTimerManager().IsTimerActive(FireTimerHandle)) return;
+
+	// 첫 발은 지연 없이 즉시 시도.
+	OnFireTick();
+
+	// 0 입력 방지용 최소 1프레임 클램프.
+	const float Interval = FMath::Max(FireInterval, 0.0167f);
+	World->GetTimerManager().SetTimer(FireTimerHandle, this, &APDSoldier::OnFireTick, Interval, /*bLoop=*/true);
+}
+
+void APDSoldier::StopContinuousFire()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(FireTimerHandle);
+	}
+}
+
+void APDSoldier::OnFireTick()
+{
+	if (!EquippedWeapon)
+	{
+		StopContinuousFire();
+		return;
+	}
+
+	UPDCombatComponent* Combat = GetCombatComponent();
+	if (!Combat || !Combat->HasValidTarget())
+	{
+		StopContinuousFire();
+		return;
+	}
+
+	if (bRequireInRangeToFire)
+	{
+		if (const AActor* Target = Combat->GetCurrentTarget())
+		{
+			const float Range = Combat->GetAttackRange();
+			const float DistSq = FVector::DistSquared(GetActorLocation(), Target->GetActorLocation());
+			if (DistSq > Range * Range) return; // 사거리 밖이면 이번 틱 스킵, 루프는 유지.
+		}
+	}
 
 	EquippedWeapon->Fire();
 }

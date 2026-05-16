@@ -49,28 +49,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Recoil")
 	TSubclassOf<UCameraShakeBase> FireCameraShakeClass;
 
+	/** 발사 1회당 에임 Yaw 오프셋 (도). 양수/음수 랜덤으로 적용됨. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Recoil", meta=(ClampMin="0.0"))
-	float RecoilSpreadPerShot = 1.5f;
+	float RecoilYawPerShot = 2.f;
 
+	/** 누적 가능한 최대 Yaw 오프셋 (도). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Recoil", meta=(ClampMin="0.0"))
-	float MaxRecoilSpread = 8.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Recoil", meta=(ClampMin="0.0"))
-	float RecoilRecoveryRate = 5.f;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Weapon|Recoil")
-	float CurrentRecoilSpread = 0.f;
+	float MaxRecoilYaw = 15.f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Weapon|State")
 	int32 CurrentAmmo = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Weapon|State")
 	bool bIsReloading = false;
-
-	FTimerHandle SpreadRecoveryHandle;
-
-	UFUNCTION()
-	void TickSpreadRecovery();
 
 public:
 	bool bCanFire = true;
@@ -93,9 +84,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|Weapon")
 	bool IsReloading() const { return bIsReloading; }
-
-	UFUNCTION(BlueprintPure, Category="PD|Weapon|Recoil")
-	float GetCurrentRecoilSpread() const { return CurrentRecoilSpread; }
 
 	UFUNCTION(BlueprintPure, Category="PD|Weapon|Ammo")
 	int32 GetAvailableAmmoCount() const;
