@@ -124,8 +124,22 @@ void APDPlayerCharacter::OnStaminaChanged(const FOnAttributeChangeData& Data)
 
 void APDPlayerCharacter::HandleDeath(AActor* Killer)
 {
+	// 무기 언이큅
 	if (APDWeaponBase* CurWeapon=GetCurrentWeapon())
 		CurWeapon->OnUnequip();
+
+	// 입력 차단
+	if (APlayerController* PC=Cast<APlayerController>(GetController()))
+		PC->DisableInput(PC);
+
+	// 이동 중지
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
+
+	// 캡슐 콜리전 비활성화 (래그돌/시체가 다른 오브젝트 방해 안 하도록)
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	// 이후 OnDeath(BP) → GM->OnPlayerDied 순으로 호출됨
 	Super::HandleDeath(Killer);
 }
 

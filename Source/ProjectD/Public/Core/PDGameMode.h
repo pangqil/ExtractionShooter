@@ -45,6 +45,9 @@ protected:
 private:
 	void HandleDeathTravel();
 	FTimerHandle DeathTravelTimerHandle;
+
+	void InitializePlayerInventoryFromLoadout(APlayerController* PC);
+	void TransferPlayerInventoryToStash(APlayerController* PC);
 };
 /*
 탈출하게 될 경우 

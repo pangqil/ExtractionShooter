@@ -46,6 +46,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Market")
 	int32 GetTraderReputationLevel() const;
 	
+	// ── 레이드 로드아웃 ──────────────────────────────────────────────────────
+	/**
+	 * 허브 로드아웃 확정 화면에서 호출.
+	 * 선택한 아이템/골드를 RaidLoadout 에 기록하고,
+	 * StashItems 에서는 해당 항목을 미리 차감해 SaveToDisk() 까지 수행.
+	 * (사망해도 스태시에는 이미 없는 상태로 저장됨)
+	 */
+	UFUNCTION(BlueprintCallable, Category="PD|Raid")
+	void ConfirmRaidLoadout(const TArray<FPDInventorySlot>& InLoadout, int32 InGold);
+
+	UFUNCTION(BlueprintPure, Category="PD|Raid")
+	const TArray<FPDInventorySlot>& GetRaidLoadout() const { return PlayerData.RaidLoadout; }
+
+	UFUNCTION(BlueprintPure, Category="PD|Raid")
+	int32 GetRaidGold() const { return PlayerData.RaidGold; }
+
+	/** StartRaid() 내부에서 인벤토리 이전 완료 후 호출. */
+	UFUNCTION(BlueprintCallable, Category="PD|Raid")
+	void ClearRaidLoadout();
+	// ─────────────────────────────────────────────────────────────────────────
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Save")
 	void SaveToDisk();
 
