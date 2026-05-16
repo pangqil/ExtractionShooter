@@ -1004,12 +1004,9 @@ void APDPlayerController::UpdateAimRotation()
 	if (!AimDirection.IsNearlyZero())
 	{
 		FRotator AimRot = AimDirection.Rotation();
-		AimRot.Yaw += RecoilYawOffset; // 반동만큼 에임 방향 틀어짐
+		AimRot.Yaw += RecoilYawOffset;
+		SetControlRotation(AimRot);
 		ControlledPawn->SetActorRotation(AimRot);
-
-		DrawDebugLine(GetWorld(), ControlledPawn->GetActorLocation(),
-			ControlledPawn->GetActorLocation() + AimDirection.GetSafeNormal() * 200.f,
-			FColor::Blue, false, 0.1f, 0, 2.f);
 	}
 }
 
