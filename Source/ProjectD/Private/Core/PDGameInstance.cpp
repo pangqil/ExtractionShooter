@@ -74,3 +74,21 @@ void UPDGameInstance::LoadFromDisk()
 	if (!SaveObject) return;
 	PlayerData=SaveObject->PlayerData;
 }
+
+void UPDGameInstance::TravelToBaseLevel(bool bMarkResetPending)
+{
+	if (BaseLevel.IsNull())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UPDGameInstance::TravelToBaseLevel: BaseLevel is not set."));
+		return;
+	}
+	if (bMarkResetPending) bPendingResetToBase=true;
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, BaseLevel);
+}
+
+bool UPDGameInstance::ConsumePendingResetToBase()
+{
+	const bool bWasPending=bPendingResetToBase;
+	bPendingResetToBase=false;
+	return bWasPending;
+}

@@ -1,6 +1,7 @@
 #include "Core/PDGameMode.h"
 #include "Core/PDGameState.h"
 #include "Core/PDGameInstance.h"
+#include "TimerManager.h"
 
 APDGameMode::APDGameMode()
 {
@@ -34,6 +35,18 @@ void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
 {
 	if (!PC) return;
 	EndRaid(false);
+	GetWorldTimerManager().SetTimer(
+		DeathTravelTimerHandle,
+		this, &APDGameMode::HandleDeathTravel,
+		DeathToTravelDelay, false);
+}
+
+void APDGameMode::HandleDeathTravel()
+{
+	if (UPDGameInstance* GI=GetGameInstance<UPDGameInstance>())
+	{
+		GI->TravelToBaseLevel(true);
+	}
 }
 
 void APDGameMode::SetRaidState(ERaidState NewState)
