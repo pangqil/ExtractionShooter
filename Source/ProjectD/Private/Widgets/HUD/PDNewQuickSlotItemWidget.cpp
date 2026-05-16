@@ -51,8 +51,17 @@ void UPDNewQuickSlotItemWidget::NativeConstruct()
 	{
 		SlotBackground->SetVisibility(ESlateVisibility::Hidden);
 	}
+	SetSlotSize(SlotSize);
 	SetSelected(false);
 	RefreshVisuals();
+}
+
+void UPDNewQuickSlotItemWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+	// 디자이너 캔버스에서도 BP Defaults의 SlotSize/머티리얼이 즉시 반영되도록
+	SetSlotSize(SlotSize);
+	SetSelected(bSelected);
 }
 
 void UPDNewQuickSlotItemWidget::InitializeQuickSlot(UPDQuickSlotComponent* InQuickSlotComponent, int32 InSlotIndex)

@@ -1,9 +1,5 @@
 #include "Widgets/HUD/PDNewQuickSlotBarWidget.h"
 
-#include "Blueprint/WidgetTree.h"
-#include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
-#include "Components/PanelWidget.h"
 #include "Data/PDKeyIconDataAsset.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
@@ -15,16 +11,14 @@
 void UPDNewQuickSlotBarWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
-	BuildFallbackWidget();
 	BindQuickSlotComponent(FindQuickSlotComponent());
 }
 
 void UPDNewQuickSlotBarWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	BuildFallbackWidget();
 	BindQuickSlotComponent(FindQuickSlotComponent());
-	RebuildSlotWidgets();
+	CollectSlotWidgets();
 	RefreshSlots();
 
 	if (ULocalPlayer* LP = GetOwningLocalPlayer())
@@ -73,22 +67,35 @@ void UPDNewQuickSlotBarWidget::BindQuickSlotComponent(UPDQuickSlotComponent* InQ
 
 	if (BoundQuickSlotComponent)
 	{
-		BoundQuickSlotComponent->GridColumns = SlotCount;
+		BoundQuickSlotComponent->GridColumns = 6;
 		BoundQuickSlotComponent->GridRows = 1;
 		BoundQuickSlotComponent->InitializeQuickSlots();
 		BoundQuickSlotComponent->OnQuickSlotsChanged.AddUniqueDynamic(this, &UPDNewQuickSlotBarWidget::HandleQuickSlotsChanged);
 		BoundQuickSlotComponent->OnSelectionChanged.AddUniqueDynamic(this, &UPDNewQuickSlotBarWidget::HandleSelectionChanged);
 	}
 
-	RebuildSlotWidgets();
+	CollectSlotWidgets();
 	RefreshSlots();
+}
+
+void UPDNewQuickSlotBarWidget::CollectSlotWidgets()
+{
+	SlotWidgets.Reset();
+	SlotWidgets.Add(Slot_0);
+	SlotWidgets.Add(Slot_1);
+	SlotWidgets.Add(Slot_2);
+	SlotWidgets.Add(Slot_3);
+	SlotWidgets.Add(Slot_4);
+	SlotWidgets.Add(Slot_5);
+
+	ApplyKeyBindings();
 }
 
 void UPDNewQuickSlotBarWidget::RefreshSlots()
 {
-	if (SlotWidgets.Num() != SlotCount)
+	if (SlotWidgets.Num() == 0)
 	{
-		RebuildSlotWidgets();
+		CollectSlotWidgets();
 	}
 
 	for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
@@ -133,80 +140,6 @@ void UPDNewQuickSlotBarWidget::ApplySelection(int32 SelectedIndex)
 			SlotWidget->SetSelected(Index == SelectedIndex);
 		}
 	}
-}
-
-void UPDNewQuickSlotBarWidget::BuildFallbackWidget()
-{
-	if (!WidgetTree)
-	{
-		return;
-	}
-
-	if (!SlotContainer)
-	{
-		if (UPanelWidget* ExistingPanel = Cast<UPanelWidget>(WidgetTree->FindWidget(TEXT("SlotContainer"))))
-		{
-			SlotContainer = ExistingPanel;
-		}
-	}
-
-	if (GetRootWidget())
-	{
-		return;
-	}
-
-	UHorizontalBox* RootBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("SlotContainer"));
-	WidgetTree->RootWidget = RootBox;
-	SlotContainer = RootBox;
-}
-
-void UPDNewQuickSlotBarWidget::RebuildSlotWidgets()
-{
-	BuildFallbackWidget();
-	SlotWidgets.Reset();
-
-	if (!SlotContainer)
-	{
-		return;
-	}
-
-	SlotContainer->ClearChildren();
-
-	UClass* ClassToUse = SlotWidgetClass ? SlotWidgetClass.Get() : UPDNewQuickSlotItemWidget::StaticClass();
-
-	for (int32 Index = 0; Index < SlotCount; ++Index)
-	{
-		UPDNewQuickSlotItemWidget* SlotWidget = CreateWidget<UPDNewQuickSlotItemWidget>(GetOwningPlayer(), ClassToUse);
-		if (!SlotWidget)
-		{
-			continue;
-		}
-
-		SlotWidget->InitializeQuickSlot(BoundQuickSlotComponent, Index);
-		SlotContainer->AddChild(SlotWidget);
-
-		const bool bIsWeaponSlot = (Index < WeaponSlotCount);
-
-		SlotWidget->SetSlotSize(bIsWeaponSlot ? WeaponSlotSize : ConsumableSlotSize);
-		SlotWidget->SetSlotMaterials(
-			bIsWeaponSlot ? WeaponSlotMaterial_Base : ConsumableSlotMaterial_Base,
-			SlotMaterial_Selected);
-
-		if (UHorizontalBoxSlot* HBoxSlot = Cast<UHorizontalBoxSlot>(SlotWidget->Slot))
-		{
-			const float HalfSpacing = SlotSpacing * 0.5f;
-			const bool bAtConsumableBoundary = (Index == WeaponSlotCount && Index > 0);
-			const float LeftPadding = bAtConsumableBoundary ? (HalfSpacing + WeaponConsumableGroupGap) : HalfSpacing;
-
-			HBoxSlot->SetPadding(FMargin(LeftPadding, 0.f, HalfSpacing, 0.f));
-			HBoxSlot->SetHorizontalAlignment(HAlign_Center);
-			HBoxSlot->SetVerticalAlignment(VAlign_Center);
-		}
-
-		SlotWidgets.Add(SlotWidget);
-	}
-
-	ApplyKeyBindings();
 }
 
 void UPDNewQuickSlotBarWidget::ApplyKeyBindings()
