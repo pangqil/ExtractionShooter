@@ -73,7 +73,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Save")
 	void LoadFromDisk();
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Levels")
+	void TravelToBaseLevel(bool bMarkResetPending);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Levels")
+	bool ConsumePendingResetToBase();
+
 protected:
 	UPROPERTY()
 	FPDPlayerData PlayerData;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Levels")
+	TSoftObjectPtr<UWorld> BaseLevel;
+
+	UPROPERTY(BlueprintReadOnly, Category = "PD|Levels")
+	bool bPendingResetToBase = false;
 };

@@ -13,6 +13,9 @@ class UPDBodyPartHealthGroupWidget;
 class UPDNewQuickSlotBarWidget;
 class UPDDebuffIconBarWidget;
 class UPDCrosshairWidget;
+class UPDGasMaskWidget;
+class UPDActionPromptListWidget;
+class UPDSkillSlotBarWidget;
 class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 enum class EWeaponType : uint8;
@@ -48,12 +51,21 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UPDAttributeBarWidget> Bar_Thirst;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDGasMaskWidget> Bar_GasMask;
+
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDNewQuickSlotBarWidget> Bar_NewQuickSlots;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDDebuffIconBarWidget> Bar_Debuffs;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDActionPromptListWidget> Bar_ActionPrompts;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDSkillSlotBarWidget> Bar_SkillSlots;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDCrosshairWidget> WBP_Crosshair;

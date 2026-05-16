@@ -8,7 +8,9 @@ class UCanvasPanel;
 class UImage;
 class UPDWorldMapDataAsset;
 class UPDMapMarkerWidget;
+class UPDFaintMarkWidget;
 struct FPDMapMarker;
+struct FPDFaintMark;
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTD_API UPDWorldMapWidget : public UPDActivatableBase
@@ -31,6 +33,10 @@ public:
     //마커 위젯 클래스(BP에서 WBP_MapMarker 지정)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="WorldMap")
     TSubclassOf<UPDMapMarkerWidget> MapMarkerWidgetClass;
+    
+    //잔존 표식 위젯 클래스(BP에서 WBP_FaintMark 지정)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="WorldMap")
+    TSubclassOf<UPDFaintMarkWidget> FaintMarkWidgetClass;
 
 protected:
     UPROPERTY(meta=(BindWidget))
@@ -52,6 +58,12 @@ protected:
 
     UFUNCTION()
     void HandleMarkerRemoved(int32 MarkerId);
+    
+    UFUNCTION()
+    void HandleFaintMarkAdded(const FPDFaintMark& Mark);
+
+    UFUNCTION()
+    void HandleFaintMarkRemoved(int32 FaintId);
 
 private:
     // 월드 => 맵 캔버스 로컬 좌표
@@ -62,8 +74,15 @@ private:
 
     //모든 마커 위젯에 DisplayIndex 재적용
     void RefreshAllMarkers();
+    
+    void SyncAllMarkerPositions();
+    void SyncAllFaintMarkPositions();
 
     //활성 마커 위젯 추적
     UPROPERTY(Transient)
     TMap<int32, TObjectPtr<UPDMapMarkerWidget>> MarkerWidgets;
+    
+    //활성 표식 위젯 추적
+    UPROPERTY(Transient)
+    TMap<int32, TObjectPtr<UPDFaintMarkWidget>> FaintMarkWidgets;
 };

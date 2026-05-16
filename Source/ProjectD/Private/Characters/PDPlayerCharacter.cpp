@@ -4,6 +4,7 @@
 #include "Component/PDVisionComponent.h"
 #include "Component/PDInteractionComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/PDGameInstance.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Items/PDQuickSlotComponent.h"
@@ -65,6 +66,14 @@ void APDPlayerCharacter::BeginPlay()
         }
 	LinkDefaultAnimLayer();
 	GetCharacterMovement()->bAllowPhysicsRotationDuringAnimRootMotion = false;
+
+	if (UPDGameInstance* GI=GetGameInstance<UPDGameInstance>())
+	{
+		if (GI->ConsumePendingResetToBase())
+		{
+			ResetToBase();
+		}
+	}
 }
 
 void APDPlayerCharacter::Tick(float DeltaTime)

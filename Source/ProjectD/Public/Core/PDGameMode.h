@@ -31,6 +31,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Raid")
 	ERaidState CurrentRaidState=ERaidState::Idle;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Raid", meta=(ClampMin="0.0"))
+	float DeathToTravelDelay = 3.0f;
+
 	void SetRaidState(ERaidState NewState);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="PD|Raid")
@@ -40,6 +43,9 @@ protected:
 	void OnRaidEnded(bool bSuccess);
 
 private:
+	void HandleDeathTravel();
+	FTimerHandle DeathTravelTimerHandle;
+
 	void InitializePlayerInventoryFromLoadout(APlayerController* PC);
 	void TransferPlayerInventoryToStash(APlayerController* PC);
 };
