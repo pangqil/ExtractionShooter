@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "InputCoreTypes.h"
+#include "Type/Types.h"
+#include "TimerManager.h"
 #include "PDNewQuickSlotBarWidget.generated.h"
 
 class UPDQuickSlotComponent;
@@ -28,7 +30,6 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	// 디자이너가 WBP의 HBox에 슬롯 인스턴스 6개를 이 이름으로 배치 (Is Variable 체크 필수)
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UPDNewQuickSlotItemWidget> Slot_0;
 
@@ -47,11 +48,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UPDNewQuickSlotItemWidget> Slot_5;
 
-	// 게임플레이 분기용 (0 ~ WeaponSlotCount-1: 무기, 이후: 소모품)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|QuickSlot", meta=(ClampMin="0", ClampMax="6"))
 	int32 WeaponSlotCount = 2;
 
-	// 슬롯 인덱스 → 매핑된 IA (6개 BP에서 채움)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|QuickSlot|Input")
 	TArray<TObjectPtr<UInputAction>> SlotInputActions;
 
@@ -71,10 +70,30 @@ private:
 	UFUNCTION()
 	void HandleSelectionChanged(int32 NewIndex);
 
-	// BindWidget으로 잡힌 Slot_0~5를 SlotWidgets 배열에 모음. 슬롯 인스턴스 생성 X.
+	UFUNCTION()
+	void HandleConsumableUseStarted(int32 SlotIndex, FPDItemData ItemData, float Duration);
+
+	UFUNCTION()
+	void HandleConsumableUseCanceled(int32 SlotIndex, FPDItemData ItemData);
+
+	UFUNCTION()
+	void HandleConsumableUseCompleted(int32 SlotIndex, FPDItemData ItemData);
+
+	UFUNCTION()
+	void HandleWeaponCooldownStarted(int32 SlotIndex, float Duration, float EndTime);
+
+	UFUNCTION()
+	void HandleWeaponCooldownFinished(int32 SlotIndex);
+
 	void CollectSlotWidgets();
 	void ApplyKeyBindings();
 	void ApplySelection(int32 SelectedIndex);
+	void StartWeaponCooldownUITimer();
+	void StopWeaponCooldownUITimer();
+	void UpdateWeaponCooldownUI();
+	void SetWeaponCooldownUIForSlot(int32 SlotIndex, float RemainingTime);
+	void ClearWeaponCooldownUI();
+	bool IsWeaponCooldownUISlot(int32 SlotIndex) const;
 	FKey FindKeyForAction(const UInputAction* Action) const;
 	UPDQuickSlotComponent* FindQuickSlotComponent() const;
 
@@ -83,4 +102,7 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UPDNewQuickSlotItemWidget>> SlotWidgets;
+
+	FTimerHandle WeaponCooldownUITimerHandle;
+	int32 ActiveWeaponCooldownSlotIndex = INDEX_NONE;
 };

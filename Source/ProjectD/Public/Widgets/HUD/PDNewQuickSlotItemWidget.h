@@ -13,6 +13,7 @@ class USizeBox;
 class UTextBlock;
 class UTexture2D;
 class UMaterialInterface;
+class UWidgetAnimation;
 class UPDQuickSlotComponent;
 class UPDInventoryComponent;
 class UPDStashComponent;
@@ -50,6 +51,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
 	void SetSlotMaterials(TSoftObjectPtr<UMaterialInterface> InBase, TSoftObjectPtr<UMaterialInterface> InSelected);
 
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void SetWeaponCooldownUI(bool bActive, float RemainingTime);
+
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void PlayCooldownReadyFlash();
+
 	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
 	bool IsSlotSelected() const { return bSelected; }
 
@@ -76,16 +83,26 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UOverlay> Container_AmmoLabel;
 	
-	// 텍스트가 선명하게 보이도록 해주는 깔개
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UImage> Image_AmmoCapsule;
 
-	// 탄약 수(현재 탄약/소유 탄약), 아이템 개수를 표현하는 텍스트
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_AmmoOrCount;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UImage> Image_KeyBinding;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Image_CooldownOverlay;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> Text_CooldownRemain;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Image_Flash;
+
+	UPROPERTY(Transient, BlueprintReadOnly, meta=(BindWidgetAnimOptional))
+	TObjectPtr<UWidgetAnimation> Anim_CooldownReadyFlash;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<USizeBox> Box_Slot;
@@ -102,6 +119,7 @@ protected:
 private:
 	void BuildFallbackWidget();
 	void RefreshVisuals();
+	void ClearWeaponCooldownUI();
 	UPDInventoryComponent* FindInventoryComponent() const;
 	UPDStashComponent* FindStashComponent() const;
 
