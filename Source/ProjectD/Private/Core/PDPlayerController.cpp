@@ -37,7 +37,7 @@ DEFINE_LOG_CATEGORY(LogPDCharacter);
 
 #include "Interfaces/PDInteractable.h"
 #include "Weapons/Base/PDWeaponBase.h"
-#include "Weapons/Base/PDRangedWeaponBase.h"  // UpdateCrosshair - GetCurrentRecoilSpread
+#include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Weapons/PDRifle.h"                   // OnToggleFireMode - ToggleFireMode 전용
 
 #include "Ping/PDPingSubsystem.h"
@@ -63,6 +63,7 @@ void APDPlayerController::RequestExtraction()
 void APDPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+	TickRecoilRecovery(DeltaTime);
 	UpdateAimRotation();
 	UpdateCrosshair();
 }
@@ -1002,7 +1003,9 @@ void APDPlayerController::UpdateAimRotation()
 
 	if (!AimDirection.IsNearlyZero())
 	{
-		ControlledPawn->SetActorRotation(AimDirection.Rotation());
+		FRotator AimRot = AimDirection.Rotation();
+		AimRot.Yaw += RecoilYawOffset; // 반동만큼 에임 방향 틀어짐
+		ControlledPawn->SetActorRotation(AimRot);
 
 		DrawDebugLine(GetWorld(), ControlledPawn->GetActorLocation(),
 			ControlledPawn->GetActorLocation() + AimDirection.GetSafeNormal() * 200.f,
@@ -1215,18 +1218,34 @@ void APDPlayerController::UpdateCrosshair()
 	float MouseX, MouseY;
 	GetMousePosition(MouseX, MouseY);
 
-	float Spread = 0.f;
-	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		if (APDRangedWeaponBase* Weapon = Cast<APDRangedWeaponBase>(Ch->GetCurrentWeapon()))
-			Spread = Weapon->GetCurrentRecoilSpread();
-
-	HUDInstance->UpdateCrosshair(FVector2D(MouseX, MouseY), Spread);
+	// 크로스헤어 확장 = 누적된 Yaw 오프셋 기반
+	HUDInstance->UpdateCrosshair(FVector2D(MouseX, MouseY), FMath::Abs(RecoilYawOffset));
 }
 
 void APDPlayerController::OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot)
 {
 	if (!HUDInstance || !NewWeapon) return;
 	HUDInstance->SetCrosshairType(NewWeapon->GetWeaponType());
+}
+
+void APDPlayerController::AddRecoilOffset(float YawDelta)
+{
+	// 무기의 MaxRecoilYaw 클램핑은 무기 쪽에서 이미 처리.
+	// 컨트롤러는 단순 누적만.
+	RecoilYawOffset += YawDelta;
+}
+
+void APDPlayerController::TickRecoilRecovery(float DeltaTime)
+{
+	if (FMath::IsNearlyZero(RecoilYawOffset)) return;
+
+	const float Sign = RecoilYawOffset > 0.f ? 1.f : -1.f;
+	const float Recovery = RecoilRecoverySpeed * DeltaTime;
+	RecoilYawOffset -= Sign * Recovery;
+
+	// 0을 지나치면 클램프
+	if (Sign > 0.f && RecoilYawOffset < 0.f) RecoilYawOffset = 0.f;
+	if (Sign < 0.f && RecoilYawOffset > 0.f) RecoilYawOffset = 0.f;
 }
 
 void APDPlayerController::OnToggleWorldMap()

@@ -7,6 +7,7 @@
 #include "Interfaces/PDDamageable.h"
 #include "Items/PDInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Core/PDPlayerController.h"
 
 APDRangedWeaponBase::APDRangedWeaponBase()
 {
@@ -176,30 +177,25 @@ void APDRangedWeaponBase::OnReloadMontageEnded(UAnimMontage* Montage, bool bInte
 
 void APDRangedWeaponBase::ApplyRecoil()
 {
+	// 카메라 셰이크 (시각적 피드백)
 	if (FireCameraShakeClass)
 	{
 		if (APlayerController* PC = GetOwnerPlayerController())
 			PC->PlayerCameraManager->StartCameraShake(FireCameraShakeClass);
 	}
 
-	CurrentRecoilSpread = FMath::Min(
-		CurrentRecoilSpread + RecoilSpreadPerShot,
-		MaxRecoilSpread);
-
-	GetWorldTimerManager().SetTimer(
-		SpreadRecoveryHandle, this,
-		&APDRangedWeaponBase::TickSpreadRecovery,
-		0.016f, true);
-}
-
-void APDRangedWeaponBase::TickSpreadRecovery()
-{
-	CurrentRecoilSpread -= RecoilRecoveryRate * 0.016f;
-
-	if (CurrentRecoilSpread <= 0.f)
+	// 에임 Yaw 오프셋 — PlayerController에 누적
+	if (APDPlayerController* PDPC = Cast<APDPlayerController>(GetOwnerPlayerController()))
 	{
-		CurrentRecoilSpread = 0.f;
-		GetWorldTimerManager().ClearTimer(SpreadRecoveryHandle);
+		// 좌우 랜덤 + MaxRecoilYaw 클램프
+		const float Sign = FMath::RandBool() ? 1.f : -1.f;
+		const float CurrentOffset = PDPC->GetRecoilYawOffset();
+		const float Delta = FMath::Min(
+			RecoilYawPerShot,
+			MaxRecoilYaw - FMath::Abs(CurrentOffset));
+
+		if (Delta > 0.f)
+			PDPC->AddRecoilOffset(Sign * Delta);
 	}
 }
 
