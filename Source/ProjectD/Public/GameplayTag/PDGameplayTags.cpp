@@ -28,6 +28,13 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Input_SwitchSlot3, "Input.SwitchSlot3")
 	UE_DEFINE_GAMEPLAY_TAG(Input_DropWeapon, "Input.DropWeapon")
 
+	UE_DEFINE_GAMEPLAY_TAG(Input_Quickslot1, "Input.Quickslot1")
+	UE_DEFINE_GAMEPLAY_TAG(Input_Quickslot2, "Input.Quickslot2")
+	UE_DEFINE_GAMEPLAY_TAG(Input_Quickslot3, "Input.Quickslot3")
+	UE_DEFINE_GAMEPLAY_TAG(Input_Quickslot4, "Input.Quickslot4")
+	UE_DEFINE_GAMEPLAY_TAG(Input_Quickslot5, "Input.Quickslot5")
+	UE_DEFINE_GAMEPLAY_TAG(Input_Quickslot6, "Input.Quickslot6")
+
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage, "Data.Damage")
 
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_LegDamaged,  "State.Debuff.LegDamaged")

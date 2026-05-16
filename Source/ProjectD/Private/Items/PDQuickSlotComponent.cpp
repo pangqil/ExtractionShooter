@@ -13,6 +13,25 @@ UPDQuickSlotComponent::UPDQuickSlotComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
+void UPDQuickSlotComponent::SetSelectedIndex(int32 NewIndex)
+{
+	if (SelectedIndex == NewIndex)
+	{
+		return;
+	}
+
+	if (NewIndex != INDEX_NONE)
+	{
+		if (!QuickSlotItems.IsValidIndex(NewIndex) || QuickSlotItems[NewIndex].IsEmpty())
+		{
+			return;
+		}
+	}
+
+	SelectedIndex = NewIndex;
+	OnSelectionChanged.Broadcast(SelectedIndex);
+}
+
 void UPDQuickSlotComponent::BeginPlay()
 {
 	Super::BeginPlay();

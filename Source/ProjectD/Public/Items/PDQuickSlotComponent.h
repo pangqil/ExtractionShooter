@@ -9,6 +9,7 @@ class UPDInventoryComponent;
 class UPDStashComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnQuickSlotsChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnQuickSlotSelectionChanged, int32, NewIndex);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class PROJECTD_API UPDQuickSlotComponent : public UActorComponent
@@ -29,6 +30,15 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="PD|QuickSlot")
 	FPDOnQuickSlotsChanged OnQuickSlotsChanged;
+
+	UPROPERTY(BlueprintAssignable, Category="PD|QuickSlot")
+	FPDOnQuickSlotSelectionChanged OnSelectionChanged;
+
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void SetSelectedIndex(int32 NewIndex);
+
+	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
+	int32 GetSelectedIndex() const { return SelectedIndex; }
 
 	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
 	int32 GetMaxSlotCount() const { return GridColumns * GridRows; }
@@ -83,4 +93,6 @@ private:
 	UPDInventoryComponent* FindOwnerInventory() const;
 	int32 GetInventoryItemQuantity(FName ItemID) const;
 	bool SyncQuickSlotsWithInventory();
+
+	int32 SelectedIndex = INDEX_NONE;
 };
