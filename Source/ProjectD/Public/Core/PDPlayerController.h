@@ -214,6 +214,13 @@ private:
 	void OnSwitchSlot2();
 	void OnSwitchSlot3();
 	void OnUseQuickSlot4();
+	void OnQuickslot1();
+	void OnQuickslot2();
+	void OnQuickslot3();
+	void OnQuickslot4();
+	void OnQuickslot5();
+	void OnQuickslot6();
+	void SelectQuickslot(int32 Index);
 	void OnToggleFireMode();
 	void OnDropWeapon();
 	void OnCoverPressed();

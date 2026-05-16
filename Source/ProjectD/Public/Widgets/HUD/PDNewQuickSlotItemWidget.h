@@ -8,7 +8,11 @@
 
 class UBorder;
 class UImage;
+class UOverlay;
+class USizeBox;
 class UTextBlock;
+class UTexture2D;
+class UMaterialInterface;
 class UPDQuickSlotComponent;
 class UPDInventoryComponent;
 class UPDStashComponent;
@@ -31,6 +35,24 @@ public:
 	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
 	int32 GetSlotIndex() const { return SlotIndex; }
 
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void SetSelected(bool bNewSelected);
+
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void SetKeyBindingIcon(UTexture2D* InIcon);
+
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void SetCountText(const FText& InCountText);
+
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void SetSlotSize(FVector2D NewSize);
+
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void SetSlotMaterials(TSoftObjectPtr<UMaterialInterface> InBase, TSoftObjectPtr<UMaterialInterface> InSelected);
+
+	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
+	bool IsSlotSelected() const { return bSelected; }
+
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
@@ -47,6 +69,30 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_Quantity;
 
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Image_SlotBG;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UOverlay> Container_AmmoLabel;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Image_AmmoCapsule;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> Text_AmmoOrCount;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Image_KeyBinding;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<USizeBox> Box_Slot;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|QuickSlot|Widget")
+	TSoftObjectPtr<UMaterialInterface> SlotBGMaterial_Base;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|QuickSlot|Widget")
+	TSoftObjectPtr<UMaterialInterface> SlotBGMaterial_Selected;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|QuickSlot")
 	FVector2D SlotSize = FVector2D(72.f, 72.f);
 
@@ -61,4 +107,5 @@ private:
 
 	FPDInventorySlot SlotData;
 	int32 SlotIndex = INDEX_NONE;
+	bool bSelected = false;
 };
