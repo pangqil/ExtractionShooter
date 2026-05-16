@@ -7,6 +7,22 @@ bool UPDMapMarkerSubsystem::DoesSupportWorldType(EWorldType::Type WorldType) con
 
 int32 UPDMapMarkerSubsystem::AddMarker(const FVector& InWorldLocation)
 {
+    if (ActiveMarkers.Num() >= MaxActiveMarkers)
+    {
+        int32 OldestId = INT_MAX;
+        for (const TPair<int32, FPDMapMarker>& Pair : ActiveMarkers)
+        {
+            if (Pair.Key < OldestId)
+            {
+                OldestId = Pair.Key;
+            }
+        }
+        if (OldestId != INT_MAX)
+        {
+            RemoveMarker(OldestId);
+        }
+    }
+    
     FPDMapMarker NewMarker;
     NewMarker.MarkerId = NextMarkerId++;
     NewMarker.WorldLocation = InWorldLocation;

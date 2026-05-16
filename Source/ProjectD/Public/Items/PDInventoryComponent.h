@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Type/Types.h"
+#include "Engine/DataTable.h"
 #include "PDInventoryComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnInventoryChanged);
@@ -16,6 +17,9 @@ class PROJECTD_API UPDInventoryComponent : public UActorComponent
 
 public:
 	UPDInventoryComponent();
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Inventory")
+	TObjectPtr<UDataTable> ItemDataTable;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	TArray<FPDInventorySlot> Items;
@@ -43,6 +47,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	bool AddItem(const FPDItemData& ItemData, int32 Quantity = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Inventory")
+	bool AddItemByID(FName ItemID, int32 Quantity = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	bool RemoveItem(FName ItemID, int32 Quantity = 1);

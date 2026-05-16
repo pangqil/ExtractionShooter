@@ -5,6 +5,8 @@
 #include "Components/BoxComponent.h"
 #include "PDCoverBase.generated.h"
 
+class UGeometryCollectionComponent;
+
 UENUM(BlueprintType)
 enum class ECoverState : uint8
 {
@@ -41,6 +43,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Cover")
 	TObjectPtr<UBoxComponent> ValidZone;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Cover")
+	TObjectPtr<UGeometryCollectionComponent> DestructionCollection;
+
 	DECLARE_DELEGATE(FOnCoverDestroyed)
 	FOnCoverDestroyed OnCoverDestroyed;
 
@@ -58,7 +63,7 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|Cover")
 	TObjectPtr<UStaticMeshComponent> CoverMesh;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category="PD|Cover")
 	float CharacterClearance = 70.f;
 
@@ -70,6 +75,15 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="PD|Cover|HP")
 	float DamagedThreshold = 0.5f;
+
+	UFUNCTION(BlueprintImplementableEvent, Category="PD|Cover")
+	void BP_OnCoverDamaged(float DamageAmount, float InCurrentHP, float InMaxHP);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="PD|Cover")
+	void BP_OnCoverStateChanged(ECoverState NewState);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="PD|Cover")
+	void BP_OnCoverDestroyed();
 
 private:
 	ECoverState CoverState = ECoverState::Normal;

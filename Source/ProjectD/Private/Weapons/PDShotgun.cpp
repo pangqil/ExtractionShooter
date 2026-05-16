@@ -1,5 +1,5 @@
-﻿#include "Weapons/PDShotgun.h"
-#include "DrawDebugHelpers.h"
+#include "Weapons/PDShotgun.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 
 APDShotgun::APDShotgun()
 {
@@ -27,108 +27,26 @@ void APDShotgun::Fire_Implementation()
             ApplyDamage(HitActor, GetCurrentStats().Damage);
         }
     }
-   
+
     PlayFireEffects();
     PlayWeaponMontage(FireMontage);
     PostFire();
-    EjectShell();
 }
 
 void APDShotgun::Reload_Implementation()
 {
     if (bIsReloading) return;
     if (CurrentAmmo >= GetCurrentStats().MaxAmmo) return;
-
     bIsReloading = true;
-    ShellsToLoad = GetCurrentStats().MaxAmmo - CurrentAmmo;
-    ShellsInserted = 0;
-
-    LoadNextShell();
-}
-
-void APDShotgun::OnShellInserted_Implementation()
-{
-    ++ShellsInserted;
-    // 실시간으로 탄약 UI에 반영
-    ++CurrentAmmo;
-    CurrentAmmo = FMath::Min(CurrentAmmo, GetCurrentStats().MaxAmmo);
-}
-
-void APDShotgun::LoadNextShell()
-{
-    if (ShellsInserted >= ShellsToLoad)
+    if (ReloadMontage)
     {
-        // 모든 탄 삽입 완료 → 펌프 동작 후 재장전 완료
-        if (PumpMontage)
-        {
-            PlayWeaponMontage(PumpMontage);
-            UAnimInstance* AnimInst = WeaponMesh ? WeaponMesh->GetAnimInstance() : nullptr;
-            if (AnimInst)
-            {
-                FOnMontageEnded EndDelegate;
-                EndDelegate.BindUObject(this, &APDShotgun::OnShellInsertMontageEnded);
-                AnimInst->Montage_SetEndDelegate(EndDelegate, PumpMontage);
-            }
-        }
-        else
-        {
-            FinishReload();
-        }
-        return;
-    }
-
-    if (ShellInsertMontage)
-    {
-        PlayWeaponMontage(ShellInsertMontage);
-
-        UAnimInstance* AnimInst = WeaponMesh ? WeaponMesh->GetAnimInstance() : nullptr;
-        if (AnimInst)
-        {
-            FOnMontageEnded EndDelegate;
-            EndDelegate.BindUObject(this, &APDShotgun::OnShellInsertMontageEnded);
-            AnimInst->Montage_SetEndDelegate(EndDelegate, ShellInsertMontage);
-        }
+        PlayWeaponMontage(ReloadMontage);
+        BindMontageEndedForReload(ReloadMontage);
     }
     else
     {
-        // 몽타주 없을 때 폴백: 타이머로 한 발씩
-        FTimerHandle TempTimer;
-        GetWorldTimerManager().SetTimer(
-            TempTimer, this,
-            &APDShotgun::LoadNextShell,
-            ShellInsertTime, false);
+        GetWorldTimerManager().SetTimer(ReloadHandle, this, &APDRangedWeaponBase::FinishReload, GetCurrentStats().ReloadTime, false);
     }
-}
-
-void APDShotgun::InterruptReloadAndFire()
-{
-    if (!bIsReloading || CurrentAmmo <= 0) return;
-
-    // 진행 중인 몽타주 중단
-    StopWeaponMontage(ShellInsertMontage);
-    StopWeaponMontage(PumpMontage);
-    bIsReloading = false;
-
-    Fire();
-}
-
-void APDShotgun::OnShellInsertMontageEnded(UAnimMontage* Montage, bool bInterrupted)
-{
-    if (bInterrupted)
-    {
-        // 도중 중단 (발사 등) — 장전 상태 정리
-        bIsReloading = false;
-        return;
-    }
-
-    if (Montage == PumpMontage)
-    {
-        FinishReload();
-        return;
-    }
-
-    // 다음 탄 삽입
-    LoadNextShell();
 }
 
 int32 APDShotgun::GetCurrentPelletCount() const
@@ -141,16 +59,15 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
 {
     AActor* WeaponOwnerActor = GetWeaponOwner();
     if (!WeaponOwnerActor) return;
- 
+
     APlayerController* PC = Cast<APlayerController>(WeaponOwnerActor->GetInstigatorController());
- 
+
     FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
         : WeaponOwnerActor->GetActorLocation();
-    
-    // GetAimDirectionFromOwner()로 플레이어/적 공통 처리
+
     FVector Forward = GetAimDirectionFromOwner(Start);
- 
+
     float TraceLength = GetCurrentStats().Range;
     if (PC)
     {
@@ -163,22 +80,18 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
     Params.AddIgnoredActor(this);
     Params.AddIgnoredActor(WeaponOwnerActor);
     Params.bTraceComplex = true;
- 
-    const float Range   = GetCurrentStats().Range;
+
     const int32 Pellets = GetCurrentPelletCount();
- 
+
     for (int32 i = 0; i < Pellets; ++i)
     {
         FVector RandDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(SpreadAngle));
         FVector End = Start + RandDir * TraceLength;
-        
+
         FHitResult Hit;
-        bool bHit = GetWorld()->LineTraceSingleByChannel(
-            Hit, Start, End, ECC_Pawn, Params);
+        bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params);
 
         if (bHit) OutHits.Add(Hit);
-        {
-            SpawnTracerEffect(Start, bHit ? Hit.Location : End);
-        }
+        SpawnTracerEffect(Start, bHit ? Hit.Location : End);
     }
 }

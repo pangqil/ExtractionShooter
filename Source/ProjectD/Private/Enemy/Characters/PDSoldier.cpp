@@ -6,7 +6,7 @@
 #include "Items/PDStashActor.h"
 #include "Items/PDStashComponent.h"
 #include "TimerManager.h"
-#include "Weapons/PDWeaponBase.h"
+#include "Weapons/Base/PDWeaponBase.h"
 
 APDSoldier::APDSoldier()
 {
@@ -42,10 +42,9 @@ void APDSoldier::OnEnterState_Dead()
 	{
 		if (UPDStashComponent* Stash = Corpse->GetStashComponent())
 		{
-			const FPDItemData& WeaponData = EquippedWeapon->GetCachedItemData();
-			if (!WeaponData.ItemID.IsNone())
+			const FName WeaponItemID = EquippedWeapon->GetItemID();
+			if (!WeaponItemID.IsNone() && Stash->AddItemByID(WeaponItemID, 1))
 			{
-				Stash->AddItemPartial(WeaponData, 1);
 				bTransferred = true;
 			}
 		}

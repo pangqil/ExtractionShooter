@@ -4,7 +4,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "Kismet/KismetMathLibrary.h"
-#include "Weapons/PDWeaponBase.h"
+#include "Weapons/Base/PDWeaponBase.h"
 
 void UPDAnimInstance::NativeInitializeAnimation()
 {
@@ -34,14 +34,13 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Cache.bIsCoverAiming=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_CoverAim);
 	Cache.bIsMeleeEquipped=CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Melee);
 
+
 	if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Rifle))
 		Cache.WeaponType=EWeaponType::Rifle;
 	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Shotgun))
 		Cache.WeaponType=EWeaponType::Shotgun;
 	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Sniper))
 		Cache.WeaponType=EWeaponType::Sniper;
-	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Pistol))
-		Cache.WeaponType=EWeaponType::Pistol;
 	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Melee))
 		Cache.WeaponType=EWeaponType::Melee;
 	else

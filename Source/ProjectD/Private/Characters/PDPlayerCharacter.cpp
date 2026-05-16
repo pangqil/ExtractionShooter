@@ -4,12 +4,13 @@
 #include "Component/PDVisionComponent.h"
 #include "Component/PDInteractionComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/PDGameInstance.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Items/PDQuickSlotComponent.h"
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDEquipmentModificationComponent.h"
-#include "Weapons/PDWeaponBase.h"
+#include "Weapons/Base/PDWeaponBase.h"
 
 APDPlayerCharacter::APDPlayerCharacter()
 {
@@ -20,7 +21,8 @@ APDPlayerCharacter::APDPlayerCharacter()
 	bUseControllerRotationRoll=false;
 
 	GetCharacterMovement()->bOrientRotationToMovement=false;
-	GetCharacterMovement()->RotationRate=FRotator(0.f, 640.f, 0.f);
+	GetCharacterMovement()->bUseControllerDesiredRotation=true;
+	GetCharacterMovement()->RotationRate=FRotator(0.f, 10.f, 0.f);
 	GetCharacterMovement()->bConstrainToPlane=true;
 	GetCharacterMovement()->bSnapToPlaneAtStart=true;
 	GetCharacterMovement()->GravityScale=2.f;
@@ -60,10 +62,18 @@ void APDPlayerCharacter::BeginPlay()
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Shotgun, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Sniper,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
-            ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Pistol,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
+            ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Melee,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
         }
 	LinkDefaultAnimLayer();
 	GetCharacterMovement()->bAllowPhysicsRotationDuringAnimRootMotion = false;
+
+	if (UPDGameInstance* GI=GetGameInstance<UPDGameInstance>())
+	{
+		if (GI->ConsumePendingResetToBase())
+		{
+			ResetToBase();
+		}
+	}
 }
 
 void APDPlayerCharacter::Tick(float DeltaTime)
@@ -114,8 +124,22 @@ void APDPlayerCharacter::OnStaminaChanged(const FOnAttributeChangeData& Data)
 
 void APDPlayerCharacter::HandleDeath(AActor* Killer)
 {
+	// 무기 언이큅
 	if (APDWeaponBase* CurWeapon=GetCurrentWeapon())
 		CurWeapon->OnUnequip();
+
+	// 입력 차단
+	if (APlayerController* PC=Cast<APlayerController>(GetController()))
+		PC->DisableInput(PC);
+
+	// 이동 중지
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
+
+	// 캡슐 콜리전 비활성화 (래그돌/시체가 다른 오브젝트 방해 안 하도록)
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	// 이후 OnDeath(BP) → GM->OnPlayerDied 순으로 호출됨
 	Super::HandleDeath(Killer);
 }
 
@@ -160,7 +184,7 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Rifle);
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Shotgun);
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Sniper);
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Pistol);
+		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Melee);
 		ASC->AddLooseGameplayTag(NewWeapon->GetWeaponTypeTag());
 	}
 	NewWeapon->SetActorHiddenInGame(false);
@@ -202,7 +226,7 @@ EWeaponSlot APDPlayerCharacter::GetSlotForWeaponType(EWeaponType Type) const
 	case EWeaponType::Rifle:   return EWeaponSlot::Slot1_Rifle;
 	case EWeaponType::Shotgun: return EWeaponSlot::Slot2_Shotgun;
 	case EWeaponType::Sniper:  return EWeaponSlot::Slot3_Sniper;
-	case EWeaponType::Pistol:  return EWeaponSlot::Slot4_Pistol;
+	case EWeaponType::Melee:   return EWeaponSlot::Slot4_Melee;
 	default:                   return EWeaponSlot::None;
 	}
 }

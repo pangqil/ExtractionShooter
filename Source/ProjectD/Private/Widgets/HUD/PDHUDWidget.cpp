@@ -9,10 +9,13 @@
 #include "GameFramework/Pawn.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "Type/Types.h"
+#include "Widgets/HUD/PDActionPromptListWidget.h"
 #include "Widgets/HUD/PDAttributeBarWidget.h"
 #include "Widgets/HUD/PDBodyPartHealthGroupWidget.h"
+#include "Widgets/HUD/PDGasMaskWidget.h"
 #include "Widgets/HUD/PDNewQuickSlotBarWidget.h"
 #include "Widgets/HUD/PDDebuffIconBarWidget.h"
+#include "Widgets/HUD/PDSkillSlotBarWidget.h"
 #include "Widgets/Crosshair/PDCrosshairWidget.h"
 #include "Items/PDQuickSlotComponent.h"
 
@@ -69,6 +72,10 @@ void UPDHUDWidget::BindAllAttributes()
 	BindAttributeToBar(Bar_Thirst,
 		UPDAttributeSet::GetThirstAttribute(),
 		UPDAttributeSet::GetMaxThirstAttribute());
+
+	BindAttributeToBar(Bar_GasMask,
+		UPDAttributeSet::GetGasMaskAttribute(),
+		UPDAttributeSet::GetMaxGasMaskAttribute());
 
 	if (Bar_BodyParts)
 	{

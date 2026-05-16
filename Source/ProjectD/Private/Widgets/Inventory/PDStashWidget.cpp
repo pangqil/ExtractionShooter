@@ -17,7 +17,7 @@
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDQuickSlotComponent.h"
 #include "Items/PDStashComponent.h"
-#include "Weapons/PDWeaponBase.h"
+#include "Weapons/Base/PDWeaponBase.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
 
