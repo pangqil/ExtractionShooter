@@ -59,6 +59,38 @@ int32 UPDGameInstance::GetTraderReputationLevel() const
 	return FMath::Max(1, PlayerData.TraderReputationLevel);
 }
 
+void UPDGameInstance::ConfirmRaidLoadout(const TArray<FPDInventorySlot>& InLoadout, int32 InGold)
+{
+	PlayerData.RaidLoadout = InLoadout;
+	PlayerData.RaidGold    = FMath::Max(0, InGold);
+	
+	PlayerData.Gold = FMath::Max(0, PlayerData.Gold - PlayerData.RaidGold);
+	
+	for (const FPDInventorySlot& LoadoutSlot : InLoadout)
+	{
+		if (LoadoutSlot.IsEmpty()) continue;
+		int32 ToRemove = LoadoutSlot.Quantity;
+		for (FPDInventorySlot& StashSlot : PlayerData.StashItems)
+		{
+			if (StashSlot.IsEmpty()) continue;
+			if (StashSlot.ItemData.ItemID != LoadoutSlot.ItemData.ItemID) continue;
+			int32 Removed = FMath::Min(StashSlot.Quantity, ToRemove);
+			StashSlot.Quantity -= Removed;
+			if (StashSlot.Quantity <= 0) StashSlot.Clear();
+			ToRemove -= Removed;
+			if (ToRemove <= 0) break;
+		}
+	}
+	
+	SaveToDisk();
+}
+
+void UPDGameInstance::ClearRaidLoadout()
+{
+	PlayerData.RaidLoadout.Empty();
+	PlayerData.RaidGold = 0;
+}
+
 void UPDGameInstance::SaveToDisk()
 {
 	UPDSaveGame* SaveObject=Cast<UPDSaveGame>(UGameplayStatics::CreateSaveGameObject(UPDSaveGame::StaticClass()));

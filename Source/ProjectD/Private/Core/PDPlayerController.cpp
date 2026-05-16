@@ -156,11 +156,26 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_DropWeapon,
 		ETriggerEvent::Started, this, &APDPlayerController::OnDropWeapon);
 
-	InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
-	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
-	InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
-	InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
-	
+	// IA_Quickslot1~6의 IMC 매핑(One~Six)과 충돌. 신규 BindNativeAction 경로로 일원화 (QS-5a).
+	// 안정 검증 후 제거 예정.
+	// InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
+	// InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
+	// InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
+	// InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
+
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot1,
+		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot1);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot2,
+		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot2);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot3,
+		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot3);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot4,
+		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot4);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot5,
+		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot5);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot6,
+		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot6);
+
 	if (PingInputComp && InputConfig)
 	{
 		PingInputComp->BindInputs(PDIC, InputConfig);
@@ -342,6 +357,9 @@ void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 
 	UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
+
+	if (ASC && ASC->HasMatchingGameplayTag(PDGameplayTags::State_MeleeAttacking))
+		return;
 
 	if (ASC && (ASC->HasMatchingGameplayTag(PDGameplayTags::Cover_Active) ||
 	            ASC->HasMatchingGameplayTag(PDGameplayTags::State_CoverAim)))
@@ -1010,6 +1028,55 @@ void APDPlayerController::OnSwitchSlot3()
 void APDPlayerController::OnUseQuickSlot4()
 {
 	UseQuickSlot(3);
+}
+
+void APDPlayerController::OnQuickslot1()
+{
+	SelectQuickslot(0);
+}
+
+void APDPlayerController::OnQuickslot2()
+{
+	SelectQuickslot(1);
+}
+
+void APDPlayerController::OnQuickslot3()
+{
+	SelectQuickslot(2);
+}
+
+void APDPlayerController::OnQuickslot4()
+{
+	SelectQuickslot(3);
+}
+
+void APDPlayerController::OnQuickslot5()
+{
+	SelectQuickslot(4);
+}
+
+void APDPlayerController::OnQuickslot6()
+{
+	SelectQuickslot(5);
+}
+
+void APDPlayerController::SelectQuickslot(int32 Index)
+{
+	if (IsGameplayInputBlockedByModalUI())
+	{
+		return;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return;
+	}
+
+	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	{
+		QuickSlotComponent->SetSelectedIndex(Index);
+	}
 }
 
 void APDPlayerController::OnCoverPressed()

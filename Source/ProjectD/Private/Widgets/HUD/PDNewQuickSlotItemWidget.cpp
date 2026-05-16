@@ -11,6 +11,7 @@
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
+#include "Materials/MaterialInterface.h"
 #include "Core/PDPlayerController.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDQuickSlotComponent.h"
@@ -27,6 +28,11 @@ void UPDNewQuickSlotItemWidget::NativeOnInitialized()
 			HotkeyWidget->SetVisibility(ESlateVisibility::Collapsed);
 		}
 	}
+	if (SlotBackground)
+	{
+		SlotBackground->SetVisibility(ESlateVisibility::Hidden);
+	}
+	SetSelected(false);
 	RefreshVisuals();
 }
 
@@ -41,6 +47,11 @@ void UPDNewQuickSlotItemWidget::NativeConstruct()
 			HotkeyWidget->SetVisibility(ESlateVisibility::Collapsed);
 		}
 	}
+	if (SlotBackground)
+	{
+		SlotBackground->SetVisibility(ESlateVisibility::Hidden);
+	}
+	SetSelected(false);
 	RefreshVisuals();
 }
 
@@ -185,6 +196,11 @@ void UPDNewQuickSlotItemWidget::RefreshVisuals()
 		{
 			Text_Quantity->SetText(FText::GetEmpty());
 		}
+
+		if (Text_AmmoOrCount)
+		{
+			Text_AmmoOrCount->SetText(FText::GetEmpty());
+		}
 		return;
 	}
 
@@ -197,6 +213,14 @@ void UPDNewQuickSlotItemWidget::RefreshVisuals()
 	if (Text_Quantity)
 	{
 		Text_Quantity->SetText(SlotData.Quantity > 1 ? FText::AsNumber(SlotData.Quantity) : FText::GetEmpty());
+	}
+
+	if (Text_AmmoOrCount)
+	{
+		Text_AmmoOrCount->SetText(
+			SlotData.Quantity > 1
+				? FText::FromString(FString::Printf(TEXT("x%d"), SlotData.Quantity))
+				: FText::GetEmpty());
 	}
 }
 
@@ -217,4 +241,65 @@ UPDStashComponent* UPDNewQuickSlotItemWidget::FindStashComponent() const
 		return PC->GetActiveStashComponent();
 	}
 	return nullptr;
+}
+
+void UPDNewQuickSlotItemWidget::SetSelected(bool bNewSelected)
+{
+	bSelected = bNewSelected;
+
+	if (Image_SlotBG)
+	{
+		const TSoftObjectPtr<UMaterialInterface>& TargetMat = bSelected ? SlotBGMaterial_Selected : SlotBGMaterial_Base;
+		if (UMaterialInterface* Mat = TargetMat.LoadSynchronous())
+		{
+			Image_SlotBG->SetBrushFromMaterial(Mat);
+		}
+	}
+
+	if (Container_AmmoLabel)
+	{
+		Container_AmmoLabel->SetVisibility(bSelected ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
+
+void UPDNewQuickSlotItemWidget::SetKeyBindingIcon(UTexture2D* InIcon)
+{
+	if (Image_KeyBinding)
+	{
+		Image_KeyBinding->SetBrushFromTexture(InIcon);
+		Image_KeyBinding->SetVisibility(InIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
+	}
+}
+
+void UPDNewQuickSlotItemWidget::SetCountText(const FText& InCountText)
+{
+	if (Text_AmmoOrCount)
+	{
+		Text_AmmoOrCount->SetText(InCountText);
+	}
+}
+
+void UPDNewQuickSlotItemWidget::SetSlotSize(FVector2D NewSize)
+{
+	SlotSize = NewSize;
+	if (Box_Slot)
+	{
+		Box_Slot->SetWidthOverride(NewSize.X);
+		Box_Slot->SetHeightOverride(NewSize.Y);
+	}
+}
+
+void UPDNewQuickSlotItemWidget::SetSlotMaterials(TSoftObjectPtr<UMaterialInterface> InBase, TSoftObjectPtr<UMaterialInterface> InSelected)
+{
+	SlotBGMaterial_Base = InBase;
+	SlotBGMaterial_Selected = InSelected;
+
+	if (Image_SlotBG)
+	{
+		const TSoftObjectPtr<UMaterialInterface>& TargetMat = bSelected ? SlotBGMaterial_Selected : SlotBGMaterial_Base;
+		if (UMaterialInterface* Mat = TargetMat.LoadSynchronous())
+		{
+			Image_SlotBG->SetBrushFromMaterial(Mat);
+		}
+	}
 }

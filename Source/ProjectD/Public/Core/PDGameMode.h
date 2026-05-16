@@ -35,11 +35,13 @@ protected:
 	
 	UFUNCTION(BlueprintImplementableEvent, Category="PD|Raid")
 	void OnRaidStateChanged(ERaidState NewState);
-	
+
 	UFUNCTION(BlueprintImplementableEvent, Category="PD|Raid")
 	void OnRaidEnded(bool bSuccess);
-	
-	
+
+private:
+	void InitializePlayerInventoryFromLoadout(APlayerController* PC);
+	void TransferPlayerInventoryToStash(APlayerController* PC);
 };
 /*
 탈출하게 될 경우 
