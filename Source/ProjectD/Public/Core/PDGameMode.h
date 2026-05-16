@@ -30,9 +30,9 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Raid")
 	ERaidState CurrentRaidState=ERaidState::Idle;
-	
+
 	void SetRaidState(ERaidState NewState);
-	
+
 	UFUNCTION(BlueprintImplementableEvent, Category="PD|Raid")
 	void OnRaidStateChanged(ERaidState NewState);
 
