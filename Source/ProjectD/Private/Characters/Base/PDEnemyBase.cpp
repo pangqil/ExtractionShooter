@@ -10,6 +10,7 @@
 
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
 #include "Items/PDItemBase.h"
+#include "Items/PDLootItem.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "Component/PDWeaponComponent.h"
 #include "Data/PDQuestComponent.h"
@@ -199,19 +200,24 @@ void APDEnemyBase::DropLootOnDeath()
 			? FMath::VRand() * FMath::FRandRange(0.f, LootSpawnRadius)
 			: FVector::ZeroVector;
 
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-		Params.Owner = this;
+		// Deferred 스폰: BeginPlay(=LoadItemData) 전에 ItemID 와 Quantity 를 주입.
+		const FTransform SpawnXform(FRotator::ZeroRotator, Origin + FVector(Offset.X, Offset.Y, 0.f));
 
-		APDItemBase* Item = World->SpawnActor<APDItemBase>(
+		APDLootItem* Item = World->SpawnActorDeferred<APDLootItem>(
 			Entry.ItemClass,
-			Origin + FVector(Offset.X, Offset.Y, 0.f),
-			FRotator::ZeroRotator,
-			Params);
+			SpawnXform,
+			/*Owner=*/this,
+			/*Instigator=*/nullptr,
+			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 
 		if (Item)
 		{
+			if (!Entry.ItemID.IsNone())
+			{
+				Item->SetItemID(Entry.ItemID);
+			}
 			Item->Quantity = Quantity;
+			Item->FinishSpawning(SpawnXform);
 			Spawned.Add(Item);
 		}
 	}

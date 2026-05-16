@@ -66,10 +66,10 @@ protected:
 	bool bDetectEnemies = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectNeutrals = true;
+	bool bDetectNeutrals = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectFriendlies = true;
+	bool bDetectFriendlies = false;
 
 private:
 	UFUNCTION()
