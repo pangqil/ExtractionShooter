@@ -21,6 +21,22 @@ bool UPDInventoryComponent::AddItem(const FPDItemData& ItemData, int32 Quantity)
 	return AddItemPartial(ItemData, Quantity) > 0;
 }
 
+bool UPDInventoryComponent::AddItemByID(FName ItemID, int32 Quantity)
+{
+	if (!ItemDataTable || ItemID.IsNone()) return false;
+
+	TArray<FPDItemData*> Rows;
+	ItemDataTable->GetAllRows<FPDItemData>(TEXT("AddItemByID"), Rows);
+
+	for (const FPDItemData* Row : Rows)
+	{
+		if (Row && Row->ItemID == ItemID)
+			return AddItem(*Row, Quantity);
+	}
+
+	return false;
+}
+
 bool UPDInventoryComponent::RemoveItem(FName ItemID, int32 Quantity)
 {
 	if (ItemID.IsNone() || Quantity <= 0 || !HasItem(ItemID, Quantity))

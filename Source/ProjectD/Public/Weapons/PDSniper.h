@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Weapons/PDWeaponBase.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Weapons/PDProjectile.h"
 #include "PDSniper.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnScopeToggled, bool, bIsScoped);
 
 UCLASS(Blueprintable)
-class PROJECTD_API APDSniper : public APDWeaponBase
+class PROJECTD_API APDSniper : public APDRangedWeaponBase
 {
 	GENERATED_BODY()
 	
@@ -20,6 +20,9 @@ public:
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper")
     TSubclassOf<APDProjectile> ProjectileClass;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Sniper")
+    TObjectPtr<UAnimMontage> BoltActionMontage;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper")
     TArray<bool> PenetrationPerLevel = { false, false, true };

@@ -14,7 +14,7 @@
 #include "Component/PDWeaponComponent.h"
 #include "Data/PDQuestComponent.h"
 #include "GameFramework/Controller.h"
-#include "Weapons/PDWeaponBase.h"
+#include "Weapons/Base/PDWeaponBase.h"
 
 APDEnemyBase::APDEnemyBase()
 {

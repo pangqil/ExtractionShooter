@@ -256,6 +256,22 @@ int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quant
 }
 
 
+bool UPDStashComponent::AddItemByID(FName ItemID, int32 Quantity)
+{
+	if (!ItemDataTable || ItemID.IsNone()) return false;
+
+	TArray<FPDItemData*> Rows;
+	ItemDataTable->GetAllRows<FPDItemData>(TEXT("AddItemByID"), Rows);
+
+	for (const FPDItemData* Row : Rows)
+	{
+		if (Row && Row->ItemID == ItemID)
+			return AddItemPartial(*Row, Quantity) > 0;
+	}
+
+	return false;
+}
+
 int32 UPDStashComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex)
 {
 	if (StashItems.Num() != GetMaxSlotCount())

@@ -1,5 +1,6 @@
 #include "Cover/PDCoverBase.h"
 #include "Components/StaticMeshComponent.h"
+#include "GeometryCollection/GeometryCollectionComponent.h"
 #include "Characters/PDPlayerCharacter.h"
 
 APDCoverBase::APDCoverBase()
@@ -7,6 +8,11 @@ APDCoverBase::APDCoverBase()
 	CoverMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CoverMesh"));
 	SetRootComponent(CoverMesh);
 	CoverMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+	DestructionCollection = CreateDefaultSubobject<UGeometryCollectionComponent>(TEXT("DestructionCollection"));
+	DestructionCollection->SetupAttachment(RootComponent);
+	DestructionCollection->SetHiddenInGame(true);
+	DestructionCollection->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	ValidZone = CreateDefaultSubobject<UBoxComponent>(TEXT("ValidZone"));
 	ValidZone->SetupAttachment(RootComponent);
@@ -71,6 +77,8 @@ void APDCoverBase::TakeCoverDamage(float Damage)
 	if (CoverState == ECoverState::Destroyed) return;
 	CurrentHP = FMath::Max(CurrentHP - Damage, 0.f);
 
+	BP_OnCoverDamaged(Damage, CurrentHP, MaxHP);
+
 	if (CurrentHP <= 0.f)
 		SetCoverState(ECoverState::Destroyed);
 	else if (CurrentHP <= MaxHP * DamagedThreshold)
@@ -81,12 +89,26 @@ void APDCoverBase::SetCoverState(ECoverState NewState)
 {
 	if (CoverState == NewState) return;
 	CoverState = NewState;
+
+	BP_OnCoverStateChanged(CoverState);
+
 	if (CoverState == ECoverState::Destroyed)
 		OnDestroyed_Internal();
 }
 
 void APDCoverBase::OnDestroyed_Internal()
 {
+	CoverMesh->SetHiddenInGame(true);
+	CoverMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	if (IsValid(DestructionCollection))
+	{
+		DestructionCollection->SetHiddenInGame(false);
+		DestructionCollection->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		DestructionCollection->SetSimulatePhysics(true);
+	}
+
+	BP_OnCoverDestroyed();
 	OnCoverDestroyed.ExecuteIfBound();
 	Occupant = nullptr;
 }

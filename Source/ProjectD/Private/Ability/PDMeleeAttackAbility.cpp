@@ -1,7 +1,8 @@
 #include "Ability/PDMeleeAttackAbility.h"
 #include "Characters/Base/PDCharacterBase.h"
 #include "Characters/PDPlayerCharacter.h"
-#include "Weapons/PDWeaponBase.h"
+#include "Weapons/Base/PDWeaponBase.h"
+#include "Weapons/Base/PDMeleeWeaponBase.h"
 #include "Interfaces/PDDamageable.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
@@ -10,9 +11,6 @@
 UPDMeleeAttackAbility::UPDMeleeAttackAbility()
 {
 	InstancingPolicy=EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	ActivationRequiredTags.AddTag(PDGameplayTags::Weapon_Type_Melee);
-	AbilityTags.AddTag(PDGameplayTags::State_MeleeAttacking);
-	BlockAbilitiesWithTag.AddTag(PDGameplayTags::State_MeleeAttacking);
 }
 
 void UPDMeleeAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -76,11 +74,18 @@ void UPDMeleeAttackAbility::PerformSweep()
 	APDPlayerCharacter* Char=Cast<APDPlayerCharacter>(GetPDCharacter());
 	if (!Char) return;
 
-	APDWeaponBase* Weapon=Char->GetCurrentWeapon();
+	APDWeaponBase* WeaponBase=Char->GetCurrentWeapon();
+	if (!WeaponBase) return;
+
+	APDMeleeWeaponBase* Weapon=Cast<APDMeleeWeaponBase>(WeaponBase);
 	if (!Weapon) return;
 
 	const float Damage=Weapon->GetCurrentStats().Damage;
-	const FVector Start=Char->GetMesh()->GetSocketLocation(WeaponSocketName);
+	const float SweepRadius=Weapon->GetSweepRadius();
+	const float SweepRange=Weapon->GetSweepRange();
+	const FName HitSocketName=Weapon->GetHitSocketName();
+
+	const FVector Start=Char->GetMesh()->GetSocketLocation(HitSocketName);
 	const FVector End=Start+Char->GetActorForwardVector()*SweepRange;
 
 	TArray<FHitResult> Hits;

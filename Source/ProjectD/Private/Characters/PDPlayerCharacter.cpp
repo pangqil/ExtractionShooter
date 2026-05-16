@@ -9,7 +9,7 @@
 #include "Items/PDQuickSlotComponent.h"
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDEquipmentModificationComponent.h"
-#include "Weapons/PDWeaponBase.h"
+#include "Weapons/Base/PDWeaponBase.h"
 
 APDPlayerCharacter::APDPlayerCharacter()
 {
@@ -20,7 +20,8 @@ APDPlayerCharacter::APDPlayerCharacter()
 	bUseControllerRotationRoll=false;
 
 	GetCharacterMovement()->bOrientRotationToMovement=false;
-	GetCharacterMovement()->RotationRate=FRotator(0.f, 640.f, 0.f);
+	GetCharacterMovement()->bUseControllerDesiredRotation=true;
+	GetCharacterMovement()->RotationRate=FRotator(0.f, 10.f, 0.f);
 	GetCharacterMovement()->bConstrainToPlane=true;
 	GetCharacterMovement()->bSnapToPlaneAtStart=true;
 	GetCharacterMovement()->GravityScale=2.f;
@@ -60,7 +61,7 @@ void APDPlayerCharacter::BeginPlay()
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Shotgun, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Sniper,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
-            ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Pistol,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
+            ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Melee,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
         }
 	LinkDefaultAnimLayer();
 	GetCharacterMovement()->bAllowPhysicsRotationDuringAnimRootMotion = false;
@@ -160,7 +161,7 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Rifle);
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Shotgun);
 		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Sniper);
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Pistol);
+		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Melee);
 		ASC->AddLooseGameplayTag(NewWeapon->GetWeaponTypeTag());
 	}
 	NewWeapon->SetActorHiddenInGame(false);
@@ -202,7 +203,7 @@ EWeaponSlot APDPlayerCharacter::GetSlotForWeaponType(EWeaponType Type) const
 	case EWeaponType::Rifle:   return EWeaponSlot::Slot1_Rifle;
 	case EWeaponType::Shotgun: return EWeaponSlot::Slot2_Shotgun;
 	case EWeaponType::Sniper:  return EWeaponSlot::Slot3_Sniper;
-	case EWeaponType::Pistol:  return EWeaponSlot::Slot4_Pistol;
+	case EWeaponType::Melee:   return EWeaponSlot::Slot4_Melee;
 	default:                   return EWeaponSlot::None;
 	}
 }

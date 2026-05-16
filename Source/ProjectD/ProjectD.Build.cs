@@ -10,13 +10,13 @@ public class ProjectD : ModuleRules
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			"AIModule", "NavigationSystem",
-			"PhysicsCore"
-		});
-
-		PrivateDependencyModuleNames.AddRange(new string[] {
 			"StateTreeModule", "GameplayStateTreeModule",
 			"UMG", "Slate", "SlateCore", "Niagara", "CommonUI", "CommonInput",
-			"PreLoadScreen", "DeveloperSettings"
+			"PhysicsCore",
+			"PreLoadScreen", "DeveloperSettings",
+			"GeometryCollectionEngine", "ChaosSolverEngine"
 		});
+
+		PrivateDependencyModuleNames.AddRange(new string[] { });
 	}
 }

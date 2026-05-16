@@ -62,7 +62,6 @@ enum class EWeaponType : uint8
 	Rifle   UMETA(DisplayName = "Rifle"),
 	Shotgun UMETA(DisplayName = "Shotgun"),
 	Sniper  UMETA(DisplayName = "Sniper"),
-	Pistol  UMETA(DisplayName = "Pistol"),
 	Melee   UMETA(DisplayName = "Melee"),
 };
 
@@ -355,7 +354,7 @@ enum class EWeaponSlot : uint8
 	Slot1_Rifle   UMETA(DisplayName = "Rifle"),
 	Slot2_Shotgun UMETA(DisplayName = "Shotgun"),
 	Slot3_Sniper  UMETA(DisplayName = "Sniper"),
-	Slot4_Pistol  UMETA(DisplayName = "Pistol"),
+	Slot4_Melee   UMETA(DisplayName = "Melee"),
 	None          UMETA(DisplayName = "None"),
 };
 

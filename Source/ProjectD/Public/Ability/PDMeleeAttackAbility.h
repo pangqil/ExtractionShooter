@@ -29,14 +29,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Melee")
 	TArray<FName> AttackSections = {TEXT("Attack1"), TEXT("Attack2"), TEXT("Attack3"), TEXT("Attack4")};
 
-	UPROPERTY(EditDefaultsOnly, Category="PD|Melee")
-	float SweepRadius=30.f;
-
-	UPROPERTY(EditDefaultsOnly, Category="PD|Melee")
-	float SweepRange=80.f;
-
-	UPROPERTY(EditDefaultsOnly, Category="PD|Melee")
-	FName WeaponSocketName=TEXT("weapon_r");
 
 private:
 	UFUNCTION()

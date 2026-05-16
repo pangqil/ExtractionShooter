@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Items/PDInventoryComponent.h"
+#include "Engine/DataTable.h"
 #include "PDStashComponent.generated.h"
 
 UENUM(BlueprintType)
@@ -38,6 +39,9 @@ class PROJECTD_API UPDStashComponent : public UActorComponent
 
 public:
 	UPDStashComponent();
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Stash")
+	TObjectPtr<UDataTable> ItemDataTable;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
 	TArray<FPDInventorySlot> StashItems;
@@ -107,6 +111,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	int32 AddItemPartial(const FPDItemData& ItemData, int32 Quantity = 1);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	bool AddItemByID(FName ItemID, int32 Quantity = 1);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	int32 AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex);

@@ -36,10 +36,9 @@
 DEFINE_LOG_CATEGORY(LogPDCharacter);
 
 #include "Interfaces/PDInteractable.h"
-#include "Weapons/PDWeaponBase.h"
-#include "Weapons/PDRifle.h"
-#include "Weapons/PDShotgun.h"
-#include "Weapons/PDSniper.h"
+#include "Weapons/Base/PDWeaponBase.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"  // UpdateCrosshair - GetCurrentRecoilSpread
+#include "Weapons/PDRifle.h"                   // OnToggleFireMode - ToggleFireMode 전용
 
 #include "Ping/PDPingSubsystem.h"
 #include "Ping/PDPingInputComponent.h"
@@ -1114,47 +1113,32 @@ void APDPlayerController::OnInteract()
 
 void APDPlayerController::OnFirePressed()
 {
-	if (IsGameplayInputBlockedByModalUI())
-	{
-		OnFireReleased();
-		return;
-	}
+	if (IsGameplayInputBlockedByModalUI()) { OnFireReleased(); return; }
 
 	if (UPDPingSubsystem* PingSys = GetWorld()->GetSubsystem<UPDPingSubsystem>())
-	{
 		if (PingSys->IsPingActive()) return;
-	}
-	
-	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
-	if (!Ch) return;
-	APDWeaponBase* Weapon = Ch->GetCurrentWeapon();
-	if (!Weapon) return;
 
-	if (APDRifle* Rifle = Cast<APDRifle>(Weapon))
-		Rifle->StartFire();
-	else if (APDShotgun* Shotgun = Cast<APDShotgun>(Weapon))
-	{
-		if (Shotgun->IsReloading()) Shotgun->InterruptReloadAndFire();
-		else Shotgun->Fire();
-	}
-	else
-		Weapon->Fire();
+	if (UAbilitySystemComponent* ASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Fire));
 }
 
 void APDPlayerController::OnFireReleased()
 {
-	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
-	if (!Ch) return;
-	if (APDRifle* Rifle = Cast<APDRifle>(Ch->GetCurrentWeapon()))
-		Rifle->StopFire();
+	// GA_FireAbility 가 이 이벤트를 수신해 자동화기 루프를 종료함
+	if (UAbilitySystemComponent* ASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+	{
+		FGameplayEventData EventData;
+		ASC->HandleGameplayEvent(PDGameplayTags::Input_FireReleased, &EventData);
+	}
 }
 
 void APDPlayerController::OnReload()
 {
-	APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn());
-	if (!Ch) return;
-	if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
-		Weapon->Reload();
+	if (UAbilitySystemComponent* ASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Reload));
 }
 
 void APDPlayerController::UpdateCrosshair()
@@ -1166,7 +1150,7 @@ void APDPlayerController::UpdateCrosshair()
 
 	float Spread = 0.f;
 	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
+		if (APDRangedWeaponBase* Weapon = Cast<APDRangedWeaponBase>(Ch->GetCurrentWeapon()))
 			Spread = Weapon->GetCurrentRecoilSpread();
 
 	HUDInstance->UpdateCrosshair(FVector2D(MouseX, MouseY), Spread);

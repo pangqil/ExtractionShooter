@@ -1,14 +1,11 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Weapons/PDSniper.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 #include "GameFramework/PlayerController.h"
 
 APDSniper::APDSniper()
 {
     WeaponType = EWeaponType::Sniper;
 
-    // 저격총 줌 FOV 설정
     DefaultFOV = 90.f;
     ZoomedFOV = 40.f;
 
@@ -25,16 +22,10 @@ void APDSniper::Fire_Implementation()
         UE_LOG(LogTemp, Warning, TEXT("PDSniper: ProjectileClass 미설정"));
         return;
     }
-    
+
     PlayFireEffects();
     SpawnProjectile(CanPenetrate());
     PostFire();
-
-    FTimerHandle T_Shell;
-    GetWorldTimerManager().SetTimer(T_Shell, FTimerDelegate::CreateLambda([this]()
-        {
-            EjectShell();
-        }), 0.3f, false);
 
     if (BoltActionMontage)
     {
@@ -48,6 +39,7 @@ void APDSniper::Fire_Implementation()
         }
     }
 }
+
 void APDSniper::Reload_Implementation()
 {
     if (bIsReloading) return;
@@ -64,14 +56,13 @@ void APDSniper::Reload_Implementation()
     {
         GetWorldTimerManager().SetTimer(
             ReloadHandle, this,
-            &APDWeaponBase::FinishReload,
+            &APDRangedWeaponBase::FinishReload,
             GetCurrentStats().ReloadTime, false);
     }
 }
 
 void APDSniper::OnBoltActionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-    // 필요 시 BP에서 추가 로직 (사운드, 이펙트 등)
 }
 
 void APDSniper::ToggleZoom()
@@ -118,13 +109,10 @@ FVector APDSniper::GetAimDirection() const
     AActor* WeaponOwnerActor = GetWeaponOwner();
     if (!WeaponOwnerActor) return FVector::ForwardVector;
 
-    APlayerController* PC = Cast<APlayerController>(WeaponOwnerActor->GetInstigatorController());
-
     FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
         : WeaponOwnerActor->GetActorLocation();
 
-    // GetAimDirectionFromOwner()로 플레이어/적 공통 처리
     return GetAimDirectionFromOwner(Start);
 }
 
