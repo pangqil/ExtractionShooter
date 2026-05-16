@@ -343,6 +343,9 @@ void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 	UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
 
+	if (ASC && ASC->HasMatchingGameplayTag(PDGameplayTags::State_MeleeAttacking))
+		return;
+
 	if (ASC && (ASC->HasMatchingGameplayTag(PDGameplayTags::Cover_Active) ||
 	            ASC->HasMatchingGameplayTag(PDGameplayTags::State_CoverAim)))
 	{
