@@ -144,7 +144,7 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Reload,
 		ETriggerEvent::Started, this, &APDPlayerController::OnReload);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot1,
-		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot1);
+		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot1);	
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot2,
 		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot2);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot3,
@@ -178,6 +178,12 @@ void APDPlayerController::SetupInputComponent()
 		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot5);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot6,
 		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot6);
+
+	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_CancelConsumableUse))
+	{
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_CancelConsumableUse,
+			ETriggerEvent::Started, this, &APDPlayerController::OnCancelConsumableUse);
+	}
 
 	if (PingInputComp && InputConfig)
 	{
@@ -1060,6 +1066,25 @@ void APDPlayerController::OnQuickslot5()
 void APDPlayerController::OnQuickslot6()
 {
 	UseQuickSlot(5);
+}
+
+void APDPlayerController::OnCancelConsumableUse()
+{
+	if (IsGameplayInputBlockedByModalUI())
+	{
+		return;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return;
+	}
+
+	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	{
+		QuickSlotComponent->CancelConsumableUse();
+	}
 }
 
 void APDPlayerController::SelectQuickslot(int32 Index)

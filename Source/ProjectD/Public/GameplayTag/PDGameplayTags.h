@@ -38,6 +38,9 @@ namespace PDGameplayTags
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Quickslot5);
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Quickslot6);
 
+	// Input QuickSlot - Cancel
+	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_CancelConsumableUse);
+
 	// Damage
 	PROJECTD_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage);
 
