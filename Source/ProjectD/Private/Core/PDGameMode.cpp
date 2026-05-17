@@ -4,7 +4,9 @@
 #include "Core/PDPlayerState.h"
 #include "Items/PDInventoryComponent.h"
 #include "GameFramework/Pawn.h"
-#include "TimerManager.h"
+#include "Subsystems/PDFrontendUISubsystem.h"
+#include "Type/Types.h"
+#include "Widgets/PDActivatableBase.h"
 
 APDGameMode::APDGameMode()
 {
@@ -89,6 +91,14 @@ void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
 	if (!PC) return;
 	EndRaid(false);
 	ScheduleReturnToBaseTravel(DeathToTravelDelay);
+
+	if (DeathScreenClass)
+	{
+		if (UPDFrontendUISubsystem* UI = UPDFrontendUISubsystem::Get(this))
+		{
+			UI->PushToLayer(EUILayer::Frontend, DeathScreenClass);
+		}
+	}
 }
 
 void APDGameMode::HandleReturnToBaseTravel()
