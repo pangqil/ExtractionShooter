@@ -170,6 +170,9 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 {
 	if (Slot==CurrentSlot) return;
 
+	if (QuickSlotComponent)
+		QuickSlotComponent->CancelConsumableUse();
+
 	int32 Idx=static_cast<int32>(Slot);
 	if (!WeaponSlots.IsValidIndex(Idx)||!WeaponSlots[Idx]) return;
 
@@ -380,6 +383,9 @@ void APDPlayerCharacter::ResetToBase()
 
 void APDPlayerCharacter::TryInteract()
 {
+	if (QuickSlotComponent)
+		QuickSlotComponent->CancelConsumableUse();
+
 	if (InteractionComponent)
 	{
 		InteractionComponent->Interact();
