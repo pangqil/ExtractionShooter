@@ -4,6 +4,9 @@
 #include "Components/ActorComponent.h"
 #include "PDInteractionComponent.generated.h"
 
+class APawn;
+class AController;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractTargetChanged, AActor*, NewTarget);
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
@@ -41,6 +44,11 @@ protected:
 
 private:
 	void PollTarget();
+
+	UFUNCTION()
+	void HandleOwnerControllerChanged(APawn* InPawn, AController* OldController, AController* NewController);
+
+	void EvaluatePollingState();
 
 	TWeakObjectPtr<AActor> CachedTarget;
 	FTimerHandle PollTimerHandle;
