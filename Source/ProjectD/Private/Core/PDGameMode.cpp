@@ -47,7 +47,7 @@ void APDGameMode::TravelToBaseLevel(bool bMarkResetPending)
 {
 	if (UPDGameInstance* GI = GetGameInstance<UPDGameInstance>())
 	{
-		GI->TravelToBaseLevel(bMarkResetPending);
+		GI->TravelToLevel(GI->GetBaseLevel(), bMarkResetPending);
 	}
 }
 

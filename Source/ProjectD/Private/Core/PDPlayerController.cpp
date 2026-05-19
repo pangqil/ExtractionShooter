@@ -36,6 +36,8 @@
 #include "Widgets/PDRootLayout.h"
 #include "Widgets/PDNotificationWidget.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
+#include "Subsystems/PDQuipSubsystem.h"
+#include "Data/PDQuipDataAsset.h"
 #include "Blueprint/UserWidget.h"
 
 DEFINE_LOG_CATEGORY(LogPDCharacter);
@@ -277,6 +279,15 @@ void APDPlayerController::BeginPlay()
 		Ch->OnWeaponSwapped.AddDynamic(this, &APDPlayerController::OnWeaponChanged);
 	}
 
+	if (UPDQuipSubsystem* QuipSub = UPDQuipSubsystem::Get(this))
+	{
+		if (UPDQuipDataAsset* LoadedDA = QuipDataAsset.LoadSynchronous())
+		{
+			QuipSub->SetQuipDataAsset(LoadedDA);
+		}
+		QuipSub->NotifyPawnChanged(GetPawn());
+	}
+
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->ConfigureLegacyWidgetClasses(
@@ -321,6 +332,14 @@ void APDPlayerController::OnPossess(APawn* InPawn)
 		UIManagerComponent->RebindHUDToASC(ASC);
 	}
 
+	if (IsLocalController())
+	{
+		if (UPDQuipSubsystem* QuipSub = UPDQuipSubsystem::Get(this))
+		{
+			QuipSub->NotifyPawnChanged(InPawn);
+		}
+	}
+
 	BindInventoryNotifications();
 }
 
@@ -331,6 +350,15 @@ void APDPlayerController::OnUnPossess()
 	{
 		UIManagerComponent->RebindHUDToASC(nullptr);
 	}
+
+	if (IsLocalController())
+	{
+		if (UPDQuipSubsystem* QuipSub = UPDQuipSubsystem::Get(this))
+		{
+			QuipSub->NotifyPawnChanged(nullptr);
+		}
+	}
+
 	Super::OnUnPossess();
 }
 
