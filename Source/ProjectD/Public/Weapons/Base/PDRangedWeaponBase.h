@@ -52,7 +52,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Weapon") bool  IsReloading()        const { return bIsReloading; }
 	UFUNCTION(BlueprintPure, Category="Weapon") bool  CanFire()            const;
 	UFUNCTION(BlueprintPure, Category="Weapon") bool  CanReload()          const;
-	UFUNCTION(BlueprintPure, Category="Weapon") bool  IsFullAuto()         const { return bFullAuto; }
+
+	/** 외부에서 영속화된 잔탄을 복원할 때 사용. [0, MaxAmmo]로 클램프. */
+	UFUNCTION(BlueprintCallable, Category="Weapon")
+	void SetCurrentAmmo(int32 NewAmmo);
+	// 자식 클래스가 FireMode(단발/연사) 같은 추가 조건을 더해 override 가능.
+	// Player GA_FireAbility / AI Soldier 양쪽 모두 본 메서드 값으로 연사 루프 진입 여부 결정.
+	UFUNCTION(BlueprintPure, Category="Weapon") virtual bool IsFullAuto() const { return bFullAuto; }
 	UFUNCTION(BlueprintPure, Category="Weapon") int32 GetAvailableAmmoCount() const;
 	UFUNCTION(BlueprintPure, Category="Weapon") int32 GetReserveAmmo() const { return ReserveAmmo; }
 

@@ -505,6 +505,9 @@ void APDPlayerCharacter::DropCurrentWeapon()
 	ReplicatedWeaponType = EWeaponType::None;
 	SyncWeaponTypeTags(ReplicatedWeaponType);
 	SyncWeaponPresentation();
+
+	// UI/AnimInstance 등이 현재 무기 변경을 감지하도록 broadcast.
+	OnWeaponSwapped.Broadcast(nullptr, EWeaponSlot::None);
 }
 
 APDWeaponBase* APDPlayerCharacter::GetCurrentWeapon() const
@@ -576,6 +579,18 @@ bool APDPlayerCharacter::TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot
 	}
 
 	SpawnedWeapon->SetLevel(FMath::Max(1, ItemSlot.ModificationLevel + 1));
+
+	// ★ 영속화된 잔탄을 PickupWeapon 호출 전에 적용 — PickupWeapon 내부의 SwitchToSlot이
+	//    OnWeaponSwapped를 broadcast하기 전에 actor의 CurrentAmmo가 정확한 값이어야
+	//    UI가 첫 표시부터 올바른 잔탄을 보임.
+	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(SpawnedWeapon))
+	{
+		if (ItemSlot.WeaponState.HasPersistedAmmo())
+		{
+			Ranged->SetCurrentAmmo(ItemSlot.WeaponState.CurrentAmmo);
+		}
+	}
+
 	PickupWeapon(SpawnedWeapon);
 	SpawnedWeapon->ForceNetUpdate();
 	ForceNetUpdate();
@@ -584,6 +599,14 @@ bool APDPlayerCharacter::TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot
 
 
 bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, bool bDestroyWeaponActor)
+{
+	FPDWeaponInstanceState Discarded;
+	return RemoveEquippedWeaponItemPreservingState(ItemData, Discarded, bDestroyWeaponActor);
+}
+
+bool APDPlayerCharacter::RemoveEquippedWeaponItemPreservingState(const FPDItemData& ItemData,
+                                                                  FPDWeaponInstanceState& OutState,
+                                                                  bool bDestroyWeaponActor)
 {
 	if (!HasAuthority()) return false;
 
@@ -600,6 +623,13 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 	}
 
 	APDWeaponBase* WeaponToRemove = WeaponSlots[SlotIndex];
+
+	// ★ destroy 이전에 런타임 상태 추출 — 호출자가 인벤토리 슬롯에 stamp 함.
+	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(WeaponToRemove))
+	{
+		OutState.CurrentAmmo = Ranged->GetCurrentAmmo();
+	}
+
 	WeaponToRemove->OnUnequip();
 	WeaponToRemove->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	WeaponToRemove->SetActorHiddenInGame(true);
@@ -613,7 +643,8 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 	}
 
 	WeaponSlots[SlotIndex] = nullptr;
-	if (CurrentSlot == TargetSlot)
+	const bool bWasCurrent = (CurrentSlot == TargetSlot);
+	if (bWasCurrent)
 	{
 		CurrentSlot = EWeaponSlot::None;
 		ReplicatedWeaponType = EWeaponType::None;
@@ -624,6 +655,12 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 	if (bDestroyWeaponActor)
 	{
 		WeaponToRemove->Destroy();
+	}
+
+	// 메인 무기가 비워진 사실을 UI/Anim에 알림. 스왑 흐름의 일부라면 Apply가 곧 새 무기를 다시 broadcast함.
+	if (bWasCurrent)
+	{
+		OnWeaponSwapped.Broadcast(nullptr, EWeaponSlot::None);
 	}
 
 	return true;

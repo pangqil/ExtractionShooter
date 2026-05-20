@@ -75,7 +75,8 @@ private:
 	void RebuildEquippedItemsFromReplication();
 	void SyncReplicatedEquippedItems();
 	bool ApplyCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const;
-	void RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const;
+	void RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot,
+	                                      FPDWeaponInstanceState* OutWeaponState = nullptr) const;
 	int32 ConvertModificationLevelToGasLevel(int32 ModificationLevel) const;
 	void BroadcastModificationApplied(EPDEquipmentSlotType SlotType, const FPDInventorySlot& EquippedSlot);
 	void BroadcastSlotChanged(EPDEquipmentSlotType SlotType);

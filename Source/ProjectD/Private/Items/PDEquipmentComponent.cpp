@@ -2,6 +2,7 @@
 
 #include "Characters/PDPlayerCharacter.h"
 #include "Core/PDPlayerState.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Items/PDInventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 
@@ -188,6 +189,8 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 		PreviousEquippedSlot = CurrentEquippedItem->ItemSlot;
 	}
 
+	FPDWeaponInstanceState CapturedPreviousState;
+
 	const float NewBagCapacityWeight = TargetSlotType == EPDEquipmentSlotType::Bag ? FMath::Max(0.f, InventorySlot.ItemData.BagCapacityWeight) : [&]()
 	{
 		const FPDInventorySlot CurrentBagSlot = GetEquippedSlot(EPDEquipmentSlotType::Bag);
@@ -202,13 +205,21 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 
 	if (bHadPreviousItem)
 	{
-		RemoveCharacterEquipSideEffects(PreviousEquippedSlot);
+		RemoveCharacterEquipSideEffects(PreviousEquippedSlot, &CapturedPreviousState);
+		// 추출된 상태를 인벤토리로 반환될 슬롯에 stamp — 이후 분기에서 그대로 사용됨.
+		PreviousEquippedSlot.WeaponState = CapturedPreviousState;
 	}
 
 	if (!ApplyCharacterEquipSideEffects(InventorySlot))
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Equip] ApplyCharacterEquipSideEffects failed for %s. Rolling back to %s."),
+			*InventorySlot.ItemData.ItemID.ToString(),
+			bHadPreviousItem ? *PreviousEquippedSlot.ItemData.ItemID.ToString() : TEXT("(none)"));
+
 		if (bHadPreviousItem)
 		{
+			// 롤백: 캡처한 상태를 함께 복원해 잔탄 손실 방지.
 			ApplyCharacterEquipSideEffects(PreviousEquippedSlot);
 		}
 		return false;
@@ -296,7 +307,18 @@ bool UPDEquipmentComponent::UnequipItemToInventory(UPDInventoryComponent* Invent
 		return false;
 	}
 
-	const FPDInventorySlot ItemToReturn = EquippedItem->ItemSlot;
+	FPDInventorySlot ItemToReturn = EquippedItem->ItemSlot;
+
+	// ★ Destroy 전에 무기 액터에서 런타임 상태 캡처 — 인벤토리로 돌려보낼 슬롯에 stamp.
+	if (APDPlayerCharacter* PC = Cast<APDPlayerCharacter>(GetOwner()))
+	{
+		const EWeaponSlot Ts = PC->GetSlotForWeaponType(ItemToReturn.ItemData.WeaponType);
+		if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(PC->GetWeaponInSlot(Ts)))
+		{
+			ItemToReturn.WeaponState.CurrentAmmo = Ranged->GetCurrentAmmo();
+		}
+	}
+
 	const float NewBagCapacityWeight = SlotType == EPDEquipmentSlotType::Bag ? 0.f : [&]()
 	{
 		const FPDInventorySlot CurrentBagSlot = GetEquippedSlot(EPDEquipmentSlotType::Bag);
@@ -318,6 +340,62 @@ bool UPDEquipmentComponent::UnequipItemToInventory(UPDInventoryComponent* Invent
 	RemoveCharacterEquipSideEffects(ItemToReturn);
 	EquippedItem->ItemSlot.Clear();
 	SyncReplicatedEquippedItems();
+	BroadcastSlotChanged(SlotType);
+	return true;
+}
+
+
+bool UPDEquipmentComponent::UnequipItemToInventorySlot(UPDInventoryComponent* InventoryComponent, EPDEquipmentSlotType SlotType, int32 InventorySlotIndex)
+{
+	if (!InventoryComponent || SlotType == EPDEquipmentSlotType::None || !InventoryComponent->Items.IsValidIndex(InventorySlotIndex))
+	{
+		return false;
+	}
+
+	FPDEquippedItem* EquippedItem = EquippedItems.Find(SlotType);
+	if (!EquippedItem || EquippedItem->ItemSlot.IsEmpty())
+	{
+		return false;
+	}
+
+	FPDInventorySlot ItemToReturn = EquippedItem->ItemSlot;
+
+	// ★ Destroy 전에 무기 액터에서 런타임 상태 캡처.
+	if (APDPlayerCharacter* PC = Cast<APDPlayerCharacter>(GetOwner()))
+	{
+		const EWeaponSlot Ts = PC->GetSlotForWeaponType(ItemToReturn.ItemData.WeaponType);
+		if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(PC->GetWeaponInSlot(Ts)))
+		{
+			ItemToReturn.WeaponState.CurrentAmmo = Ranged->GetCurrentAmmo();
+		}
+	}
+
+	const float NewBagCapacityWeight = SlotType == EPDEquipmentSlotType::Bag ? 0.f : [&]()
+	{
+		const FPDInventorySlot CurrentBagSlot = GetEquippedSlot(EPDEquipmentSlotType::Bag);
+		return CurrentBagSlot.IsEmpty() ? 0.f : FMath::Max(0.f, CurrentBagSlot.ItemData.BagCapacityWeight);
+	}();
+
+	if (!InventoryComponent->CanFitWeightAfterEquipmentChange(FPDInventorySlot(), ItemToReturn, NewBagCapacityWeight))
+	{
+		InventoryComponent->BroadcastWeightLimitExceeded();
+		return false;
+	}
+
+	if (!InventoryComponent->Items[InventorySlotIndex].IsEmpty())
+	{
+		return false;
+	}
+
+	InventoryComponent->Items[InventorySlotIndex] = ItemToReturn;
+	InventoryComponent->Items[InventorySlotIndex].bIsEmpty = false;
+	InventoryComponent->Items[InventorySlotIndex].Quantity = FMath::Max(1, InventoryComponent->Items[InventorySlotIndex].Quantity);
+
+	RemoveCharacterEquipSideEffects(ItemToReturn);
+	EquippedItem->ItemSlot.Clear();
+	SyncReplicatedEquippedItems();
+	// UPDItemSoundLibrary::PlayItemMoveSound(this, ItemToReturn.ItemData); // 멀티 측에 ItemSoundLibrary 미반영
+	InventoryComponent->OnInventoryChanged.Broadcast();
 	BroadcastSlotChanged(SlotType);
 	return true;
 }
@@ -348,7 +426,8 @@ bool UPDEquipmentComponent::ApplyCharacterEquipSideEffects(const FPDInventorySlo
 	return false;
 }
 
-void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const
+void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot,
+                                                              FPDWeaponInstanceState* OutWeaponState) const
 {
 	const FPDItemData& ItemData = ItemSlot.ItemData;
 	if (ItemData.WeaponType == EWeaponType::None)
@@ -367,7 +446,14 @@ void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDInventorySl
 
 	if (PlayerCharacter)
 	{
-		PlayerCharacter->RemoveEquippedWeaponItem(ItemData);
+		if (OutWeaponState)
+		{
+			PlayerCharacter->RemoveEquippedWeaponItemPreservingState(ItemData, *OutWeaponState);
+		}
+		else
+		{
+			PlayerCharacter->RemoveEquippedWeaponItem(ItemData);
+		}
 	}
 }
 
