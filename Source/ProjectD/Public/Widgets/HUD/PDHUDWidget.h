@@ -16,9 +16,13 @@ class UPDDebuffIconBarWidget;
 class UPDCrosshairWidget;
 class UPDGasMaskWidget;
 class UPDActionPromptListWidget;
+class UPDInteractPromptWidget;
 class UPDSkillSlotBarWidget;
 class UPDCircularProgressWidget;
+class UPDQuipToastWidget;
+class UPDMainWeaponAmmoWidget;
 class UPDQuickSlotComponent;
+class UPDInteractionComponent;
 class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 enum class EWeaponType : uint8;
@@ -68,6 +72,9 @@ protected:
 	TObjectPtr<UPDActionPromptListWidget> Bar_ActionPrompts;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDInteractPromptWidget> WBP_InteractPrompt;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDSkillSlotBarWidget> Bar_SkillSlots;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -75,6 +82,12 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDCircularProgressWidget> WBP_UseProgress;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDQuipToastWidget> WBP_QuipToast;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDMainWeaponAmmoWidget> WBP_MainWeaponAmmo;
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "PD|HUD")
@@ -136,8 +149,20 @@ private:
 	UPDQuickSlotComponent* FindOwningQuickSlotComponent() const;
 	void RefreshUseProgressBinding(UPDQuickSlotComponent* NewComponent);
 
+	UPDInteractionComponent* FindOwningInteractionComponent() const;
+	void RefreshInteractPromptBinding(UPDInteractionComponent* NewComponent);
+
+	UFUNCTION()
+	void HandleInteractTargetChanged(AActor* NewTarget);
+
+	// 매 프레임 호출되는 위치 갱신(타이머 기반).
+	void UpdateInteractPromptPosition();
+
 	TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
 	TWeakObjectPtr<UPDQuickSlotComponent> CachedQuickSlot;
+	TWeakObjectPtr<UPDInteractionComponent> CachedInteraction;
+	TWeakObjectPtr<AActor> CachedInteractTarget;
+	FTimerHandle InteractPromptUpdateTimer;
 	TArray<FBoundAttributeHandle> BoundAttributeHandles;
 	TArray<FBoundTagHandle> BoundTagHandles;
 };

@@ -8,7 +8,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Texture2D.h"
-#include "Widgets/Loading/PDLoadingScreenWidget.h"
+#include "Widgets/Transition/PDLoadingScreenWidget.h"
 
 void UPDLoadingScreenSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -111,7 +111,7 @@ void UPDLoadingScreenSubsystem::HandlePostLoadMapWithWorld(UWorld* LoadedWorld)
 	{
 		return;
 	}
-	
+
 	bHolding = true;
 	HoldElapsed = 0.f;
 }

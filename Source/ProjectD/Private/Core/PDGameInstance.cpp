@@ -155,10 +155,11 @@ void UPDGameInstance::LoadFromDisk()
 	PlayerData=SaveObject->PlayerData;
 }
 
-void UPDGameInstance::TravelToBaseLevel(bool bMarkResetPending)
+void UPDGameInstance::TravelToLevel(TSoftObjectPtr<UWorld> Level, bool bMarkBaseResetPending)
 {
-	if (BaseLevel.IsNull())
+	if (Level.IsNull())
 	{
+		UE_LOG(LogTemp, Warning, TEXT("UPDGameInstance::TravelToLevel: Level is not set."));
 		return;
 	}
 
@@ -168,22 +169,22 @@ void UPDGameInstance::TravelToBaseLevel(bool bMarkResetPending)
 		return;
 	}
 
-	if (bMarkResetPending) bPendingResetToBase=true;
+	if (bMarkBaseResetPending) bPendingResetToBase=true;
 
 	if (World->GetNetMode() == NM_Client)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UPDGameInstance::TravelToBaseLevel: clients must request travel through the server."));
+		UE_LOG(LogTemp, Warning, TEXT("UPDGameInstance::TravelToLevel: clients must request travel through the server."));
 		return;
 	}
 
 	if (World->GetNetMode() != NM_Standalone)
 	{
-		const FString BaseLevelPackageName = FPackageName::ObjectPathToPackageName(BaseLevel.ToSoftObjectPath().ToString());
-		World->ServerTravel(BaseLevelPackageName);
+		const FString LevelPackageName = FPackageName::ObjectPathToPackageName(Level.ToSoftObjectPath().ToString());
+		World->ServerTravel(LevelPackageName);
 		return;
 	}
 
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, BaseLevel);
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, Level);
 }
 
 bool UPDGameInstance::ConsumePendingResetToBase()

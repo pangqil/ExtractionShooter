@@ -40,6 +40,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment")
 	bool UnequipItemToInventory(UPDInventoryComponent* InventoryComponent, EPDEquipmentSlotType SlotType);
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Equipment")
+	bool UnequipItemToInventorySlot(UPDInventoryComponent* InventoryComponent, EPDEquipmentSlotType SlotType, int32 InventorySlotIndex);
+
 	UFUNCTION(BlueprintPure, Category = "PD|Equipment")
 	bool CanEquipItem(const FPDItemData& ItemData) const;
 
@@ -75,7 +78,8 @@ private:
 	void RebuildEquippedItemsFromReplication();
 	void SyncReplicatedEquippedItems();
 	bool ApplyCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const;
-	void RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const;
+	void RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot,
+	                                      FPDWeaponInstanceState* OutWeaponState = nullptr) const;
 	int32 ConvertModificationLevelToGasLevel(int32 ModificationLevel) const;
 	void BroadcastModificationApplied(EPDEquipmentSlotType SlotType, const FPDInventorySlot& EquippedSlot);
 	void BroadcastSlotChanged(EPDEquipmentSlotType SlotType);

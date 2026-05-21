@@ -507,6 +507,7 @@ void APDPlayerCharacter::DropCurrentWeapon()
 	ReplicatedWeaponType = EWeaponType::None;
 	SyncWeaponTypeTags(ReplicatedWeaponType);
 	SyncWeaponPresentation();
+
 	OnWeaponSwapped.Broadcast(nullptr, EWeaponSlot::None);
 }
 
@@ -579,6 +580,17 @@ bool APDPlayerCharacter::TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot
 	}
 
 	SpawnedWeapon->SetLevel(FMath::Max(1, ItemSlot.ModificationLevel + 1));
+
+	// ???ì†?”ëœ ?”íƒ„??PickupWeapon ?¸ì¶œ ?„ì— ?ìš© ??PickupWeapon ?´ë???SwitchToSlot??	//    OnWeaponSwappedë¥?broadcast?˜ê¸° ?„ì— actor??CurrentAmmoê°€ ?•í™•??ê°’ì´?´ì•¼
+	//    UIê°€ ì²??œì‹œë¶€???¬ë°”ë¥??”íƒ„??ë³´ì„.
+	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(SpawnedWeapon))
+	{
+		if (ItemSlot.WeaponState.HasPersistedAmmo())
+		{
+			Ranged->SetCurrentAmmo(ItemSlot.WeaponState.CurrentAmmo);
+		}
+	}
+
 	PickupWeapon(SpawnedWeapon);
 	SpawnedWeapon->ForceNetUpdate();
 	ForceNetUpdate();
@@ -587,6 +599,14 @@ bool APDPlayerCharacter::TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot
 
 
 bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, bool bDestroyWeaponActor)
+{
+	FPDWeaponInstanceState Discarded;
+	return RemoveEquippedWeaponItemPreservingState(ItemData, Discarded, bDestroyWeaponActor);
+}
+
+bool APDPlayerCharacter::RemoveEquippedWeaponItemPreservingState(const FPDItemData& ItemData,
+                                                                  FPDWeaponInstanceState& OutState,
+                                                                  bool bDestroyWeaponActor)
 {
 	if (!HasAuthority()) return false;
 
@@ -603,6 +623,13 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 	}
 
 	APDWeaponBase* WeaponToRemove = WeaponSlots[SlotIndex];
+
+	// ??destroy ?´ì „???°í????íƒœ ì¶”ì¶œ ???¸ì¶œ?ê? ?¸ë²¤? ë¦¬ ?¬ë¡¯??stamp ??
+	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(WeaponToRemove))
+	{
+		OutState.CurrentAmmo = Ranged->GetCurrentAmmo();
+	}
+
 	WeaponToRemove->OnUnequip();
 	WeaponToRemove->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	WeaponToRemove->SetActorHiddenInGame(true);
@@ -616,7 +643,8 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 	}
 
 	WeaponSlots[SlotIndex] = nullptr;
-	if (CurrentSlot == TargetSlot)
+	const bool bWasCurrent = (CurrentSlot == TargetSlot);
+	if (bWasCurrent)
 	{
 		CurrentSlot = EWeaponSlot::None;
 		ReplicatedWeaponType = EWeaponType::None;
@@ -628,6 +656,12 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 	if (bDestroyWeaponActor)
 	{
 		WeaponToRemove->Destroy();
+	}
+
+	// ë©”ì¸ ë¬´ê¸°ê°€ ë¹„ì›Œì§??¬ì‹¤??UI/Anim???Œë¦¼. ?¤ì™‘ ?ë¦„???¼ë??¼ë©´ Applyê°€ ê³???ë¬´ê¸°ë¥??¤ì‹œ broadcast??
+	if (bWasCurrent)
+	{
+		OnWeaponSwapped.Broadcast(nullptr, EWeaponSlot::None);
 	}
 
 	return true;

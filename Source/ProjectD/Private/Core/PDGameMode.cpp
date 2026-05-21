@@ -4,7 +4,7 @@
 #include "Core/PDPlayerState.h"
 #include "Items/PDInventoryComponent.h"
 #include "GameFramework/Pawn.h"
-#include "TimerManager.h"
+#include "Type/Types.h"
 
 APDGameMode::APDGameMode()
 {
@@ -45,7 +45,7 @@ void APDGameMode::TravelToBaseLevel(bool bMarkResetPending)
 {
 	if (UPDGameInstance* GI = GetGameInstance<UPDGameInstance>())
 	{
-		GI->TravelToBaseLevel(bMarkResetPending);
+		GI->TravelToLevel(GI->GetBaseLevel(), bMarkResetPending);
 	}
 }
 
@@ -59,6 +59,7 @@ void APDGameMode::RequestExtraction(APlayerController* PC)
 
 void APDGameMode::EndRaid(bool bSuccess)
 {
+	if (CurrentRaidState == ERaidState::Ended) return;
 	SetRaidState(ERaidState::Ended);
 
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
@@ -87,6 +88,7 @@ void APDGameMode::EndRaid(bool bSuccess)
 void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
 {
 	if (!PC) return;
+	if (CurrentRaidState == ERaidState::Ended) return;
 	EndRaid(false);
 	ScheduleReturnToBaseTravel(DeathToTravelDelay);
 }
