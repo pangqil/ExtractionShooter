@@ -42,6 +42,10 @@ enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDLootInterfaceClosedSignature, UPDLootComponent*);
+// === Source legacy: 인터페이스 닫힘 델리게이트 시그니처 ===
+DECLARE_MULTICAST_DELEGATE_OneParam(FPDStashInterfaceClosedSignature, UPDStashComponent*);
+DECLARE_MULTICAST_DELEGATE_OneParam(FPDMarketInterfaceClosedSignature, UPDMarketComponent*);
+DECLARE_MULTICAST_DELEGATE(FPDEquipmentModificationInterfaceClosedSignature);
 
 UCLASS(abstract)
 class PROJECTD_API APDPlayerController : public APlayerController
@@ -73,6 +77,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	UPDStashComponent* GetActiveStashComponent() const;
 
+	// === Source legacy: 인터페이스 닫힘 델리게이트 ===
+	FPDStashInterfaceClosedSignature OnStashInterfaceClosed;
+	FPDMarketInterfaceClosedSignature OnMarketInterfaceClosed;
+	FPDEquipmentModificationInterfaceClosedSignature OnEquipmentModificationInterfaceClosed;
+
 	// ─── LootBox 인터페이스 ──────────────────────────────────────────────
 	// Stash 와 완전히 분리된 시스템 — UPDLootComponent 백엔드.
 	FPDLootInterfaceClosedSignature OnLootInterfaceClosed;
@@ -101,6 +110,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Market")
 	bool IsMarketInterfaceOpen() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Market")
+	UPDMarketComponent* GetActiveMarketComponent() const;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	bool SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity = 1);

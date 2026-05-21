@@ -194,7 +194,7 @@ void UPDPlayerUIManagerComponent::OpenMarket(UPDMarketComponent* MarketComponent
 		UE_LOG(LogPDCharacter, Warning, TEXT("MarketComponent is not valid."));
 		return;
 	}
-	if (!InventoryWidgetClass || !MarketWidgetClass)
+	if (!MarketWidgetClass)
 	{
 		UE_LOG(LogPDCharacter, Warning, TEXT("Market UI widget class is not set."));
 		return;
@@ -203,12 +203,6 @@ void UPDPlayerUIManagerComponent::OpenMarket(UPDMarketComponent* MarketComponent
 	ActiveMarketComponent = MarketComponent;
 	CloseStash();
 	CloseEquipmentModification();
-
-	if (!InventoryWidgetInstance)
-	{
-		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(PC, InventoryWidgetClass);
-	}
-	AddWidgetToViewportIfNeeded(InventoryWidgetInstance);
 
 	if (!MarketWidgetInstance)
 	{
@@ -328,17 +322,11 @@ void UPDPlayerUIManagerComponent::OpenEquipmentModification()
 	CloseMarket();
 	CloseQuest();
 
-	if (!InventoryWidgetClass || !EquipmentModificationWidgetClass)
+	if (!EquipmentModificationWidgetClass)
 	{
 		UE_LOG(LogPDCharacter, Warning, TEXT("Equipment modification UI widget class is not set."));
 		return;
 	}
-
-	if (!InventoryWidgetInstance)
-	{
-		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(PC, InventoryWidgetClass);
-	}
-	AddWidgetToViewportIfNeeded(InventoryWidgetInstance);
 
 	EquipmentModificationWidgetInstance = CreateWidget<UUserWidget>(PC, EquipmentModificationWidgetClass);
 	if (!EquipmentModificationWidgetInstance)

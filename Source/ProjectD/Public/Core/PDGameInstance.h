@@ -42,6 +42,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	int32 GetStashUpgradeLevel() const;
 
+	// === SecureContainer (Source에서 이식) ===
+	UFUNCTION(BlueprintCallable, Category = "PD|SecureContainer")
+	void SetSecureContainerItems(const TArray<FPDInventorySlot>& InSecureContainerItems);
+
+	const TArray<FPDInventorySlot>& GetSecureContainerItems() const;
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void SetTraderReputation(int32 InLevel, int32 InExp);
 
@@ -91,6 +97,10 @@ public:
 protected:
 	UPROPERTY()
 	FPDPlayerData PlayerData;
+
+	// SecureContainer의 원래 동작 보존: 레이드 간 메모리 조롤 (세이브 파일이 아닌 세션 수명)
+	UPROPERTY(Transient)
+	TArray<FPDInventorySlot> SecureContainerItems;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Levels")
 	TSoftObjectPtr<UWorld> BaseLevel;

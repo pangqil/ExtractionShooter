@@ -1,9 +1,7 @@
 #include "Widgets/Inventory/PDMarketWidget.h"
 
-#include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
-#include "Components/UniformGridPanel.h"
-#include "Components/UniformGridSlot.h"
+#include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
@@ -15,12 +13,14 @@ void UPDMarketWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	BindMarketChanged();
+	BindInventoryChanged();
 	RefreshMarketInfo();
 	RefreshMarketGoods();
 }
 
 void UPDMarketWidget::NativeDestruct()
 {
+	UnbindInventoryChanged();
 	UnbindMarketChanged();
 	Super::NativeDestruct();
 }
@@ -29,93 +29,53 @@ void UPDMarketWidget::InitializeMarket(UPDMarketComponent* InMarketComponent)
 {
 	MarketComponent = InMarketComponent;
 	BindMarketChanged();
+	BindInventoryChanged();
 	RefreshMarketInfo();
 	RefreshMarketGoods();
 }
 
-
 void UPDMarketWidget::RefreshMarketInfo()
 {
 	ResolveMarketInfoTextBlocks();
-
-	const UPDInventoryComponent* BuyerInventory = FindInventoryComponent();
-	const int32 CurrentLevel = MarketComponent ? MarketComponent->GetTraderReputationLevelForInventory(BuyerInventory) : 1;
-	const int32 CurrentExp = MarketComponent ? MarketComponent->GetCurrentTraderLevelDisplayExpForInventory(BuyerInventory) : 0;
-	const int32 NextRequiredExp = MarketComponent ? MarketComponent->GetNextTraderLevelDisplayRequiredExpForInventory(BuyerInventory) : 0;
-
-	const bool bIsMaxMarketLevel = (NextRequiredExp <= 0);
-
-	if (TextMarketLevel)
-	{
-		TextMarketLevel->SetVisibility(bIsMaxMarketLevel ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
-		if (!bIsMaxMarketLevel)
-		{
-			TextMarketLevel->SetText(FText::FromString(FString::Printf(TEXT("Lv.%d"), CurrentLevel)));
-		}
-	}
-
-	if (TextMarketExp)
-	{
-		if (bIsMaxMarketLevel)
-		{
-			TextMarketExp->SetText(FText::FromString(TEXT("MAX")));
-		}
-		else
-		{
-			TextMarketExp->SetText(FText::FromString(FString::Printf(TEXT("EXP %d / %d"), CurrentExp, NextRequiredExp)));
-		}
-	}
+	RefreshInventoryGold();
 }
 
 void UPDMarketWidget::RefreshMarketGoods()
 {
-	ResolveMarketGridPanel();
+	ResolveMarketListPanel();
+	RefreshInventoryGold();
 
-	if (!MarketGridPanel)
+	if (MarketListPanel)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("PDMarketWidget: Market grid widget was not found. Expected widget name: %s"), *MarketGridWidgetName.ToString());
-		return;
+		MarketListPanel->ClearChildren();
 	}
 
-	MarketGridPanel->ClearChildren();
-
-	if (!MarketComponent || !MarketItemWidgetClass)
+	if (!MarketComponent || !MarketListPanel || !MarketRowWidgetClass)
 	{
 		return;
 	}
 
 	UPDInventoryComponent* BuyerInventory = FindInventoryComponent();
-	const int32 Columns = FMath::Max(1, MarketGridColumns);
 
-	int32 VisibleIndex = 0;
-	for (int32 Index = 0; Index < MarketComponent->Goods.Num(); ++Index)
+	for (int32 EntryIndex = 0; EntryIndex < MarketComponent->Goods.Num(); ++EntryIndex)
 	{
-		if (!MarketComponent->ShouldShowEntryForInventory(Index, BuyerInventory))
+		if (!MarketComponent->ShouldShowEntry(EntryIndex))
 		{
 			continue;
 		}
 
-		UUserWidget* CreatedWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), MarketItemWidgetClass);
-		if (!CreatedWidget)
+		UPDMarketItemWidget* RowWidget = CreateWidget<UPDMarketItemWidget>(GetOwningPlayer(), MarketRowWidgetClass);
+		if (!RowWidget)
 		{
 			continue;
 		}
 
-		if (UPDMarketItemWidget* MarketItemWidget = Cast<UPDMarketItemWidget>(CreatedWidget))
-		{
-			MarketItemWidget->SetMarketEntry(MarketComponent, BuyerInventory, MarketComponent->Goods[Index], Index);
-		}
-
-		UUniformGridSlot* GridSlot = MarketGridPanel->AddChildToUniformGrid(CreatedWidget, VisibleIndex / Columns, VisibleIndex % Columns);
-		++VisibleIndex;
-		if (GridSlot)
-		{
-			GridSlot->SetHorizontalAlignment(HAlign_Center);
-			GridSlot->SetVerticalAlignment(VAlign_Center);
-		}
+		RowWidget->SetInventorySlotWidgetClass(MarketSlotWidgetClass);
+		RowWidget->SetQuantityPopupWidgetClass(MarketQuantityPopupWidgetClass);
+		RowWidget->SetMarketEntry(MarketComponent, BuyerInventory, MarketComponent->Goods[EntryIndex], EntryIndex);
+		MarketListPanel->AddChild(RowWidget);
 	}
 }
-
 
 void UPDMarketWidget::ResolveMarketInfoTextBlocks()
 {
@@ -124,44 +84,89 @@ void UPDMarketWidget::ResolveMarketInfoTextBlocks()
 		return;
 	}
 
-	if (!TextMarketLevel && !MarketLevelTextWidgetName.IsNone())
+	if (!TextInventoryGold && !InventoryGoldTextWidgetName.IsNone())
 	{
-		TextMarketLevel = Cast<UTextBlock>(WidgetTree->FindWidget(MarketLevelTextWidgetName));
-	}
-
-	if (!TextMarketExp && !MarketExpTextWidgetName.IsNone())
-	{
-		TextMarketExp = Cast<UTextBlock>(WidgetTree->FindWidget(MarketExpTextWidgetName));
+		TextInventoryGold = Cast<UTextBlock>(WidgetTree->FindWidget(InventoryGoldTextWidgetName));
 	}
 }
 
-void UPDMarketWidget::ResolveMarketGridPanel()
+void UPDMarketWidget::ResolveMarketListPanel()
 {
-	if (MarketGridPanel)
+	if (MarketListPanel || !WidgetTree || MarketListWidgetName.IsNone())
 	{
 		return;
 	}
 
-	if (!WidgetTree)
+	MarketListPanel = Cast<UPanelWidget>(WidgetTree->FindWidget(MarketListWidgetName));
+}
+
+void UPDMarketWidget::BindMarketChanged()
+{
+	if (BoundMarketComponent == MarketComponent)
 	{
 		return;
 	}
 
-	if (UWidget* FoundWidget = WidgetTree->FindWidget(MarketGridWidgetName))
+	UnbindMarketChanged();
+	BoundMarketComponent = MarketComponent;
+
+	if (BoundMarketComponent)
 	{
-		MarketGridPanel = Cast<UUniformGridPanel>(FoundWidget);
+		BoundMarketComponent->OnMarketChanged.AddUniqueDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
+	}
+}
+
+void UPDMarketWidget::UnbindMarketChanged()
+{
+	if (BoundMarketComponent)
+	{
+		BoundMarketComponent->OnMarketChanged.RemoveDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
+		BoundMarketComponent = nullptr;
+	}
+}
+
+void UPDMarketWidget::BindInventoryChanged()
+{
+	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	if (BoundInventoryComponent == InventoryComponent)
+	{
+		return;
 	}
 
-	if (!MarketGridPanel)
+	UnbindInventoryChanged();
+	BoundInventoryComponent = InventoryComponent;
+
+	if (BoundInventoryComponent)
 	{
-		WidgetTree->ForEachWidget([this](UWidget* Widget)
-		{
-			if (!MarketGridPanel)
-			{
-				MarketGridPanel = Cast<UUniformGridPanel>(Widget);
-			}
-		});
+		BoundInventoryComponent->OnInventoryChanged.AddUniqueDynamic(this, &UPDMarketWidget::RefreshMarketInfo);
+		BoundInventoryComponent->OnInventoryChanged.AddUniqueDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
 	}
+}
+
+void UPDMarketWidget::UnbindInventoryChanged()
+{
+	if (BoundInventoryComponent)
+	{
+		BoundInventoryComponent->OnInventoryChanged.RemoveDynamic(this, &UPDMarketWidget::RefreshMarketInfo);
+		BoundInventoryComponent->OnInventoryChanged.RemoveDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
+		BoundInventoryComponent = nullptr;
+	}
+}
+
+void UPDMarketWidget::RefreshInventoryGold()
+{
+	ResolveMarketInfoTextBlocks();
+
+	if (TextInventoryGold)
+	{
+		const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+		TextInventoryGold->SetText(MakeGoldText(InventoryComponent ? InventoryComponent->GetGold() : 0));
+	}
+}
+
+FText UPDMarketWidget::MakeGoldText(int32 Gold) const
+{
+	return FText::AsNumber(FMath::Max(0, Gold));
 }
 
 UPDInventoryComponent* UPDMarketWidget::FindInventoryComponent() const
@@ -173,46 +178,10 @@ UPDInventoryComponent* UPDMarketWidget::FindInventoryComponent() const
 			return InventoryComponent;
 		}
 	}
-
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();
 	}
 
 	return nullptr;
-}
-
-
-void UPDMarketWidget::HandleMarketReputationChanged(int32 NewLevel, int32 NewExp)
-{
-	RefreshMarketInfo();
-	RefreshMarketGoods();
-}
-
-void UPDMarketWidget::BindMarketChanged()
-{
-	if (BoundMarketComponent == MarketComponent)
-	{
-		return;
-	}
-
-	UnbindMarketChanged();
-
-	BoundMarketComponent = MarketComponent;
-
-	if (BoundMarketComponent)
-	{
-		BoundMarketComponent->OnMarketChanged.AddUniqueDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
-		BoundMarketComponent->OnTraderReputationChanged.AddUniqueDynamic(this, &UPDMarketWidget::HandleMarketReputationChanged);
-	}
-}
-
-void UPDMarketWidget::UnbindMarketChanged()
-{
-	if (BoundMarketComponent)
-	{
-		BoundMarketComponent->OnMarketChanged.RemoveDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
-		BoundMarketComponent->OnTraderReputationChanged.RemoveDynamic(this, &UPDMarketWidget::HandleMarketReputationChanged);
-		BoundMarketComponent = nullptr;
-	}
 }
