@@ -105,6 +105,21 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerMoveStashSlotQuantity(UPDStashComponent* StashComponent, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 
+	UFUNCTION(Server, Reliable)
+	void ServerMoveInventorySlotQuantity(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerStoreInventorySlotQuantityToQuickSlot(int32 SourceSlotIndex, int32 TargetQuickSlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerMoveQuickSlotQuantity(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTakeQuickSlotQuantityToInventorySlot(int32 QuickSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerEquipInventoryWeaponSlot(int32 InventorySlotIndex);
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
 	void OpenEquipmentModificationInterface();
 

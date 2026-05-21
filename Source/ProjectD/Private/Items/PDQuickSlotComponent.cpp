@@ -701,7 +701,7 @@ bool UPDQuickSlotComponent::EquipInventoryWeaponSlot(int32 InventorySlotIndex)
 	}
 
 	const int32 CooldownSlotIndex = FindWeaponQuickSlotByItemID(Slot.ItemData.ItemID);
-	return EquipWeaponFromInventorySlot(InventorySlotIndex, CooldownSlotIndex);
+	return EquipWeaponFromInventorySlot(InventorySlotIndex, CooldownSlotIndex, false);
 }
 
 bool UPDQuickSlotComponent::UseQuickSlot(int32 SlotIndex)
@@ -781,12 +781,12 @@ bool UPDQuickSlotComponent::UseWeaponQuickSlot(int32 SlotIndex, const FPDInvento
 		return false;
 	}
 
-	return EquipWeaponFromInventorySlot(InventorySlotIndex, SlotIndex);
+	return EquipWeaponFromInventorySlot(InventorySlotIndex, SlotIndex, true);
 }
 
-bool UPDQuickSlotComponent::EquipWeaponFromInventorySlot(int32 InventorySlotIndex, int32 CooldownSlotIndex)
+bool UPDQuickSlotComponent::EquipWeaponFromInventorySlot(int32 InventorySlotIndex, int32 CooldownSlotIndex, bool bRespectWeaponSwitchCooldown)
 {
-	if (bIsUsingConsumable || IsWeaponQuickSlotOnCooldown())
+	if (bIsUsingConsumable || (bRespectWeaponSwitchCooldown && IsWeaponQuickSlotOnCooldown()))
 	{
 		return false;
 	}
@@ -808,7 +808,11 @@ bool UPDQuickSlotComponent::EquipWeaponFromInventorySlot(int32 InventorySlotInde
 
 	if (IsEquippedItem(InventorySlot.ItemData))
 	{
-		return false;
+		InventoryComponent->Items[InventorySlotIndex].Clear();
+		InventoryComponent->OnInventoryChanged.Broadcast();
+		SyncQuickSlotsWithInventory();
+		OnQuickSlotsChanged.Broadcast();
+		return true;
 	}
 
 	bool bEquipped = false;
@@ -817,6 +821,12 @@ bool UPDQuickSlotComponent::EquipWeaponFromInventorySlot(int32 InventorySlotInde
 		if (APDPlayerCharacter* PlayerCharacter = FindOwnerPlayerCharacter())
 		{
 			bEquipped = PlayerCharacter->TryAutoEquipWeaponSlot(InventorySlot);
+		}
+
+		if (bEquipped)
+		{
+			InventoryComponent->Items[InventorySlotIndex].Clear();
+			InventoryComponent->OnInventoryChanged.Broadcast();
 		}
 	}
 	else
@@ -835,7 +845,10 @@ bool UPDQuickSlotComponent::EquipWeaponFromInventorySlot(int32 InventorySlotInde
 
 	SyncQuickSlotsWithInventory();
 	OnQuickSlotsChanged.Broadcast();
-	StartWeaponQuickSlotCooldown(CooldownSlotIndex);
+	if (QuickSlotItems.IsValidIndex(CooldownSlotIndex))
+	{
+		StartWeaponQuickSlotCooldown(CooldownSlotIndex);
+	}
 	return true;
 }
 

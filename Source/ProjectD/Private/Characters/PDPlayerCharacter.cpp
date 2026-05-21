@@ -192,11 +192,13 @@ UPDQuestComponent* APDPlayerCharacter::GetQuestComponent() const
 void APDPlayerCharacter::OnRep_WeaponSlots()
 {
 	SyncWeaponPresentation();
+	OnWeaponSwapped.Broadcast(GetCurrentWeapon(), CurrentSlot);
 }
 
 void APDPlayerCharacter::OnRep_CurrentSlot()
 {
 	SyncWeaponPresentation();
+	OnWeaponSwapped.Broadcast(GetCurrentWeapon(), CurrentSlot);
 }
 
 void APDPlayerCharacter::OnRep_ReplicatedWeaponType()
@@ -505,6 +507,7 @@ void APDPlayerCharacter::DropCurrentWeapon()
 	ReplicatedWeaponType = EWeaponType::None;
 	SyncWeaponTypeTags(ReplicatedWeaponType);
 	SyncWeaponPresentation();
+	OnWeaponSwapped.Broadcast(nullptr, EWeaponSlot::None);
 }
 
 APDWeaponBase* APDPlayerCharacter::GetCurrentWeapon() const
@@ -618,6 +621,7 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 		CurrentSlot = EWeaponSlot::None;
 		ReplicatedWeaponType = EWeaponType::None;
 		SyncWeaponTypeTags(ReplicatedWeaponType);
+		OnWeaponSwapped.Broadcast(nullptr, EWeaponSlot::None);
 	}
 	SyncWeaponPresentation();
 

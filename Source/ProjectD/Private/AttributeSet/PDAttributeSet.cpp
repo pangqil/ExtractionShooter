@@ -81,6 +81,17 @@ void UPDAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 
 void UPDAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
+	if (Attribute == GetMoveSpeedAttribute() || Attribute == GetMaxMoveSpeedAttribute())
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PD AttrSpeed] PreAttributeChange. Owner=%s Attribute=%s CurrentMove=%.2f CurrentMax=%.2f NewValue=%.2f"),
+			*GetNameSafe(GetOwningActor()),
+			*Attribute.GetName(),
+			GetMoveSpeed(),
+			GetMaxMoveSpeed(),
+			NewValue);
+	}
+
 	Super::PreAttributeChange(Attribute, NewValue);
 	HandleAttributeClamp(Attribute, NewValue);
 }
@@ -90,6 +101,21 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 	Super::PostGameplayEffectExecute(Data);
 	AActor* OwnerActor = GetOwningActor();
 	const bool bHasAuthority = OwnerActor && OwnerActor->HasAuthority();
+
+	if (Data.EvaluatedData.Attribute == GetMoveSpeedAttribute() ||
+		Data.EvaluatedData.Attribute == GetMaxMoveSpeedAttribute())
+	{
+		const UGameplayEffect* SourceGE = Data.EffectSpec.Def;
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PD AttrSpeed] PostGameplayEffectExecute. Owner=%s Authority=%d Attribute=%s GE=%s Magnitude=%.2f Move=%.2f Max=%.2f"),
+			*GetNameSafe(OwnerActor),
+			bHasAuthority ? 1 : 0,
+			*Data.EvaluatedData.Attribute.GetName(),
+			*GetNameSafe(SourceGE),
+			Data.EvaluatedData.Magnitude,
+			GetMoveSpeed(),
+			GetMaxMoveSpeed());
+	}
 
 	if (Data.EvaluatedData.Attribute==GetDamageAttribute())
 	{

@@ -396,8 +396,14 @@ void APDPlayerController::OnAbilityInputPressed(FGameplayTag InputTag)
 	{
 		if (InputTag == PDGameplayTags::Input_Roll || InputTag == PDGameplayTags::Input_Sprint)
 		{
+			if (InputTag == PDGameplayTags::Input_Sprint &&
+				ASC->HasMatchingGameplayTag(PDGameplayTags::State_Sprinting))
+			{
+				return;
+			}
+
 			const bool bActivated = ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
-			if (!HasAuthority() && (InputTag == PDGameplayTags::Input_Sprint || !bActivated))
+			if (!HasAuthority() && !bActivated)
 			{
 				ServerTryActivateAbilityByTag(InputTag);
 			}
@@ -475,6 +481,12 @@ void APDPlayerController::ServerTryActivateAbilityByTag_Implementation(FGameplay
 
 	if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
+		if (InputTag == PDGameplayTags::Input_Sprint &&
+			ASC->HasMatchingGameplayTag(PDGameplayTags::State_Sprinting))
+		{
+			return;
+		}
+
 		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
 	}
 }
@@ -685,6 +697,50 @@ void APDPlayerController::ServerMoveStashSlotQuantity_Implementation(UPDStashCom
 		{
 			StashComponent->SaveToPlayerState(GetPlayerState<APDPlayerState>());
 		}
+	}
+}
+
+void APDPlayerController::ServerMoveInventorySlotQuantity_Implementation(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		InventoryComponent->MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerStoreInventorySlotQuantityToQuickSlot_Implementation(int32 SourceSlotIndex, int32 TargetQuickSlotIndex, int32 Quantity)
+{
+	UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent();
+	UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent();
+	if (InventoryComponent && QuickSlotComponent)
+	{
+		QuickSlotComponent->StoreInventorySlotQuantityToSlot(InventoryComponent, SourceSlotIndex, TargetQuickSlotIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerMoveQuickSlotQuantity_Implementation(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	if (UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent())
+	{
+		QuickSlotComponent->MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerTakeQuickSlotQuantityToInventorySlot_Implementation(int32 QuickSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity)
+{
+	UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent();
+	UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent();
+	if (InventoryComponent && QuickSlotComponent)
+	{
+		QuickSlotComponent->TakeQuickSlotQuantityToInventorySlot(InventoryComponent, QuickSlotIndex, TargetInventorySlotIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerEquipInventoryWeaponSlot_Implementation(int32 InventorySlotIndex)
+{
+	if (UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent())
+	{
+		QuickSlotComponent->EquipInventoryWeaponSlot(InventorySlotIndex);
 	}
 }
 

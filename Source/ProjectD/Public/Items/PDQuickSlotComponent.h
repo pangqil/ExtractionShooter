@@ -212,7 +212,7 @@ private:
 	bool IsEquippedItem(const FPDItemData& ItemData) const;
 	bool SyncQuickSlotsWithInventory();
 	bool UseWeaponQuickSlot(int32 SlotIndex, const FPDInventorySlot& Slot);
-	bool EquipWeaponFromInventorySlot(int32 InventorySlotIndex, int32 CooldownSlotIndex);
+	bool EquipWeaponFromInventorySlot(int32 InventorySlotIndex, int32 CooldownSlotIndex, bool bRespectWeaponSwitchCooldown = true);
 	bool BeginConsumableUse(int32 SlotIndex, const FPDInventorySlot& Slot);
 	void FinishConsumableUse();
 	bool ConsumeItem(const FPDInventorySlot& Slot);

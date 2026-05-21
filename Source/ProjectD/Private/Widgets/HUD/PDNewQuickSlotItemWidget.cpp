@@ -131,11 +131,29 @@ bool UPDNewQuickSlotItemWidget::NativeOnDrop(const FGeometry& InGeometry, const 
 	switch (DragOperation->SourceContainerType)
 	{
 	case EPDItemContainerType::Inventory:
+		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+		{
+			const AActor* QuickSlotOwner = QuickSlotComponent->GetOwner();
+			if (!QuickSlotOwner || !QuickSlotOwner->HasAuthority())
+			{
+				PlayerController->ServerStoreInventorySlotQuantityToQuickSlot(DragOperation->SourceSlotIndex, SlotIndex, Quantity);
+				return true;
+			}
+		}
 		bMoved = QuickSlotComponent->StoreInventorySlotQuantityToSlot(FindInventoryComponent(), DragOperation->SourceSlotIndex, SlotIndex, Quantity);
 		break;
 	case EPDItemContainerType::Stash:
 		return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 	case EPDItemContainerType::QuickSlot:
+		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+		{
+			const AActor* QuickSlotOwner = QuickSlotComponent->GetOwner();
+			if (!QuickSlotOwner || !QuickSlotOwner->HasAuthority())
+			{
+				PlayerController->ServerMoveQuickSlotQuantity(DragOperation->SourceSlotIndex, SlotIndex, Quantity);
+				return true;
+			}
+		}
 		bMoved = QuickSlotComponent->MoveSlotQuantityToSlot(DragOperation->SourceSlotIndex, SlotIndex, Quantity);
 		break;
 	default:

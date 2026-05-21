@@ -2,6 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Blueprint/UserWidget.h"
+#include "Characters/PDPlayerCharacter.h"
 #include "Components/Widget.h"
 #include "Core/PDPlayerController.h"
 #include "Data/PDQuestComponent.h"
@@ -21,6 +22,15 @@
 #include "Widgets/PDNotificationWidget.h"
 #include "Widgets/PDRootLayout.h"
 #include "Widgets/Quest/PDQuestWindowWidget.h"
+
+namespace
+{
+	bool ShouldShowCrosshairForController(const APDPlayerController* PC)
+	{
+		const APDPlayerCharacter* PlayerCharacter = PC ? Cast<APDPlayerCharacter>(PC->GetPawn()) : nullptr;
+		return PlayerCharacter && PlayerCharacter->GetCurrentWeapon();
+	}
+}
 
 UPDPlayerUIManagerComponent::UPDPlayerUIManagerComponent()
 {
@@ -162,7 +172,8 @@ void UPDPlayerUIManagerComponent::ApplyEffectiveUIState(EWidgetInputMode Mode)
 {
 	if (HUDInstance)
 	{
-		HUDInstance->SetCrosshairVisible(Mode == EWidgetInputMode::Game);
+		HUDInstance->SetCrosshairVisible(
+			Mode == EWidgetInputMode::Game && ShouldShowCrosshairForController(GetPDController()));
 	}
 }
 
@@ -569,7 +580,7 @@ void UPDPlayerUIManagerComponent::SetGameplayInputBlockedByModalUI(bool bBlocked
 
 	if (HUDInstance)
 	{
-		HUDInstance->SetCrosshairVisible(true);
+		HUDInstance->SetCrosshairVisible(ShouldShowCrosshairForController(PC));
 	}
 }
 
@@ -591,9 +602,22 @@ void UPDPlayerUIManagerComponent::UpdateCrosshair(const FVector2D& MousePosition
 
 void UPDPlayerUIManagerComponent::SetCrosshairType(APDWeaponBase* NewWeapon)
 {
-	if (HUDInstance && NewWeapon)
+	if (!HUDInstance)
 	{
-		HUDInstance->SetCrosshairType(NewWeapon->GetWeaponType());
+		return;
+	}
+
+	if (!NewWeapon)
+	{
+		HUDInstance->SetCrosshairType(EWeaponType::None);
+		HUDInstance->SetCrosshairVisible(false);
+		return;
+	}
+
+	HUDInstance->SetCrosshairType(NewWeapon->GetWeaponType());
+	if (!bIsGameplayInputBlockedByModalUI)
+	{
+		HUDInstance->SetCrosshairVisible(true);
 	}
 }
 

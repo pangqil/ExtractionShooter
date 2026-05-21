@@ -6,6 +6,7 @@
 #include "PDSprintAbility.generated.h"
 
 class UGameplayEffect;
+class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 
 UCLASS()
@@ -20,6 +21,12 @@ public:
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
+
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags,
+		const FGameplayTagContainer* TargetTags,
+		FGameplayTagContainer* OptionalRelevantTags) const override;
 
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
@@ -52,6 +59,8 @@ private:
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo) const;
+	void RemoveSprintGameplayEffects(UAbilitySystemComponent* ASC) const;
+	void SyncCharacterMovementSpeed() const;
 	void BindStaminaChanged();
 	void UnbindStaminaChanged();
 	void OnStaminaChanged(const FOnAttributeChangeData& Data);

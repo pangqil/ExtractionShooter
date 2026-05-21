@@ -547,6 +547,16 @@ void UPDInventoryWidget::HandleEquipmentSlotItemDropped(UPDEquipmentSlotWidget* 
 	{
 		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
+			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+			{
+				const AActor* QuickSlotOwner = QuickSlotComponent->GetOwner();
+				if (!QuickSlotOwner || !QuickSlotOwner->HasAuthority())
+				{
+					PlayerController->ServerEquipInventoryWeaponSlot(DragOperation->SourceSlotIndex);
+					return;
+				}
+			}
+
 			if (QuickSlotComponent->EquipInventoryWeaponSlot(DragOperation->SourceSlotIndex))
 			{
 				RefreshEquipmentSlots();
@@ -1034,6 +1044,16 @@ void UPDInventoryWidget::HandleContextMenuEquipClicked(UPDInventoryItemContextMe
 	{
 		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
+			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+			{
+				const AActor* QuickSlotOwner = QuickSlotComponent->GetOwner();
+				if (!QuickSlotOwner || !QuickSlotOwner->HasAuthority())
+				{
+					PlayerController->ServerEquipInventoryWeaponSlot(SlotIndex);
+					return;
+				}
+			}
+
 			if (QuickSlotComponent->EquipInventoryWeaponSlot(SlotIndex))
 			{
 				RefreshEquipmentSlots();
@@ -1101,6 +1121,15 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 	switch (SourceContainerType)
 	{
 	case EPDItemContainerType::Inventory:
+		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+		{
+			const AActor* InventoryOwner = InventoryComponent->GetOwner();
+			if (!InventoryOwner || !InventoryOwner->HasAuthority())
+			{
+				PlayerController->ServerMoveInventorySlotQuantity(SourceSlotIndex, TargetSlotIndex, Quantity);
+				return;
+			}
+		}
 		InventoryComponent->MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
 		break;
 	case EPDItemContainerType::Stash:
@@ -1122,6 +1151,15 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 	case EPDItemContainerType::QuickSlot:
 		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
+			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+			{
+				const AActor* QuickSlotOwner = QuickSlotComponent->GetOwner();
+				if (!QuickSlotOwner || !QuickSlotOwner->HasAuthority())
+				{
+					PlayerController->ServerTakeQuickSlotQuantityToInventorySlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+					return;
+				}
+			}
 			QuickSlotComponent->TakeQuickSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
 		}
 		break;

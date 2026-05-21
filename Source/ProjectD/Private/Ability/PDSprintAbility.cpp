@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "AttributeSet/PDAttributeSet.h"
 #include "Characters/Base/PDCharacterBase.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayTag/PDGameplayTags.h"
 
@@ -21,6 +22,21 @@ UPDSprintAbility::UPDSprintAbility()
 	ActivationBlockedTags.AddTag(PDGameplayTags::State_Downed);
 	ActivationBlockedTags.AddTag(PDGameplayTags::State_GettingUp);
 	ActivationBlockedTags.AddTag(PDGameplayTags::State_Dead);
+}
+
+bool UPDSprintAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
+	{
+		return false;
+	}
+
+	const UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	return !ASC || !ASC->HasMatchingGameplayTag(PDGameplayTags::State_Sprinting);
 }
 
 void UPDSprintAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -50,10 +66,16 @@ void UPDSprintAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	{
+		RemoveSprintGameplayEffects(ASC);
+	}
+
 	SprintEffectHandle = ApplySprintGameplayEffect(SprintEffectClass, Handle, ActorInfo, ActivationInfo);
 	SprintCostEffectHandle = ApplySprintGameplayEffect(SprintCostEffectClass, Handle, ActorInfo, ActivationInfo);
 
-	if (!SprintEffectHandle.IsValid() && !SprintCostEffectHandle.IsValid())
+	if ((!SprintEffectHandle.IsValid() && SprintEffectClass) ||
+		(!SprintCostEffectHandle.IsValid() && SprintCostEffectClass))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -81,7 +103,11 @@ void UPDSprintAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 		{
 			ASC->RemoveActiveGameplayEffect(SprintCostEffectHandle);
 		}
+
+		RemoveSprintGameplayEffects(ASC);
 	}
+
+	SyncCharacterMovementSpeed();
 
 	SprintEffectHandle.Invalidate();
 	SprintCostEffectHandle.Invalidate();
@@ -105,6 +131,42 @@ FActiveGameplayEffectHandle UPDSprintAbility::ApplySprintGameplayEffect(TSubclas
 		ActivationInfo,
 		EffectClass.GetDefaultObject(),
 		GetAbilityLevel(Handle, ActorInfo));
+}
+
+void UPDSprintAbility::RemoveSprintGameplayEffects(UAbilitySystemComponent* ASC) const
+{
+	if (!ASC)
+	{
+		return;
+	}
+
+	if (SprintEffectClass)
+	{
+		ASC->RemoveActiveGameplayEffectBySourceEffect(SprintEffectClass, ASC);
+	}
+
+	if (SprintCostEffectClass)
+	{
+		ASC->RemoveActiveGameplayEffectBySourceEffect(SprintCostEffectClass, ASC);
+	}
+}
+
+void UPDSprintAbility::SyncCharacterMovementSpeed() const
+{
+	APDCharacterBase* Character = GetPDCharacter();
+	if (!Character || Character->IsDowned() || Character->IsGettingUp() || Character->IsDead())
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement();
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!MovementComponent || !ASC)
+	{
+		return;
+	}
+
+	MovementComponent->MaxWalkSpeed = ASC->GetNumericAttribute(UPDAttributeSet::GetMoveSpeedAttribute());
 }
 
 void UPDSprintAbility::BindStaminaChanged()
