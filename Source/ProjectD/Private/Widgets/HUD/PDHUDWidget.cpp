@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+
 
 
 #include "Widgets/HUD/PDHUDWidget.h"
@@ -6,6 +6,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AttributeSet/PDAttributeSet.h"
+#include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "Type/Types.h"
@@ -23,7 +24,7 @@
 UPDHUDWidget::UPDHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// HUD는 입력 모드를 절대 건드리면 안 됨. 베이스 기본값 Menu가 FInputModeUIOnly를 강제하는 사고 방지.
+
 	InputMode = EWidgetInputMode::Passive;
 }
 
@@ -120,7 +121,7 @@ void UPDHUDWidget::BindAttributeToBar(UPDAttributeBarWidget* Bar,
 	TWeakObjectPtr<UPDHUDWidget> WeakSelf = this;
 
 	auto OnChanged =
-		[WeakBar, WeakSelf, CurrentAttr, MaxAttr](const FOnAttributeChangeData& /*Data*/)
+		[WeakBar, WeakSelf, CurrentAttr, MaxAttr](const FOnAttributeChangeData& )
 		{
 			if (!WeakBar.IsValid() || !WeakSelf.IsValid()) return;
 			WeakSelf->RefreshBar(WeakBar.Get(), CurrentAttr, MaxAttr);
@@ -182,8 +183,8 @@ void UPDHUDWidget::BindTagEvent(const FGameplayTag& Tag,
 	if (!CachedASC.IsValid()) return;
 	UAbilitySystemComponent* ASC = CachedASC.Get();
 
-	// 초기 상태 동기화 — 바인딩 시점의 현재 태그 카운트로 핸들러 1회 호출.
-	// RegisterGameplayTagEvent(NewOrRemoved)는 전이만 trigger하므로, 이미 1+ 상태인 태그를 놓치지 않기 위해 필요.
+
+
 	OnChanged(Tag, ASC->GetGameplayTagCount(Tag));
 
 	TWeakObjectPtr<UPDHUDWidget> WeakSelf = this;
@@ -281,6 +282,14 @@ void UPDHUDWidget::RefreshNewQuickSlots()
 
 UPDQuickSlotComponent* UPDHUDWidget::FindOwningQuickSlotComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDQuickSlotComponent* QuickSlotComponent = PDController->GetPlayerQuickSlotComponent())
+		{
+			return QuickSlotComponent;
+		}
+	}
+
 	if (APawn* Pawn = GetOwningPlayerPawn())
 	{
 		return Pawn->FindComponentByClass<UPDQuickSlotComponent>();
@@ -303,7 +312,7 @@ void UPDHUDWidget::RefreshUseProgressBinding(UPDQuickSlotComponent* NewComponent
 		Old->OnConsumableUseCompleted.RemoveDynamic(this, &UPDHUDWidget::HandleConsumableUseCompleted);
 	}
 
-	// 이전 구독 해제 후 활성 채널링이 있었다면 시각적 잔상 제거.
+
 	if (WBP_UseProgress && WBP_UseProgress->IsRunning())
 	{
 		WBP_UseProgress->StopProgress();

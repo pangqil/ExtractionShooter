@@ -8,10 +8,14 @@
 #include "GameplayTag/PDGameplayTags.h"
 #include "InputActionValue.h"
 #include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
 #include "Core/PDGameMode.h"
+#include "Core/PDPlayerState.h"
+#include "Core/PDPlayerUIManagerComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/PDGameplayAbilityBase.h"
+#include "Ability/PDSprintAbility.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Input/PDInputComponent.h"
@@ -23,6 +27,7 @@
 #include "Widgets/Quest/PDQuestWindowWidget.h"
 #include "Items/PDMarketComponent.h"
 #include "Items/PDInventoryComponent.h"
+#include "Items/PDEquipmentComponent.h"
 #include "Items/PDQuickSlotComponent.h"
 #include "Data/PDQuestComponent.h"
 #include "Items/PDStashComponent.h"
@@ -38,28 +43,78 @@ DEFINE_LOG_CATEGORY(LogPDCharacter);
 #include "Interfaces/PDInteractable.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
-#include "Weapons/PDRifle.h"                   // OnToggleFireMode - ToggleFireMode 전용
+#include "Weapons/PDRifle.h"
 
 #include "Ping/PDPingSubsystem.h"
 #include "Ping/PDPingInputComponent.h"
 #include "Widgets/HUD/PDWorldMapWidget.h"
-#include "Ability/PDCoverAbility.h"
-#include "Ability/PDCoverAimAbility.h"
 
 APDPlayerController::APDPlayerController()
 {
 	PrimaryActorTick.bCanEverTick=true;
 	PingInputComp = CreateDefaultSubobject<UPDPingInputComponent>(TEXT("PingInputComp"));
+	UIManagerComponent = CreateDefaultSubobject<UPDPlayerUIManagerComponent>(TEXT("UIManagerComponent"));
 }
 
 void APDPlayerController::RequestExtraction()
 {
+	if (!HasAuthority())
+	{
+		ServerRequestExtraction();
+		return;
+	}
+
 	if (APDGameMode* GM=GetWorld()->GetAuthGameMode<APDGameMode>())
 	{
 		GM->RequestExtraction(this);
 	}
 }
 
+void APDPlayerController::ServerRequestExtraction_Implementation()
+{
+	RequestExtraction();
+}
+
+APDPlayerState* APDPlayerController::GetPDPlayerState() const
+{
+	return GetPlayerState<APDPlayerState>();
+}
+
+UPDInventoryComponent* APDPlayerController::GetPlayerInventoryComponent() const
+{
+	if (APDPlayerState* PDPlayerState = GetPDPlayerState())
+	{
+		return PDPlayerState->GetInventoryComponent();
+	}
+	return GetPawn() ? GetPawn()->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+}
+
+UPDEquipmentComponent* APDPlayerController::GetPlayerEquipmentComponent() const
+{
+	if (APDPlayerState* PDPlayerState = GetPDPlayerState())
+	{
+		return PDPlayerState->GetEquipmentComponent();
+	}
+	return GetPawn() ? GetPawn()->FindComponentByClass<UPDEquipmentComponent>() : nullptr;
+}
+
+UPDQuickSlotComponent* APDPlayerController::GetPlayerQuickSlotComponent() const
+{
+	if (APDPlayerState* PDPlayerState = GetPDPlayerState())
+	{
+		return PDPlayerState->GetQuickSlotComponent();
+	}
+	return GetPawn() ? GetPawn()->FindComponentByClass<UPDQuickSlotComponent>() : nullptr;
+}
+
+UPDQuestComponent* APDPlayerController::GetPlayerQuestComponent() const
+{
+	if (APDPlayerState* PDPlayerState = GetPDPlayerState())
+	{
+		return PDPlayerState->GetQuestComponent();
+	}
+	return GetPawn() ? GetPawn()->FindComponentByClass<UPDQuestComponent>() : nullptr;
+}
 void APDPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
@@ -126,14 +181,17 @@ void APDPlayerController::SetupInputComponent()
 	{
 		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
 			ETriggerEvent::Started, this, &APDPlayerController::TryInteract);
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
+			ETriggerEvent::Completed, this, &APDPlayerController::StopInteract);
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
+			ETriggerEvent::Canceled, this, &APDPlayerController::StopInteract);
 	}
 	else
 	{
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
+		InputComponent->BindKey(EKeys::E, IE_Released, this, &APDPlayerController::StopInteract);
 	}
 
-
-	UE_LOG(LogPDCharacter, Warning, TEXT("[Input] AbilityInputActions count: %d"), InputConfig->AbilityInputActions.Num());
 	PDIC->BindAbilityActions(InputConfig, this, &APDPlayerController::OnAbilityInputPressed,
 		&APDPlayerController::OnAbilityInputReleased);
 
@@ -144,27 +202,25 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Reload,
 		ETriggerEvent::Started, this, &APDPlayerController::OnReload);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot1,
-		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot1);	
+		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot1);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot2,
 		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot2);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot3,
 		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot3);
-	
+
 	InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed,
 		this, &APDPlayerController::OnAimPressed);
-	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Cover,
-		ETriggerEvent::Started, this, &APDPlayerController::OnCoverPressed);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_ToggleFireMode,
 		ETriggerEvent::Started, this, &APDPlayerController::OnToggleFireMode);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_DropWeapon,
 		ETriggerEvent::Started, this, &APDPlayerController::OnDropWeapon);
 
-	// IA_Quickslot1~6의 IMC 매핑(One~Six)과 충돌. 신규 BindNativeAction 경로로 일원화 (QS-5a).
-	// 안정 검증 후 제거 예정.
-	// InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
-	// InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
-	// InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
-	// InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
+
+
+
+
+
+
 
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot1,
 		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot1);
@@ -189,15 +245,19 @@ void APDPlayerController::SetupInputComponent()
 	{
 		PingInputComp->BindInputs(PDIC, InputConfig);
 	}
-	
-	//월드맵
+
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Map,
-	ETriggerEvent::Started, this, &APDPlayerController::OnToggleWorldMap);
+		ETriggerEvent::Started, this, &APDPlayerController::OnToggleWorldMap);
 }
 
 void APDPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (!IsLocalController())
+	{
+		return;
+	}
 
 	FInputModeGameAndUI InputMode;
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
@@ -211,64 +271,36 @@ void APDPlayerController::BeginPlay()
 	CurrentMouseCursor = EMouseCursor::Default;
 
 	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
-		Ch->OnWeaponSwapped.AddDynamic(this, &APDPlayerController::OnWeaponChanged);
-
-	CreateAndAddHUDWidget();
-	BindInventoryNotifications();
-	
-	if (RootLayoutClass)
 	{
-		RootLayoutInstance = CreateWidget<UPDRootLayout>(this, RootLayoutClass);
-		if (RootLayoutInstance)
-		{
-			RootLayoutInstance->AddToViewport(5);
-			if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
-			{
-				UISubsystem->OnEffectiveUIStateChanged.AddUObject(this, &APDPlayerController::ApplyEffectiveUIState);
-				UISubsystem->RegisterRootLayout(RootLayoutInstance);
-			}
-		}
+		Ch->OnWeaponSwapped.AddDynamic(this, &APDPlayerController::OnWeaponChanged);
 	}
+
+	if (UIManagerComponent)
+	{
+		UIManagerComponent->ConfigureLegacyWidgetClasses(
+			HUDClass,
+			RootLayoutClass,
+			InventoryWidgetClass,
+			StashWidgetClass,
+			MarketWidgetClass,
+			EquipmentModificationWidgetClass,
+			NotificationWidgetClass,
+			NotificationDuration,
+			NotificationZOrder,
+			QuestWindowWidgetClass,
+			WorldMapClass);
+		UIManagerComponent->InitializeUI(this);
+	}
+
+	BindInventoryNotifications();
 }
 
 void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UnbindInventoryNotifications();
-	if (QuestWindowWidgetInstance)
+	if (UIManagerComponent)
 	{
-		QuestWindowWidgetInstance->RemoveFromParent();
-		QuestWindowWidgetInstance = nullptr;
-	}
-
-	if (NotificationWidgetInstance)
-	{
-		NotificationWidgetInstance->RemoveFromParent();
-		NotificationWidgetInstance = nullptr;
-	}
-
-	if (EquipmentModificationWidgetInstance)
-	{
-		EquipmentModificationWidgetInstance->RemoveFromParent();
-		EquipmentModificationWidgetInstance = nullptr;
-	}
-
-	if (HUDInstance)
-	{
-		HUDInstance->Deactivate();
-		HUDInstance->RemoveFromParent();
-		HUDInstance = nullptr;
-	}
-
-	if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(this))
-	{
-		UISubsystem->OnEffectiveUIStateChanged.RemoveAll(this);
-		UISubsystem->UnregisterRootLayout();
-	}
-
-	if (RootLayoutInstance)
-	{
-		RootLayoutInstance->RemoveFromParent();
-		RootLayoutInstance = nullptr;
+		UIManagerComponent->ShutdownUI(EndPlayReason);
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -279,12 +311,12 @@ void APDPlayerController::OnPossess(APawn* InPawn)
 	UnbindInventoryNotifications();
 	Super::OnPossess(InPawn);
 
-	if (HUDInstance)
+	if (UIManagerComponent)
 	{
 		UAbilitySystemComponent* ASC = InPawn
 			? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InPawn)
 			: nullptr;
-		HUDInstance->RebindToASC(ASC);
+		UIManagerComponent->RebindHUDToASC(ASC);
 	}
 
 	BindInventoryNotifications();
@@ -293,70 +325,26 @@ void APDPlayerController::OnPossess(APawn* InPawn)
 void APDPlayerController::OnUnPossess()
 {
 	UnbindInventoryNotifications();
-	if (HUDInstance)
+	if (UIManagerComponent)
 	{
-		HUDInstance->RebindToASC(nullptr);
+		UIManagerComponent->RebindHUDToASC(nullptr);
 	}
 	Super::OnUnPossess();
 }
 
 void APDPlayerController::CreateAndAddHUDWidget()
 {
-	if (!HUDClass) return;
-	if (HUDInstance) return;
-
-	HUDInstance = CreateWidget<UPDHUDWidget>(this, HUDClass);
-	if (HUDInstance)
+	if (UIManagerComponent)
 	{
-		HUDInstance->AddToViewport(0);
-		HUDInstance->Activate();
+		UIManagerComponent->CreateAndAddHUDWidget();
 	}
 }
 
 void APDPlayerController::ApplyEffectiveUIState(EWidgetInputMode Mode)
 {
-	switch (Mode)
+	if (UIManagerComponent)
 	{
-	case EWidgetInputMode::Game:
-		{
-			FInputModeGameAndUI InputMode;
-			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-			InputMode.SetHideCursorDuringCapture(false);
-			SetInputMode(InputMode);
-			bShowMouseCursor = false;
-			if (HUDInstance)
-			{
-				HUDInstance->SetCrosshairVisible(true);
-			}
-			break;
-		}
-	case EWidgetInputMode::GameAndMenu:
-		{
-			FInputModeGameAndUI InputMode;
-			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-			InputMode.SetHideCursorDuringCapture(false);
-			SetInputMode(InputMode);
-			bShowMouseCursor = true;
-			if (HUDInstance)
-			{
-				HUDInstance->SetCrosshairVisible(false);
-			}
-			break;
-		}
-	case EWidgetInputMode::Menu:
-		{
-			FInputModeUIOnly InputMode;
-			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-			SetInputMode(InputMode);
-			bShowMouseCursor = true;
-			if (HUDInstance)
-			{
-				HUDInstance->SetCrosshairVisible(false);
-			}
-			break;
-		}
-	case EWidgetInputMode::Passive:
-		break;
+		UIManagerComponent->ApplyEffectiveUIState(Mode);
 	}
 }
 
@@ -364,22 +352,16 @@ void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 {
 	if (IsGameplayInputBlockedByModalUI() && !ShouldAllowMovementWhileUIOpen()) return;
 
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+	}
+
 	UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
 
 	if (ASC && ASC->HasMatchingGameplayTag(PDGameplayTags::State_MeleeAttacking))
 		return;
-
-	if (ASC && (ASC->HasMatchingGameplayTag(PDGameplayTags::Cover_Active) ||
-	            ASC->HasMatchingGameplayTag(PDGameplayTags::State_CoverAim)))
-	{
-		TArray<FGameplayAbilitySpecHandle> ToCancel;
-		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
-			if (Spec.IsActive()) ToCancel.Add(Spec.Handle);
-		for (const FGameplayAbilitySpecHandle& Handle : ToCancel)
-			ASC->CancelAbilityHandle(Handle);
-		return;
-	}
 
 	APawn* ControlledPawn = GetPawn();
 	if (!ControlledPawn) return;
@@ -392,6 +374,11 @@ void APDPlayerController::OnJump()
 {
 	if (IsGameplayInputBlockedByModalUI()) return;
 
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+	}
+
 	if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetPawn()))
 	{
 		OwnerCharacter->Jump();
@@ -400,309 +387,334 @@ void APDPlayerController::OnJump()
 
 void APDPlayerController::OnAbilityInputPressed(FGameplayTag InputTag)
 {
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+	}
+
 	if (UAbilitySystemComponent* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
-		const bool bActivated = ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
+		if (InputTag == PDGameplayTags::Input_Roll || InputTag == PDGameplayTags::Input_Sprint)
+		{
+			const bool bActivated = ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
+			if (!HasAuthority() && (InputTag == PDGameplayTags::Input_Sprint || !bActivated))
+			{
+				ServerTryActivateAbilityByTag(InputTag);
+			}
+			return;
+		}
+	}
+
+	if (!HasAuthority())
+	{
+		ServerTryActivateAbilityByTag(InputTag);
+		return;
+	}
+
+	if (UAbilitySystemComponent* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+	{
+		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
 	}
 }
 
 
 void APDPlayerController::OnAbilityInputReleased(FGameplayTag InputTag)
 {
+	if (InputTag == PDGameplayTags::Input_Sprint)
+	{
+		CancelAbilityByInputTag(InputTag);
 
+		if (!HasAuthority())
+		{
+			ServerCancelAbilityByTag(InputTag);
+		}
+	}
+}
+
+void APDPlayerController::CancelAbilityByInputTag(FGameplayTag InputTag)
+{
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
+	if (!ASC || !InputTag.IsValid())
+	{
+		return;
+	}
+
+	TArray<FGameplayAbilitySpecHandle> HandlesToCancel;
+	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		if (!Spec.IsActive() || !Spec.Ability)
+		{
+			continue;
+		}
+
+		const bool bMatchesInputTag =
+			Spec.Ability->GetAssetTags().HasTagExact(InputTag) ||
+			Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag);
+		const bool bIsSprintAbility =
+			InputTag == PDGameplayTags::Input_Sprint &&
+			Spec.Ability->IsA<UPDSprintAbility>();
+
+		if (bMatchesInputTag || bIsSprintAbility)
+		{
+			HandlesToCancel.Add(Spec.Handle);
+		}
+	}
+
+	for (const FGameplayAbilitySpecHandle& AbilityHandle : HandlesToCancel)
+	{
+		ASC->CancelAbilityHandle(AbilityHandle);
+	}
+}
+
+void APDPlayerController::ServerTryActivateAbilityByTag_Implementation(FGameplayTag InputTag)
+{
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+	}
+
+	if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+	{
+		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
+	}
+}
+
+void APDPlayerController::ServerCancelAbilityByTag_Implementation(FGameplayTag InputTag)
+{
+	CancelAbilityByInputTag(InputTag);
+}
+
+void APDPlayerController::ServerHandleGameplayEvent_Implementation(FGameplayTag EventTag)
+{
+	if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
+	{
+		FGameplayEventData EventData;
+		ASC->HandleGameplayEvent(EventTag, &EventData);
+	}
 }
 
 
 void APDPlayerController::OpenMarketInterface(UPDMarketComponent* MarketComponent)
 {
-	if (!MarketComponent)
+	if (UIManagerComponent)
 	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("MarketComponent is not valid."));
+		UIManagerComponent->OpenMarket(MarketComponent);
+	}
+}
+
+void APDPlayerController::ClientOpenMarketInterface_Implementation(UPDMarketComponent* MarketComponent)
+{
+	if (!UIManagerComponent) return;
+	if (UIManagerComponent->IsMarketOpen() && UIManagerComponent->GetActiveMarketComponent() == MarketComponent)
+	{
+		UIManagerComponent->CloseMarket();
 		return;
 	}
-
-	if (!InventoryWidgetClass)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
-		return;
-	}
-
-	if (!MarketWidgetClass)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("MarketWidgetClass is not set."));
-		return;
-	}
-
-	ActiveMarketComponent = MarketComponent;
-
-	if (IsStashInterfaceOpen())
-	{
-		CloseStashInterface();
-	}
-
-	if (IsEquipmentModificationInterfaceOpen())
-	{
-		CloseEquipmentModificationInterface();
-	}
-
-	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
-		if (InventoryWidgetInstance)
-		{
-			InventoryWidgetInstance->AddToViewport();
-		}
-	}
-
-	if (!MarketWidgetInstance || !MarketWidgetInstance->IsInViewport())
-	{
-		MarketWidgetInstance = CreateWidget<UPDMarketWidget>(this, MarketWidgetClass);
-		if (MarketWidgetInstance)
-		{
-			MarketWidgetInstance->InitializeMarket(MarketComponent);
-			MarketWidgetInstance->AddToViewport();
-		}
-	}
-	else
-	{
-		MarketWidgetInstance->InitializeMarket(MarketComponent);
-	}
-
-	SetGameplayInputBlockedByModalUI(true, MarketWidgetInstance);
+	UIManagerComponent->OpenMarket(MarketComponent);
 }
 
 void APDPlayerController::CloseMarketInterface()
 {
-	if (MarketWidgetInstance && MarketWidgetInstance->IsInViewport())
+	if (UIManagerComponent)
 	{
-		MarketWidgetInstance->RemoveFromParent();
-	}
-	MarketWidgetInstance = nullptr;
-	ActiveMarketComponent = nullptr;
-
-	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance->RemoveFromParent();
-	}
-	InventoryWidgetInstance = nullptr;
-
-	if (!IsStashInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
-	{
-		SetGameplayInputBlockedByModalUI(false);
+		UIManagerComponent->CloseMarket();
 	}
 }
 
 bool APDPlayerController::IsMarketInterfaceOpen() const
 {
-	return MarketWidgetInstance && MarketWidgetInstance->IsInViewport();
+	return UIManagerComponent && UIManagerComponent->IsMarketOpen();
 }
 
 void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
 {
-	if (!InventoryWidgetClass)
+	if (HasAuthority() && StashSource)
 	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
+		StashSource->LoadFromPlayerState(GetPlayerState<APDPlayerState>());
+	}
+
+	if (UIManagerComponent)
+	{
+		UIManagerComponent->OpenStash(StashSource);
+	}
+}
+
+void APDPlayerController::ClientOpenStashInterface_Implementation(UPDStashComponent* StashSource)
+{
+	if (!UIManagerComponent) return;
+	if (UIManagerComponent->IsStashOpen() && UIManagerComponent->GetActiveStashComponent() == StashSource)
+	{
+		UIManagerComponent->CloseStash();
 		return;
 	}
-
-	if (!StashWidgetClass)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("StashWidgetClass is not set."));
-		return;
-	}
-
-	if (!StashSource)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("OpenStashInterface called with null StashSource."));
-		return;
-	}
-
-	if (IsMarketInterfaceOpen())
-	{
-		CloseMarketInterface();
-	}
-
-	if (IsEquipmentModificationInterfaceOpen())
-	{
-		CloseEquipmentModificationInterface();
-	}
-
-	ActiveStashComponent = StashSource;
-
-	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
-		if (InventoryWidgetInstance)
-		{
-			InventoryWidgetInstance->SetActiveStashComponent(StashSource);
-			InventoryWidgetInstance->AddToViewport();
-		}
-	}
-	else
-	{
-		InventoryWidgetInstance->SetActiveStashComponent(StashSource);
-	}
-
-	if (!StashWidgetInstance || !StashWidgetInstance->IsInViewport())
-	{
-		StashWidgetInstance = CreateWidget<UPDStashWidget>(this, StashWidgetClass);
-		if (StashWidgetInstance)
-		{
-			StashWidgetInstance->InitializeStash(StashSource);
-			StashWidgetInstance->AddToViewport();
-		}
-	}
-	else
-	{
-		// 다른 박스로 열기를 다시 누른 경우: 위젯은 유지하고 데이터만 교체.
-		StashWidgetInstance->InitializeStash(StashSource);
-	}
-
-	SetGameplayInputBlockedByModalUI(true, StashWidgetInstance);
+	UIManagerComponent->OpenStash(StashSource);
 }
 
 void APDPlayerController::CloseStashInterface()
 {
-	if (StashWidgetInstance && StashWidgetInstance->IsInViewport())
+	if (UIManagerComponent)
 	{
-		StashWidgetInstance->RemoveFromParent();
-	}
-	StashWidgetInstance = nullptr;
-
-	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance->RemoveFromParent();
-	}
-	InventoryWidgetInstance = nullptr;
-
-	ActiveStashComponent.Reset();
-
-	if (!IsMarketInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
-	{
-		SetGameplayInputBlockedByModalUI(false);
+		UIManagerComponent->CloseStash();
 	}
 }
 
 bool APDPlayerController::IsStashInterfaceOpen() const
 {
-	return StashWidgetInstance && StashWidgetInstance->IsInViewport();
+	return UIManagerComponent && UIManagerComponent->IsStashOpen();
 }
 
 
+UPDStashComponent* APDPlayerController::GetActiveStashComponent() const
+{
+	return UIManagerComponent ? UIManagerComponent->GetActiveStashComponent() : nullptr;
+}
+
 bool APDPlayerController::SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity)
 {
-	if (!ActiveMarketComponent || !IsMarketInterfaceOpen())
+	UPDMarketComponent* ActiveMarket = UIManagerComponent ? UIManagerComponent->GetActiveMarketComponent() : nullptr;
+	if (!ActiveMarket || !IsMarketInterfaceOpen())
 	{
 		return false;
 	}
 
-	APawn* ControlledPawn = GetPawn();
-	if (!ControlledPawn)
-	{
-		return false;
-	}
-
-	UPDInventoryComponent* InventoryComponent = ControlledPawn->FindComponentByClass<UPDInventoryComponent>();
+	UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent();
 	if (!InventoryComponent)
 	{
 		return false;
 	}
 
-	return ActiveMarketComponent->SellInventorySlot(InventoryComponent, SlotIndex, Quantity);
+	if (!HasAuthority())
+	{
+		ServerSellInventorySlotToMarket(ActiveMarket, SlotIndex, Quantity);
+		return true;
+	}
+
+	return ActiveMarket->SellInventorySlot(InventoryComponent, SlotIndex, Quantity);
+}
+
+void APDPlayerController::ServerBuyMarketEntry_Implementation(UPDMarketComponent* MarketComponent, int32 EntryIndex, int32 Quantity)
+{
+	if (!MarketComponent)
+	{
+		return;
+	}
+
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		MarketComponent->BuyEntry(InventoryComponent, EntryIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerSellInventorySlotToMarket_Implementation(UPDMarketComponent* MarketComponent, int32 SlotIndex, int32 Quantity)
+{
+	if (!MarketComponent)
+	{
+		return;
+	}
+
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		MarketComponent->SellInventorySlot(InventoryComponent, SlotIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerUpgradeStash_Implementation(UPDStashComponent* StashComponent)
+{
+	if (!StashComponent)
+	{
+		return;
+	}
+
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		StashComponent->UpgradeStash(InventoryComponent);
+	}
+}
+
+void APDPlayerController::ServerStoreInventorySlotQuantityToStash_Implementation(UPDStashComponent* StashComponent, int32 SourceSlotIndex, int32 TargetStashSlotIndex, int32 Quantity)
+{
+	if (!StashComponent)
+	{
+		return;
+	}
+
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		if (TargetStashSlotIndex == INDEX_NONE)
+		{
+			StashComponent->StoreInventorySlotQuantity(InventoryComponent, SourceSlotIndex, Quantity);
+		}
+		else
+		{
+			StashComponent->StoreInventorySlotQuantityToSlot(InventoryComponent, SourceSlotIndex, TargetStashSlotIndex, Quantity);
+		}
+	}
+}
+
+void APDPlayerController::ServerTakeStashSlotQuantity_Implementation(UPDStashComponent* StashComponent, int32 StashSlotIndex, int32 Quantity)
+{
+	if (!StashComponent)
+	{
+		return;
+	}
+
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		StashComponent->TakeStashSlotQuantity(InventoryComponent, StashSlotIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerTakeStashSlotQuantityToInventorySlot_Implementation(UPDStashComponent* StashComponent, int32 StashSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity)
+{
+	if (!StashComponent)
+	{
+		return;
+	}
+
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		StashComponent->TakeStashSlotQuantityToInventorySlot(InventoryComponent, StashSlotIndex, TargetInventorySlotIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerMoveStashSlotQuantity_Implementation(UPDStashComponent* StashComponent, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	if (StashComponent)
+	{
+		if (StashComponent->MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity))
+		{
+			StashComponent->SaveToPlayerState(GetPlayerState<APDPlayerState>());
+		}
+	}
 }
 
 
 void APDPlayerController::OpenEquipmentModificationInterface()
 {
-	if (IsEquipmentModificationInterfaceOpen())
+	if (UIManagerComponent)
 	{
-		return;
+		UIManagerComponent->OpenEquipmentModification();
 	}
-
-	if (IsStashInterfaceOpen())
-	{
-		CloseStashInterface();
-	}
-
-	if (IsMarketInterfaceOpen())
-	{
-		CloseMarketInterface();
-	}
-
-	if (IsQuestInterfaceOpen())
-	{
-		CloseQuestInterface();
-	}
-
-	if (!InventoryWidgetClass)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
-		return;
-	}
-
-	if (!EquipmentModificationWidgetClass)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("EquipmentModificationWidgetClass is not set."));
-		return;
-	}
-
-	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
-		if (InventoryWidgetInstance)
-		{
-			InventoryWidgetInstance->AddToViewport();
-		}
-	}
-
-	EquipmentModificationWidgetInstance = CreateWidget<UUserWidget>(this, EquipmentModificationWidgetClass);
-	if (!EquipmentModificationWidgetInstance)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("Failed to create equipment modification widget."));
-		return;
-	}
-
-	EquipmentModificationWidgetInstance->AddToViewport();
-	SetGameplayInputBlockedByModalUI(true, EquipmentModificationWidgetInstance);
 }
 
 void APDPlayerController::CloseEquipmentModificationInterface()
 {
-	if (EquipmentModificationWidgetInstance && EquipmentModificationWidgetInstance->IsInViewport())
+	if (UIManagerComponent)
 	{
-		EquipmentModificationWidgetInstance->RemoveFromParent();
-	}
-	EquipmentModificationWidgetInstance = nullptr;
-
-	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance->RemoveFromParent();
-	}
-	InventoryWidgetInstance = nullptr;
-
-	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen() && !IsQuestInterfaceOpen())
-	{
-		SetGameplayInputBlockedByModalUI(false);
+		UIManagerComponent->CloseEquipmentModification();
 	}
 }
 
 bool APDPlayerController::IsEquipmentModificationInterfaceOpen() const
 {
-	return EquipmentModificationWidgetInstance && EquipmentModificationWidgetInstance->IsInViewport();
+	return UIManagerComponent && UIManagerComponent->IsEquipmentModificationOpen();
 }
-
 
 void APDPlayerController::BindInventoryNotifications()
 {
 	UnbindInventoryNotifications();
 
-	APawn* ControlledPawn = GetPawn();
-	if (!ControlledPawn)
-	{
-		return;
-	}
-
-	UPDInventoryComponent* InventoryComponent = ControlledPawn->FindComponentByClass<UPDInventoryComponent>();
+	UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent();
 	if (!InventoryComponent)
 	{
 		return;
@@ -728,168 +740,47 @@ void APDPlayerController::HandleInventoryMessage(const FText& Message)
 
 void APDPlayerController::ShowNotification(const FText& Message, float Duration)
 {
-	if (Message.IsEmpty())
+	if (UIManagerComponent)
 	{
-		return;
+		UIManagerComponent->ShowNotification(Message, Duration);
 	}
-
-	if (!NotificationWidgetClass)
-	{
-		return;
-	}
-
-	if (!NotificationWidgetInstance)
-	{
-		NotificationWidgetInstance = CreateWidget<UPDNotificationWidget>(this, NotificationWidgetClass);
-	}
-
-	if (!NotificationWidgetInstance)
-	{
-		return;
-	}
-
-	if (!NotificationWidgetInstance->IsInViewport())
-	{
-		NotificationWidgetInstance->AddToViewport(NotificationZOrder);
-	}
-
-	NotificationWidgetInstance->ShowNotification(Message, Duration > 0.f ? Duration : NotificationDuration);
 }
 
 void APDPlayerController::OpenQuestInterface()
 {
-	if (IsQuestInterfaceOpen())
+	if (UIManagerComponent)
 	{
-		return;
+		UIManagerComponent->OpenQuest();
 	}
-
-	if (IsStashInterfaceOpen())
-	{
-		CloseStashInterface();
-	}
-
-	if (IsMarketInterfaceOpen())
-	{
-		CloseMarketInterface();
-	}
-
-	if (IsEquipmentModificationInterfaceOpen())
-	{
-		CloseEquipmentModificationInterface();
-	}
-
-	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance->RemoveFromParent();
-		InventoryWidgetInstance = nullptr;
-	}
-
-	if (!QuestWindowWidgetClass)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("QuestWindowWidgetClass is not set."));
-		SetGameplayInputBlockedByModalUI(false);
-		return;
-	}
-
-	QuestWindowWidgetInstance = CreateWidget<UPDQuestWindowWidget>(this, QuestWindowWidgetClass);
-	if (!QuestWindowWidgetInstance)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("Failed to create quest window widget."));
-		SetGameplayInputBlockedByModalUI(false);
-		return;
-	}
-
-	APawn* ControlledPawn = GetPawn();
-	UPDQuestComponent* QuestComponent = ControlledPawn ? ControlledPawn->FindComponentByClass<UPDQuestComponent>() : nullptr;
-	UPDInventoryComponent* InventoryComponent = ControlledPawn ? ControlledPawn->FindComponentByClass<UPDInventoryComponent>() : nullptr;
-	QuestWindowWidgetInstance->InitializeQuestWindow(QuestComponent, InventoryComponent);
-	QuestWindowWidgetInstance->AddToViewport();
-
-	SetGameplayInputBlockedByModalUI(true, QuestWindowWidgetInstance);
 }
 
 void APDPlayerController::CloseQuestInterface()
 {
-	if (QuestWindowWidgetInstance && QuestWindowWidgetInstance->IsInViewport())
+	if (UIManagerComponent)
 	{
-		QuestWindowWidgetInstance->RemoveFromParent();
-	}
-	QuestWindowWidgetInstance = nullptr;
-
-	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
-	{
-		SetGameplayInputBlockedByModalUI(false);
+		UIManagerComponent->CloseQuest();
 	}
 }
 
 bool APDPlayerController::IsQuestInterfaceOpen() const
 {
-	return QuestWindowWidgetInstance && QuestWindowWidgetInstance->IsInViewport();
+	return UIManagerComponent && UIManagerComponent->IsQuestOpen();
 }
 
 void APDPlayerController::ToggleQuest()
 {
-	if (IsQuestInterfaceOpen())
+	if (UIManagerComponent)
 	{
-		CloseQuestInterface();
-		return;
+		UIManagerComponent->ToggleQuest();
 	}
-
-	OpenQuestInterface();
 }
 
 void APDPlayerController::ToggleInventory()
 {
-	if (IsQuestInterfaceOpen())
+	if (UIManagerComponent)
 	{
-		CloseQuestInterface();
-		return;
+		UIManagerComponent->ToggleInventory();
 	}
-
-	if (IsStashInterfaceOpen())
-	{
-		CloseStashInterface();
-		return;
-	}
-
-	if (IsMarketInterfaceOpen())
-	{
-		CloseMarketInterface();
-		return;
-	}
-
-	if (IsEquipmentModificationInterfaceOpen())
-	{
-		CloseEquipmentModificationInterface();
-		return;
-	}
-
-	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance->RemoveFromParent();
-		InventoryWidgetInstance = nullptr;
-
-		SetGameplayInputBlockedByModalUI(false);
-		return;
-	}
-
-	if (!InventoryWidgetClass)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
-		return;
-	}
-
-	InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
-	if (!InventoryWidgetInstance)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("Failed to create inventory widget."));
-		return;
-	}
-
-	InventoryWidgetInstance->AddToViewport();
-
-	SetGameplayInputBlockedByModalUI(true, InventoryWidgetInstance);
-	SetIgnoreMoveInput(false);
 }
 
 void APDPlayerController::TryInteract()
@@ -900,95 +791,31 @@ void APDPlayerController::TryInteract()
 	}
 }
 
+void APDPlayerController::StopInteract()
+{
+	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->StopInteract();
+	}
+}
+
 bool APDPlayerController::IsGameplayInputBlockedByModalUI() const
 {
-	return bIsGameplayInputBlockedByModalUI;
+	return UIManagerComponent && UIManagerComponent->IsGameplayInputBlockedByModalUI();
 }
 
 bool APDPlayerController::ShouldAllowMovementWhileUIOpen() const
 {
-	return InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport()
-		&& !IsStashInterfaceOpen()
-		&& !IsMarketInterfaceOpen()
-		&& !IsEquipmentModificationInterfaceOpen()
-		&& !IsQuestInterfaceOpen();
+	return UIManagerComponent && UIManagerComponent->ShouldAllowMovementWhileUIOpen();
 }
 
 void APDPlayerController::SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus)
 {
-	if (bBlocked)
+	if (UIManagerComponent)
 	{
-		if (!bIsGameplayInputBlockedByModalUI)
-		{
-			bMouseCursorVisibleBeforeModalUI = bShowMouseCursor;
-			bMouseClickEventsEnabledBeforeModalUI = bEnableClickEvents;
-			bMouseOverEventsEnabledBeforeModalUI = bEnableMouseOverEvents;
-		}
-
-		bIsGameplayInputBlockedByModalUI = true;
-		OnFireReleased();
-		const bool bAllowMovement = ShouldAllowMovementWhileUIOpen();
-		SetIgnoreMoveInput(!bAllowMovement);
-		SetIgnoreLookInput(true);
-
-		if (!bAllowMovement)
-		{
-			if (APawn* ControlledPawn = GetPawn())
-			{
-				if (UPawnMovementComponent* MovementComponent = ControlledPawn->GetMovementComponent())
-				{
-					MovementComponent->StopMovementImmediately();
-				}
-			}
-		}
-
-		FInputModeGameAndUI InputMode;
-		if (WidgetToFocus)
-		{
-			InputMode.SetWidgetToFocus(WidgetToFocus->TakeWidget());
-		}
-		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		InputMode.SetHideCursorDuringCapture(false);
-		SetInputMode(InputMode);
-
-		bShowMouseCursor = true;
-		bEnableClickEvents = true;
-		bEnableMouseOverEvents = true;
-		DefaultMouseCursor = EMouseCursor::Default;
-		CurrentMouseCursor = EMouseCursor::Default;
-
-		// 인벤토리/창고/마켓 같은 모달 UI가 열려 있는 동안에는
-		// 게임 조준 크로스헤어를 숨기고, 시스템 마우스 커서만 보이게 한다.
-		if (HUDInstance)
-		{
-			HUDInstance->SetCrosshairVisible(false);
-		}
-
-		return;
-	}
-
-	if (!bIsGameplayInputBlockedByModalUI)
-	{
-		return;
-	}
-
-	bIsGameplayInputBlockedByModalUI = false;
-	SetIgnoreMoveInput(false);
-	SetIgnoreLookInput(false);
-
-	FInputModeGameOnly InputMode;
-	SetInputMode(InputMode);
-	bShowMouseCursor = bMouseCursorVisibleBeforeModalUI;
-	bEnableClickEvents = bMouseClickEventsEnabledBeforeModalUI;
-	bEnableMouseOverEvents = bMouseOverEventsEnabledBeforeModalUI;
-
-	// 모달 UI가 닫히면 게임 조준 크로스헤어를 다시 표시한다.
-	if (HUDInstance)
-	{
-		HUDInstance->SetCrosshairVisible(true);
+		UIManagerComponent->SetGameplayInputBlockedByModalUI(bBlocked, WidgetToFocus);
 	}
 }
-
 void APDPlayerController::UpdateAimRotation()
 {
 	if (IsGameplayInputBlockedByModalUI()) return;
@@ -997,22 +824,41 @@ void APDPlayerController::UpdateAimRotation()
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
 		if (ASC->HasMatchingGameplayTag(PDGameplayTags::State_Rolling)) return;
-		if (ASC->HasMatchingGameplayTag(PDGameplayTags::Cover_Active)) return;
 	}
 
 	APawn* ControlledPawn =GetPawn();
 	if (!ControlledPawn) return;
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(ControlledPawn))
+	{
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+	}
 
-	FHitResult Hit;
-	if (!GetHitResultUnderCursor(ECC_Visibility, true, Hit)) return;
+	FHitResult AimHit;
+	if (!GetHitResultUnderCursor(ECC_Visibility, true, AimHit)) return;
 
-	FVector AimDirection=Hit.Location-ControlledPawn->GetActorLocation();
+	FHitResult FireAimHit;
+	if (!GetRecoiledHitResult(ECC_Visibility, true, FireAimHit))
+	{
+		FireAimHit = AimHit;
+	}
+
+	CachedAimWorldLocation = FireAimHit.Location;
+	bHasCachedAimWorldLocation = true;
+	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(ControlledPawn))
+	{
+		PlayerCharacter->SetSharedAimWorldLocation(AimHit.Location);
+	}
+	if (!HasAuthority())
+	{
+		ServerSetAimWorldLocation(AimHit.Location, FireAimHit.Location);
+	}
+
+	FVector AimDirection=AimHit.Location-ControlledPawn->GetActorLocation();
 	AimDirection.Z=0.f;
 
 	if (!AimDirection.IsNearlyZero())
 	{
 		FRotator AimRot = AimDirection.Rotation();
-		AimRot.Yaw += RecoilYawOffset;
 		SetControlRotation(AimRot);
 		ControlledPawn->SetActorRotation(AimRot);
 	}
@@ -1075,13 +921,7 @@ void APDPlayerController::OnCancelConsumableUse()
 		return;
 	}
 
-	APawn* ControlledPawn = GetPawn();
-	if (!ControlledPawn)
-	{
-		return;
-	}
-
-	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	if (UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent())
 	{
 		QuickSlotComponent->CancelConsumableUse();
 	}
@@ -1094,62 +934,64 @@ void APDPlayerController::SelectQuickslot(int32 Index)
 		return;
 	}
 
-	APawn* ControlledPawn = GetPawn();
-	if (!ControlledPawn)
-	{
-		return;
-	}
-
-	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	if (UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent())
 	{
 		QuickSlotComponent->SetSelectedIndex(Index);
 	}
 }
 
-void APDPlayerController::OnCoverPressed()
-{
-	UAbilitySystemComponent* ASC =
-		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
-	if (!ASC) return;
-
-	// 조준 중이면 → 조준만 해제 (커버 유지)
-	if (ASC->HasMatchingGameplayTag(PDGameplayTags::State_CoverAim))
-	{
-		TArray<FGameplayAbilitySpecHandle> ToCancel;
-		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
-			if (Spec.IsActive() && Spec.Ability &&
-			    Spec.Ability->IsA<UPDCoverAimAbility>())
-				ToCancel.Add(Spec.Handle);
-		for (const FGameplayAbilitySpecHandle& Handle : ToCancel)
-			ASC->CancelAbilityHandle(Handle);
-		return;
-	}
-
-	// 그 외: GAS에 위임 (진입 or 해제)
-	ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Cover));
-}
-
 void APDPlayerController::OnAimPressed()
 {
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+	}
+
 	if (UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
-		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Aim));
+		if (HasAuthority())
+		{
+			ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Aim));
+		}
+		else
+		{
+			ServerTryActivateAbilityByTag(PDGameplayTags::Input_Aim);
+		}
 	}
 }
 
 void APDPlayerController::OnToggleFireMode()
 {
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+	}
+
+	if (!HasAuthority())
+	{
+		ServerToggleFireMode();
+		return;
+	}
+
 	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
 		if (APDWeaponBase* Weapon = Ch->GetCurrentWeapon())
 			if (APDRifle* Rifle = Cast<APDRifle>(Weapon))
 				Rifle->ToggleFireMode();
 }
 
+void APDPlayerController::ServerToggleFireMode_Implementation()
+{
+	OnToggleFireMode();
+}
+
 void APDPlayerController::OnDropWeapon()
 {
 	if (APDPlayerCharacter* Ch = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (Ch->IsDowned() || Ch->IsGettingUp() || Ch->IsDead()) return;
 		Ch->DropCurrentWeapon();
+	}
 }
 
 void APDPlayerController::UseQuickSlot(int32 SlotIndex)
@@ -1159,17 +1001,16 @@ void APDPlayerController::UseQuickSlot(int32 SlotIndex)
 		return;
 	}
 
-	APawn* ControlledPawn = GetPawn();
-	if (!ControlledPawn)
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
 	{
-		return;
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
 	}
 
-	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	if (UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent())
 	{
-		if (QuickSlotComponent->UseQuickSlot(SlotIndex) && HUDInstance)
+		if (QuickSlotComponent->UseQuickSlot(SlotIndex) && UIManagerComponent)
 		{
-			HUDInstance->RefreshNewQuickSlots();
+			UIManagerComponent->RefreshNewQuickSlots();
 		}
 	}
 }
@@ -1179,7 +1020,7 @@ void APDPlayerController::OnInteract()
 	APawn* ControlledPawn = GetPawn();
 	if (!ControlledPawn) return;
 
-	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	if (UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent())
 	{
 		QuickSlotComponent->CancelConsumableUse();
 	}
@@ -1214,25 +1055,44 @@ void APDPlayerController::OnFirePressed()
 {
 	if (IsGameplayInputBlockedByModalUI()) { OnFireReleased(); return; }
 
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead())
+		{
+			OnFireReleased();
+			return;
+		}
+	}
+
 	if (UPDPingSubsystem* PingSys = GetWorld()->GetSubsystem<UPDPingSubsystem>())
 		if (PingSys->IsPingActive()) return;
 
-	if (APawn* ControlledPawn = GetPawn())
+	if (UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent())
 	{
-		if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
-		{
-			QuickSlotComponent->CancelConsumableUse();
-		}
+		QuickSlotComponent->CancelConsumableUse();
 	}
 
 	if (UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
-		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Fire));
+	{
+		if (HasAuthority())
+		{
+			ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Fire));
+		}
+		else
+		{
+			ServerTryActivateAbilityByTag(PDGameplayTags::Input_Fire);
+		}
+	}
 }
 
 void APDPlayerController::OnFireReleased()
 {
-	// GA_FireAbility 가 이 이벤트를 수신해 자동화기 루프를 종료함
+	if (!HasAuthority())
+	{
+		ServerHandleGameplayEvent(PDGameplayTags::Input_FireReleased);
+		return;
+	}
 	if (UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
@@ -1243,68 +1103,165 @@ void APDPlayerController::OnFireReleased()
 
 void APDPlayerController::OnReload()
 {
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+	}
+
 	if (UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
-		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Reload));
+	{
+		if (HasAuthority())
+		{
+			ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PDGameplayTags::Input_Reload));
+		}
+		else
+		{
+			ServerTryActivateAbilityByTag(PDGameplayTags::Input_Reload);
+		}
+	}
 }
 
 void APDPlayerController::UpdateCrosshair()
 {
-	if (!HUDInstance) return;
+	if (!UIManagerComponent) return;
 
-	float MouseX, MouseY;
-	GetMousePosition(MouseX, MouseY);
+	FVector2D MousePos;
+	if (!GetRecoiledMousePosition(MousePos)) return;
 
-	// 크로스헤어 확장 = 누적된 Yaw 오프셋 기반
-	HUDInstance->UpdateCrosshair(FVector2D(MouseX, MouseY), FMath::Abs(RecoilYawOffset));
+	const float Spread = RecoilCursorPixelsPerDegree > KINDA_SMALL_NUMBER
+		? RecoilCursorOffset.Size() / RecoilCursorPixelsPerDegree
+		: RecoilCursorOffset.Size();
+	UIManagerComponent->UpdateCrosshair(MousePos, Spread);
 }
 
 void APDPlayerController::OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot)
 {
-	if (!HUDInstance || !NewWeapon) return;
-	HUDInstance->SetCrosshairType(NewWeapon->GetWeaponType());
+	if (UIManagerComponent)
+	{
+		UIManagerComponent->SetCrosshairType(NewWeapon);
+	}
 }
 
 void APDPlayerController::AddRecoilOffset(float YawDelta)
 {
-	// 무기의 MaxRecoilYaw 클램핑은 무기 쪽에서 이미 처리.
-	// 컨트롤러는 단순 누적만.
-	RecoilYawOffset += YawDelta;
+
+
+	const float RecoilPixels = FMath::Max(0.f, YawDelta) * RecoilCursorPixelsPerDegree;
+	const float HorizontalJitter = RecoilPixels * RecoilCursorHorizontalRatio;
+
+	RecoilCursorOffset.X += FMath::FRandRange(-HorizontalJitter, HorizontalJitter);
+	RecoilCursorOffset.Y -= RecoilPixels;
+
+	if (MaxRecoilCursorOffset > 0.f)
+	{
+		const float MaxOffsetSquared = FMath::Square(MaxRecoilCursorOffset);
+		if (RecoilCursorOffset.SizeSquared() > MaxOffsetSquared)
+		{
+			RecoilCursorOffset = RecoilCursorOffset.GetSafeNormal() * MaxRecoilCursorOffset;
+		}
+	}
+
+	RecoilYawOffset = RecoilCursorPixelsPerDegree > KINDA_SMALL_NUMBER
+		? RecoilCursorOffset.Size() / RecoilCursorPixelsPerDegree
+		: RecoilCursorOffset.Size();
 }
 
 void APDPlayerController::TickRecoilRecovery(float DeltaTime)
 {
-	if (FMath::IsNearlyZero(RecoilYawOffset)) return;
+	if (RecoilCursorOffset.IsNearlyZero())
+	{
+		RecoilCursorOffset = FVector2D::ZeroVector;
+		RecoilYawOffset = 0.f;
+		return;
+	}
 
-	const float Sign = RecoilYawOffset > 0.f ? 1.f : -1.f;
-	const float Recovery = RecoilRecoverySpeed * DeltaTime;
-	RecoilYawOffset -= Sign * Recovery;
+	const float RecoveryPixels = RecoilRecoverySpeed * RecoilCursorPixelsPerDegree * DeltaTime;
+	const float CurrentSize = RecoilCursorOffset.Size();
+	if (CurrentSize <= RecoveryPixels || RecoveryPixels <= 0.f)
+	{
+		RecoilCursorOffset = FVector2D::ZeroVector;
+		RecoilYawOffset = 0.f;
+		return;
+	}
 
-	// 0을 지나치면 클램프
-	if (Sign > 0.f && RecoilYawOffset < 0.f) RecoilYawOffset = 0.f;
-	if (Sign < 0.f && RecoilYawOffset > 0.f) RecoilYawOffset = 0.f;
+	RecoilCursorOffset -= RecoilCursorOffset.GetSafeNormal() * RecoveryPixels;
+	RecoilYawOffset = RecoilCursorPixelsPerDegree > KINDA_SMALL_NUMBER
+		? RecoilCursorOffset.Size() / RecoilCursorPixelsPerDegree
+		: RecoilCursorOffset.Size();
+
+}
+
+bool APDPlayerController::GetRecoiledMousePosition(FVector2D& OutMousePosition) const
+{
+	float MouseX = 0.f;
+	float MouseY = 0.f;
+	if (!GetMousePosition(MouseX, MouseY))
+	{
+		return false;
+	}
+
+	OutMousePosition = FVector2D(MouseX, MouseY) + RecoilCursorOffset;
+	return true;
+}
+
+bool APDPlayerController::GetRecoiledHitResult(ECollisionChannel TraceChannel, bool bTraceComplex, FHitResult& OutHit) const
+{
+	FVector2D MousePos;
+	if (!GetRecoiledMousePosition(MousePos))
+	{
+		return false;
+	}
+
+	return GetHitResultAtScreenPosition(MousePos, TraceChannel, bTraceComplex, OutHit);
+}
+
+bool APDPlayerController::GetRecoiledHitResultForObjects(const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, bool bTraceComplex, FHitResult& OutHit) const
+{
+	FVector2D MousePos;
+	if (!GetRecoiledMousePosition(MousePos))
+	{
+		return false;
+	}
+
+	return GetHitResultAtScreenPosition(MousePos, ObjectTypes, bTraceComplex, OutHit);
+}
+
+bool APDPlayerController::GetCachedAimWorldLocation(FVector& OutLocation) const
+{
+	if (!bHasCachedAimWorldLocation)
+	{
+		return false;
+	}
+
+	OutLocation = CachedAimWorldLocation;
+	return true;
+}
+
+void APDPlayerController::ServerSetAimWorldLocation_Implementation(FVector AimLocation, FVector FireAimLocation)
+{
+	CachedAimWorldLocation = FireAimLocation;
+	bHasCachedAimWorldLocation = true;
+	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsDead()) return;
+
+		PlayerCharacter->SetSharedAimWorldLocation(AimLocation);
+		FVector AimDirection = AimLocation - PlayerCharacter->GetActorLocation();
+		AimDirection.Z = 0.f;
+		if (!AimDirection.IsNearlyZero())
+		{
+			const FRotator AimRot = AimDirection.Rotation();
+			SetControlRotation(AimRot);
+			PlayerCharacter->SetActorRotation(AimRot);
+		}
+	}
 }
 
 void APDPlayerController::OnToggleWorldMap()
 {
-	//이미 떠 있으면 닫기
-	if (IsValid(WorldMapInstance))
+	if (UIManagerComponent)
 	{
-		WorldMapInstance->RemoveFromParent();
-		WorldMapInstance = nullptr;
-		
-		bShowMouseCursor = false;
-		return;
-	}
-
-	//열기
-	if (!WorldMapClass) return;
-
-	WorldMapInstance = CreateWidget<UPDWorldMapWidget>(this, WorldMapClass);
-	if (WorldMapInstance)
-	{
-		WorldMapInstance->AddToViewport(10);
-		
-		bShowMouseCursor = true;
+		UIManagerComponent->ToggleWorldMap();
 	}
 }

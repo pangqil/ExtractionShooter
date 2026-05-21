@@ -5,6 +5,8 @@
 #include "Type/Types.h"
 #include "PDGameInstance.generated.h"
 
+class APlayerController;
+
 UCLASS()
 class PROJECTD_API UPDGameInstance : public UGameInstance
 {
@@ -12,12 +14,21 @@ class PROJECTD_API UPDGameInstance : public UGameInstance
 
 public:
 	virtual void Init() override;
-	
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Save")
 	void SetPlayerData(const FPDPlayerData& InData);
-	
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Save")
 	FPDPlayerData GetPlayerData() const { return PlayerData; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Save")
+	FString GetSaveKeyForController(const APlayerController* PlayerController) const;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Save")
+	FPDPlayerData LoadPlayerDataFromDisk(const FString& SaveKey, bool bUseLegacyFallback = false) const;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Save")
+	void SavePlayerDataToDisk(const FString& SaveKey, const FPDPlayerData& InData) const;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void SetStashItems(const TArray<FPDInventorySlot>& InStashItems);
@@ -45,14 +56,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Market")
 	int32 GetTraderReputationLevel() const;
-	
-	// ── 레이드 로드아웃 ──────────────────────────────────────────────────────
-	/**
-	 * 허브 로드아웃 확정 화면에서 호출.
-	 * 선택한 아이템/골드를 RaidLoadout 에 기록하고,
-	 * StashItems 에서는 해당 항목을 미리 차감해 SaveToDisk() 까지 수행.
-	 * (사망해도 스태시에는 이미 없는 상태로 저장됨)
-	 */
+
+
+
 	UFUNCTION(BlueprintCallable, Category="PD|Raid")
 	void ConfirmRaidLoadout(const TArray<FPDInventorySlot>& InLoadout, int32 InGold);
 
@@ -62,10 +68,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="PD|Raid")
 	int32 GetRaidGold() const { return PlayerData.RaidGold; }
 
-	/** StartRaid() 내부에서 인벤토리 이전 완료 후 호출. */
+
 	UFUNCTION(BlueprintCallable, Category="PD|Raid")
 	void ClearRaidLoadout();
-	// ─────────────────────────────────────────────────────────────────────────
+
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Save")
 	void SaveToDisk();
@@ -88,4 +94,8 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Levels")
 	bool bPendingResetToBase = false;
+
+private:
+	FString MakePlayerSlotName(const FString& SaveKey) const;
+	FString SanitizeSaveKey(const FString& SaveKey) const;
 };

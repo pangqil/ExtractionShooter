@@ -1,5 +1,8 @@
 #include "Weapons/PDCartridge.h"
-#include "Kismet/GameplayStatics.h"
+
+#include "AbilitySystemGlobals.h"
+#include "GameplayCueManager.h"
+#include "GameplayTag/PDGameplayTags.h"
 
 APDCartridge::APDCartridge()
 {
@@ -23,12 +26,12 @@ void APDCartridge::BeginPlay()
 
 	CartridgeMesh->OnComponentHit.AddDynamic(this, &APDCartridge::OnHit);
 
-	// EjectImpulse: 배출구 기준 측면·상방 방향으로 튀어나가게
+
 	const FVector Impulse = GetActorRightVector() * EjectImpulse
 	                      + GetActorUpVector()    * (EjectImpulse * 0.5f);
 	CartridgeMesh->AddImpulse(Impulse, NAME_None, true);
 
-	// 안전망: 바닥에 닿지 않아도 일정 시간 후 제거
+
 	GetWorldTimerManager().SetTimer(
 		DestroyTimerHandle,
 		FTimerDelegate::CreateLambda([this]()
@@ -42,7 +45,17 @@ void APDCartridge::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	if (FallSound)
-		UGameplayStatics::PlaySoundAtLocation(GetWorld(), FallSound, GetActorLocation());
+	{
+		FGameplayCueParameters Params;
+		Params.Location = GetActorLocation();
+		Params.Normal = Hit.ImpactNormal;
+		Params.SourceObject = FallSound;
+		UAbilitySystemGlobals::Get().GetGameplayCueManager()->HandleGameplayCue(
+			this,
+			PDGameplayTags::GameplayCue_Weapon_CartridgeHit,
+			EGameplayCueEvent::Executed,
+			Params);
+	}
 
 	Destroy();
 }

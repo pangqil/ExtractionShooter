@@ -2,10 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Components/BoxComponent.h"
 #include "PDCoverBase.generated.h"
 
 class UGeometryCollectionComponent;
+class UStaticMeshComponent;
 
 UENUM(BlueprintType)
 enum class ECoverState : uint8
@@ -41,22 +41,10 @@ public:
 	bool IsOccupied() const { return Occupant.IsValid(); }
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Cover")
-	TObjectPtr<UBoxComponent> ValidZone;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Cover")
 	TObjectPtr<UGeometryCollectionComponent> DestructionCollection;
 
 	DECLARE_DELEGATE(FOnCoverDestroyed)
 	FOnCoverDestroyed OnCoverDestroyed;
-
-	UFUNCTION()
-	void OnValidZoneBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-	    bool bFromSweep, const FHitResult& SweepResult);
-
-	UFUNCTION()
-	void OnValidZoneEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 protected:
 	virtual void BeginPlay() override;

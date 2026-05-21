@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+
 
 
 #include "Weapons/PDProjectile.h"
@@ -10,6 +10,8 @@
 APDProjectile::APDProjectile()
 {
     PrimaryActorTick.bCanEverTick = false;
+    bReplicates = true;
+    SetReplicateMovement(true);
 
     CollisionComp = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionComp"));
     CollisionComp->InitSphereRadius(5.f);
@@ -43,15 +45,13 @@ void APDProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
     UPrimitiveComponent* OtherComp, FVector NormalImpulse,
     const FHitResult& Hit)
 {
+    if (!HasAuthority()) return;
     if (!OtherActor || OtherActor == this || OtherActor == WeaponOwner.Get()) return;
 
-    // 1. IPDDamageable 인터페이스 있는지 체크
+
     if (!OtherActor->Implements<UPDDamageable>()) return;
 
-    // 2. 이미 죽은 대상 체크
-    if (!IPDDamageable::Execute_IsAlive(OtherActor)) return;
 
-    // 3. 데미지 적용
     FPDDamageInfo DamageInfo;
     DamageInfo.BaseDamage = Damage;
     DamageInfo.Instigator = WeaponOwner;
@@ -60,7 +60,7 @@ void APDProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
 
     IPDDamageable::Execute_ApplyDamage(OtherActor, DamageInfo);
 
-    // 4. 관통 처리
+
     if (bCanPenetrate && PenetrationCount < MaxPenetrationCount)
         ++PenetrationCount;
     else

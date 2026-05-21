@@ -1,11 +1,42 @@
 #include "Items/PDStashComponent.h"
 
 #include "Core/PDGameInstance.h"
+#include "Core/PDPlayerController.h"
+#include "Core/PDPlayerState.h"
 #include "Items/PDItemSlotTransfer.h"
+#include "Net/UnrealNetwork.h"
+
+namespace
+{
+	APDPlayerController* GetLocalPDPlayerController(const UObject* WorldContext)
+	{
+		const UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
+		return World ? Cast<APDPlayerController>(World->GetFirstPlayerController()) : nullptr;
+	}
+
+	APDPlayerState* GetPDPlayerStateFromInventory(const UPDInventoryComponent* InventoryComponent)
+	{
+		return InventoryComponent ? Cast<APDPlayerState>(InventoryComponent->GetOwner()) : nullptr;
+	}
+
+	void ForceReplicationForChangedContainers(const UPDStashComponent* StashComponent, const UPDInventoryComponent* InventoryComponent)
+	{
+		if (AActor* StashOwner = StashComponent ? StashComponent->GetOwner() : nullptr)
+		{
+			StashOwner->ForceNetUpdate();
+		}
+
+		if (AActor* InventoryOwner = InventoryComponent ? InventoryComponent->GetOwner() : nullptr)
+		{
+			InventoryOwner->ForceNetUpdate();
+		}
+	}
+}
 
 UPDStashComponent::UPDStashComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 
 	GridColumns = 5;
 	BaseGridRows = 4;
@@ -21,15 +52,60 @@ UPDStashComponent::UPDStashComponent()
 	UpgradeData[2].AddedRows = 1;
 }
 
+void UPDStashComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UPDStashComponent, StashItems);
+	DOREPLIFETIME(UPDStashComponent, GridRows);
+	DOREPLIFETIME(UPDStashComponent, CurrentUpgradeLevel);
+}
+
+void UPDStashComponent::OnRep_StashItems()
+{
+	OnStashChanged.Broadcast();
+}
+
+void UPDStashComponent::OnRep_StashConfig()
+{
+	OnStashChanged.Broadcast();
+	OnStashUpgraded.Broadcast(CurrentUpgradeLevel, GridRows);
+}
+
 void UPDStashComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	LoadFromGameInstance();
+	if (PersistenceMode == EPDStashPersistenceMode::GameInstanceLegacy)
+	{
+		LoadFromGameInstance();
+	}
+	else if (PersistenceMode == EPDStashPersistenceMode::PlayerStatePersistent)
+	{
+		SetStashUpgradeLevel(CurrentUpgradeLevel);
+		InitializeStash();
+	}
+	else if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		SetStashUpgradeLevel(CurrentUpgradeLevel);
+		InitializeStash();
+	}
 }
 
 void UPDStashComponent::LoadFromGameInstance()
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	if (PersistenceMode != EPDStashPersistenceMode::GameInstanceLegacy)
+	{
+		SetStashUpgradeLevel(CurrentUpgradeLevel);
+		InitializeStash();
+		return;
+	}
+
 	const UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr;
 	if (GI)
 	{
@@ -44,8 +120,35 @@ void UPDStashComponent::LoadFromGameInstance()
 	InitializeStash();
 }
 
+void UPDStashComponent::LoadFromPlayerState(APDPlayerState* PlayerState)
+{
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	if (PersistenceMode != EPDStashPersistenceMode::PlayerStatePersistent || !PlayerState)
+	{
+		return;
+	}
+
+	StashItems = PlayerState->GetPersistentStashItems();
+	SetStashUpgradeLevel(PlayerState->GetPersistentStashUpgradeLevel());
+	InitializeStash();
+}
+
 void UPDStashComponent::SaveToGameInstance()
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	if (PersistenceMode != EPDStashPersistenceMode::GameInstanceLegacy)
+	{
+		return;
+	}
+
 	UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr;
 	if (!GI)
 	{
@@ -56,6 +159,51 @@ void UPDStashComponent::SaveToGameInstance()
 	GI->SetStashUpgradeLevel(CurrentUpgradeLevel);
 }
 
+void UPDStashComponent::SaveToPlayerState(APDPlayerState* PlayerState, bool bSaveToDisk)
+{
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	if (PersistenceMode != EPDStashPersistenceMode::PlayerStatePersistent || !PlayerState)
+	{
+		return;
+	}
+
+	PlayerState->SetPersistentStashSnapshot(StashItems, CurrentUpgradeLevel);
+
+	if (!bSaveToDisk)
+	{
+		return;
+	}
+
+	if (UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr)
+	{
+		GI->SavePlayerDataToDisk(
+			GI->GetSaveKeyForController(Cast<APlayerController>(PlayerState->GetOwner())),
+			PlayerState->GetPersistentData());
+	}
+}
+
+void UPDStashComponent::PersistIfNeeded()
+{
+	if (PersistenceMode == EPDStashPersistenceMode::GameInstanceLegacy)
+	{
+		SaveToGameInstance();
+	}
+}
+
+void UPDStashComponent::PersistIfNeededForInventory(const UPDInventoryComponent* InventoryComponent)
+{
+	if (PersistenceMode == EPDStashPersistenceMode::PlayerStatePersistent)
+	{
+		SaveToPlayerState(GetPDPlayerStateFromInventory(InventoryComponent));
+		return;
+	}
+
+	PersistIfNeeded();
+}
 
 int32 UPDStashComponent::GetNextUpgradeCost() const
 {
@@ -96,6 +244,16 @@ EPDStashUpgradeResult UPDStashComponent::CanUpgradeStash(const UPDInventoryCompo
 
 EPDStashUpgradeResult UPDStashComponent::UpgradeStash(UPDInventoryComponent* SourceInventory)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		{
+			PC->ServerUpgradeStash(this);
+			return EPDStashUpgradeResult::Success;
+		}
+		return EPDStashUpgradeResult::InvalidInventory;
+	}
+
 	const EPDStashUpgradeResult Result = CanUpgradeStash(SourceInventory);
 	if (Result != EPDStashUpgradeResult::Success)
 	{
@@ -116,13 +274,18 @@ EPDStashUpgradeResult UPDStashComponent::UpgradeStash(UPDInventoryComponent* Sou
 	GridRows += AddedRows;
 
 	InitializeStash();
-	SaveToGameInstance();
+	PersistIfNeededForInventory(SourceInventory);
 	OnStashUpgraded.Broadcast(CurrentUpgradeLevel, GridRows);
 	return EPDStashUpgradeResult::Success;
 }
 
 void UPDStashComponent::SetStashUpgradeLevel(int32 NewUpgradeLevel)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
 	CurrentUpgradeLevel = FMath::Clamp(NewUpgradeLevel, 0, GetMaxUpgradeLevel());
 
 	GridRows = FMath::Max(1, BaseGridRows);
@@ -147,6 +310,11 @@ int32 UPDStashComponent::FindEmptySlot() const
 
 void UPDStashComponent::InitializeStash()
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
 	const int32 MaxSlotCount = GetMaxSlotCount();
 
 	if (MaxSlotCount <= 0)
@@ -178,6 +346,11 @@ void UPDStashComponent::InitializeStash()
 
 void UPDStashComponent::ResetStash()
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
 	StashItems.SetNum(GetMaxSlotCount());
 
 	for (FPDInventorySlot& Slot : StashItems)
@@ -185,12 +358,17 @@ void UPDStashComponent::ResetStash()
 		Slot.Clear();
 	}
 
-	SaveToGameInstance();
+	PersistIfNeeded();
 	OnStashChanged.Broadcast();
 }
 
 int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return 0;
+	}
+
 	if (ItemData.ItemID.IsNone() || Quantity <= 0)
 	{
 		return 0;
@@ -219,8 +397,9 @@ int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quant
 
 				if (RemainingQuantity <= 0)
 				{
-					SaveToGameInstance();
+					PersistIfNeeded();
 					OnStashChanged.Broadcast();
+					ForceReplicationForChangedContainers(this, nullptr);
 					return AddedQuantity;
 				}
 			}
@@ -248,8 +427,9 @@ int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quant
 
 	if (AddedQuantity > 0)
 	{
-		SaveToGameInstance();
+		PersistIfNeeded();
 		OnStashChanged.Broadcast();
+		ForceReplicationForChangedContainers(this, nullptr);
 	}
 
 	return AddedQuantity;
@@ -258,6 +438,11 @@ int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quant
 
 bool UPDStashComponent::AddItemByID(FName ItemID, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return false;
+	}
+
 	if (!ItemDataTable || ItemID.IsNone()) return false;
 
 	TArray<FPDItemData*> Rows;
@@ -274,6 +459,11 @@ bool UPDStashComponent::AddItemByID(FName ItemID, int32 Quantity)
 
 int32 UPDStashComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return 0;
+	}
+
 	if (StashItems.Num() != GetMaxSlotCount())
 	{
 		InitializeStash();
@@ -287,8 +477,9 @@ int32 UPDStashComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32
 	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(StashItems[TargetSlotIndex], ItemData, Quantity);
 	if (AddedQuantity > 0)
 	{
-		SaveToGameInstance();
+		PersistIfNeeded();
 		OnStashChanged.Broadcast();
+		ForceReplicationForChangedContainers(this, nullptr);
 	}
 
 	return AddedQuantity;
@@ -296,6 +487,16 @@ int32 UPDStashComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32
 
 bool UPDStashComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		{
+			PC->ServerMoveStashSlotQuantity(this, SourceSlotIndex, TargetSlotIndex, Quantity);
+			return true;
+		}
+		return false;
+	}
+
 	if (StashItems.Num() != GetMaxSlotCount())
 	{
 		InitializeStash();
@@ -309,8 +510,9 @@ bool UPDStashComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 Targ
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(StashItems[SourceSlotIndex], StashItems[TargetSlotIndex], Quantity);
 	if (bMoved)
 	{
-		SaveToGameInstance();
+		PersistIfNeeded();
 		OnStashChanged.Broadcast();
+		ForceReplicationForChangedContainers(this, nullptr);
 	}
 
 	return bMoved;
@@ -318,6 +520,11 @@ bool UPDStashComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 Targ
 
 bool UPDStashComponent::RemoveItem(FName ItemID, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return false;
+	}
+
 	if (ItemID.IsNone() || Quantity <= 0 || !HasItem(ItemID, Quantity))
 	{
 		return false;
@@ -342,8 +549,9 @@ bool UPDStashComponent::RemoveItem(FName ItemID, int32 Quantity)
 		}
 	}
 
-	SaveToGameInstance();
+	PersistIfNeeded();
 	OnStashChanged.Broadcast();
+	ForceReplicationForChangedContainers(this, nullptr);
 	return true;
 }
 
@@ -360,6 +568,16 @@ bool UPDStashComponent::StoreInventorySlot(UPDInventoryComponent* SourceInventor
 
 bool UPDStashComponent::StoreInventorySlotQuantity(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		{
+			PC->ServerStoreInventorySlotQuantityToStash(this, SourceSlotIndex, INDEX_NONE, Quantity);
+			return true;
+		}
+		return false;
+	}
+
 	if (!SourceInventory || !SourceInventory->Items.IsValidIndex(SourceSlotIndex) || Quantity <= 0)
 	{
 		return false;
@@ -388,12 +606,24 @@ bool UPDStashComponent::StoreInventorySlotQuantity(UPDInventoryComponent* Source
 	}
 
 	SourceInventory->OnInventoryChanged.Broadcast();
+	PersistIfNeededForInventory(SourceInventory);
+	ForceReplicationForChangedContainers(this, SourceInventory);
 	return true;
 }
 
 
 bool UPDStashComponent::StoreInventorySlotQuantityToSlot(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 TargetStashSlotIndex, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		{
+			PC->ServerStoreInventorySlotQuantityToStash(this, SourceSlotIndex, TargetStashSlotIndex, Quantity);
+			return true;
+		}
+		return false;
+	}
+
 	if (!SourceInventory || SourceInventory->Items.Num() != SourceInventory->GetMaxSlotCount())
 	{
 		if (SourceInventory)
@@ -416,8 +646,9 @@ bool UPDStashComponent::StoreInventorySlotQuantityToSlot(UPDInventoryComponent* 
 	if (bMoved)
 	{
 		SourceInventory->OnInventoryChanged.Broadcast();
-		SaveToGameInstance();
+		PersistIfNeededForInventory(SourceInventory);
 		OnStashChanged.Broadcast();
+		ForceReplicationForChangedContainers(this, SourceInventory);
 	}
 
 	return bMoved;
@@ -436,6 +667,16 @@ bool UPDStashComponent::TakeStashSlot(UPDInventoryComponent* TargetInventory, in
 
 bool UPDStashComponent::TakeStashSlotQuantity(UPDInventoryComponent* TargetInventory, int32 StashSlotIndex, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		{
+			PC->ServerTakeStashSlotQuantity(this, StashSlotIndex, Quantity);
+			return true;
+		}
+		return false;
+	}
+
 	if (!TargetInventory || !StashItems.IsValidIndex(StashSlotIndex) || Quantity <= 0)
 	{
 		return false;
@@ -463,14 +704,25 @@ bool UPDStashComponent::TakeStashSlotQuantity(UPDInventoryComponent* TargetInven
 		SourceSlot.Clear();
 	}
 
-	SaveToGameInstance();
+	PersistIfNeededForInventory(TargetInventory);
 	OnStashChanged.Broadcast();
+	ForceReplicationForChangedContainers(this, TargetInventory);
 	return true;
 }
 
 
 bool UPDStashComponent::TakeStashSlotQuantityToInventorySlot(UPDInventoryComponent* TargetInventory, int32 StashSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		{
+			PC->ServerTakeStashSlotQuantityToInventorySlot(this, StashSlotIndex, TargetInventorySlotIndex, Quantity);
+			return true;
+		}
+		return false;
+	}
+
 	if (!TargetInventory || TargetInventory->Items.Num() != TargetInventory->GetMaxSlotCount())
 	{
 		if (TargetInventory)
@@ -499,9 +751,10 @@ bool UPDStashComponent::TakeStashSlotQuantityToInventorySlot(UPDInventoryCompone
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(StashItems[StashSlotIndex], TargetInventory->Items[TargetInventorySlotIndex], Quantity);
 	if (bMoved)
 	{
-		SaveToGameInstance();
+		PersistIfNeededForInventory(TargetInventory);
 		OnStashChanged.Broadcast();
 		TargetInventory->OnInventoryChanged.Broadcast();
+		ForceReplicationForChangedContainers(this, TargetInventory);
 	}
 
 	return bMoved;

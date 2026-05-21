@@ -2,8 +2,12 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 
+#include "Characters/PDPlayerCharacter.h"
 #include "Items/PDInventoryComponent.h"
 #include "Engine/DataTable.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "GameplayTag/PDGameplayTags.h"
 
 namespace
 {
@@ -32,6 +36,8 @@ namespace
 APDItemBase::APDItemBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
+	SetReplicateMovement(true);
 
 	PickupCollision = CreateDefaultSubobject<USphereComponent>(TEXT("PickupCollision"));
 	SetRootComponent(PickupCollision);
@@ -55,13 +61,23 @@ void APDItemBase::BeginPlay()
 
 void APDItemBase::Interact_Implementation(AActor* Interactor)
 {
+	if (!HasAuthority()) return;
+
 	if (!Interactor || Quantity <= 0)
 	{
 		OnPickupFailed();
 		return;
 	}
 
-	UPDInventoryComponent* Inventory = Interactor->FindComponentByClass<UPDInventoryComponent>();
+	UPDInventoryComponent* Inventory = nullptr;
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(Interactor))
+	{
+		Inventory = PlayerCharacter->GetInventoryComponent();
+	}
+	else
+	{
+		Inventory = Interactor->FindComponentByClass<UPDInventoryComponent>();
+	}
 
 	if (!Inventory)
 	{
@@ -86,6 +102,17 @@ void APDItemBase::Interact_Implementation(AActor* Interactor)
 	}
 
 	Quantity -= AddedQuantity;
+
+	if (UAbilitySystemComponent* ASCComp = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Interactor))
+	{
+		FGameplayCueParameters Params;
+		Params.Location = GetActorLocation();
+		Params.SourceObject = this;
+		Params.RawMagnitude = static_cast<float>(AddedQuantity);
+
+		ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Item_Pickup, Params);
+	}
+
 	OnPickupSucceeded(AddedQuantity, Quantity);
 
 	if (Quantity <= 0)

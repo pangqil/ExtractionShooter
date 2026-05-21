@@ -6,17 +6,19 @@
 #include "Type/Types.h"
 #include "GameplayEffectTypes.h"
 #include "ActiveGameplayEffectHandle.h"
-#include "Cover/PDCoverBase.h"
 #include "PDPlayerCharacter.generated.h"
 
 class APDWeaponBase;
 class APDRangedWeaponBase;
+class APDPlayerState;
 class UPDAnimInstance;
 class UPDVisionComponent;
 class UPDInteractionComponent;
+class UPDInventoryComponent;
 class UPDQuickSlotComponent;
 class UPDEquipmentComponent;
 class UPDEquipmentModificationComponent;
+class UPDQuestComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -40,6 +42,9 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void HandleDeath(AActor* Killer) override;
+	virtual bool ShouldEnterDownedStateOnLethalDamage() const override { return true; }
+	virtual void OnLifeStateChanged(EPDLifeState OldLifeState, AActor* ContextActor) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
@@ -53,12 +58,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDInteractionComponent> InteractionComponent;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
-	TObjectPtr<UPDQuickSlotComponent> QuickSlotComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
-	TObjectPtr<UPDEquipmentComponent> EquipmentComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDEquipmentModificationComponent> EquipmentModificationComponent;
@@ -88,11 +87,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
 	TSubclassOf<UGameplayEffect> GasExposureEffectClass;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
+	UPROPERTY(ReplicatedUsing=OnRep_WeaponSlots, VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
 	TArray<TObjectPtr<APDWeaponBase>> WeaponSlots;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
+	UPROPERTY(ReplicatedUsing=OnRep_CurrentSlot, VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
 	EWeaponSlot CurrentSlot=EWeaponSlot::None;
+
+	UPROPERTY(ReplicatedUsing=OnRep_ReplicatedWeaponType, VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
+	EWeaponType ReplicatedWeaponType = EWeaponType::None;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Vision")
+	FVector ReplicatedAimWorldLocation = FVector::ZeroVector;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Vision")
+	bool bHasReplicatedAimWorldLocation = false;
 
 	void OnStaminaChanged(const FOnAttributeChangeData& Data);
 
@@ -109,13 +117,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	void PickupWeapon(APDWeaponBase* Weapon);
 
-	// 인벤토리/박스의 무기 아이템 데이터를 받아서 빈 슬롯이 있으면 spawn 후 자동 장착.
-	// 슬롯이 차 있거나 WeaponClass가 없으면 false 반환(호출자가 인벤토리로 보내야 함).
+	void SetSharedAimWorldLocation(const FVector& AimLocation);
+	bool GetSharedAimWorldLocation(FVector& OutLocation) const;
+	FVector GetSharedVisionForwardVector(const FVector& FromLocation) const;
+
+
+
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	bool TryAutoEquipWeaponItem(const FPDItemData& ItemData);
 
-	// 개조 레벨 등 개별 슬롯 상태를 유지하면서 무기를 장착한다.
-	// 장착된 무기의 기존 레벨 시스템에는 ModificationLevel + 1을 전달한다.
+
+
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	bool TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot);
 
@@ -137,11 +149,20 @@ public:
 	UFUNCTION(BlueprintPure, Category="PD|Player")
 	FORCEINLINE EWeaponSlot GetCurrentSlot() const { return CurrentSlot; }
 
+	UFUNCTION(BlueprintPure, Category="PD|Player|Weapon")
+	FORCEINLINE EWeaponType GetReplicatedWeaponType() const { return ReplicatedWeaponType; }
+
 	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
-	UPDQuickSlotComponent* GetQuickSlotComponent() const { return QuickSlotComponent; }
+	UPDQuickSlotComponent* GetQuickSlotComponent() const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Inventory")
+	UPDInventoryComponent* GetInventoryComponent() const;
 
 	UFUNCTION(BlueprintPure, Category="PD|Equipment")
-	UPDEquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent; }
+	UPDEquipmentComponent* GetEquipmentComponent() const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Quest")
+	UPDQuestComponent* GetQuestComponent() const;
 
 	UFUNCTION(BlueprintPure, Category="PD|Equipment")
 	UPDEquipmentModificationComponent* GetEquipmentModificationComponent() const { return EquipmentModificationComponent; }
@@ -149,13 +170,26 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
 	void TryInteract();
 
-	//기지진입하면 모든 디버프, AS초기화
+	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
+	void StopInteract();
+
+	bool IsInteractingWith(const AActor* TargetActor) const;
+
+	UFUNCTION(Server, Reliable)
+	void ServerTryInteract();
+
+	UFUNCTION(Server, Reliable)
+	void ServerInteractTarget(AActor* TargetActor);
+
+	UFUNCTION(Server, Reliable)
+	void ServerStopInteract(AActor* TargetActor);
+
+	UFUNCTION(Server, Reliable)
+	void ServerHandleAnimGameplayEvent(FGameplayTag EventTag);
+
+
 	UFUNCTION(BlueprintCallable, Category="PD|Survival")
 	void ResetToBase();
-
-	UFUNCTION(BlueprintPure, Category="PD|Cover")
-	APDCoverBase* GetCoverCandidate() const { return CoverCandidate.Get(); }
-	void SetCoverCandidate(APDCoverBase* Cover) { CoverCandidate = Cover; }
 
 	virtual TSubclassOf<UGameplayEffect> GetHungerDecayEffectClass()  const override { return HungerDecayEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetThirstDecayEffectClass()  const override { return ThirstDecayEffectClass; }
@@ -169,13 +203,47 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category="PD|Player|Animation")
 	TSubclassOf<UAnimInstance> DefaultAnimLayerClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Player|Animation")
+	TSubclassOf<UAnimInstance> DownedAnimLayerClass;
 private:
+	UFUNCTION()
+	void OnRep_WeaponSlots();
+
+	UFUNCTION()
+	void OnRep_CurrentSlot();
+
+	UFUNCTION()
+	void OnRep_ReplicatedWeaponType();
+
 	void OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount);
+	void ApplyAnimationLayerForTag(const FGameplayTag& LayerTag);
 	void LinkDefaultAnimLayer();
+	void LinkDownedAnimLayer();
+	void ApplyWeaponAnimationLayer(APDWeaponBase* Weapon);
+	void ApplyWeaponAnimationLayerForType(EWeaponType WeaponType);
+	void SyncWeaponTypeTags(EWeaponType WeaponType);
+	void SyncWeaponPresentation();
+	UPDInteractionComponent* GetOrCreateInteractionComponent();
+	void BeginGettingUpPresentation();
+	void FinishGettingUpFromTimer();
+
+	UFUNCTION(Server, Reliable)
+	void ServerPickupWeapon(APDWeaponBase* Weapon);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSwitchToSlot(EWeaponSlot Slot);
+
+	UFUNCTION(Server, Reliable)
+	void ServerDropCurrentWeapon();
 
 	FActiveGameplayEffectHandle HungerDecayHandle;
 	FActiveGameplayEffectHandle ThirstDecayHandle;
 	FActiveGameplayEffectHandle GasMaskDecayHandle;
 
-	TWeakObjectPtr<APDCoverBase> CoverCandidate;
+	bool bPlayerAbilityDelegatesBound = false;
+	bool bPlayerPersistentEffectsApplied = false;
+
+	TWeakObjectPtr<AActor> ActiveInteractTarget;
+	FTimerHandle GetUpTimerHandle;
 };

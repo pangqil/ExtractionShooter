@@ -1,7 +1,8 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+
 
 
 #include "Component/PDWeaponComponent.h"
+#include "Core/PDPlayerController.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/EngineTypes.h"
 
@@ -25,7 +26,7 @@ FVector UPDWeaponComponent::GetAimDirection(const FVector& StartLocation) const
     AActor* Owner = GetOwner();
     if (!Owner) return FVector::ForwardVector;
 
-    // ── 적: AimTarget이 설정된 경우 ────────────────────────────────────
+
     if (AimTarget.IsValid())
     {
         FVector TargetLoc = AimTarget->GetActorLocation() + FVector(0.f, 0.f, 80.f);
@@ -33,30 +34,44 @@ FVector UPDWeaponComponent::GetAimDirection(const FVector& StartLocation) const
         if (!Dir.IsNearlyZero()) return Dir.GetSafeNormal();
     }
 
-    // ── 플레이어: PlayerController 커서 ────────────────────────────────
+
     APlayerController* PC = Cast<APlayerController>(Owner->GetInstigatorController());
     if (PC)
     {
-        // 1순위: 커서가 Pawn 위 → 부위 직접 조준
+        if (const APDPlayerController* PDPC = Cast<APDPlayerController>(PC))
+        {
+            FVector CachedAimLocation;
+            if (PDPC->GetCachedAimWorldLocation(CachedAimLocation))
+            {
+                FVector Dir = CachedAimLocation - StartLocation;
+                if (!Dir.IsNearlyZero()) return Dir.GetSafeNormal();
+            }
+        }
+
+
         FHitResult PawnHit;
-        if (PC->GetHitResultUnderCursorForObjects(
-            { UEngineTypes::ConvertToObjectType(ECC_Pawn) }, true, PawnHit)
+        const TArray<TEnumAsByte<EObjectTypeQuery>> PawnObjectTypes = { UEngineTypes::ConvertToObjectType(ECC_Pawn) };
+        const bool bPawnHit = Cast<APDPlayerController>(PC)
+            ? Cast<APDPlayerController>(PC)->GetRecoiledHitResultForObjects(PawnObjectTypes, true, PawnHit)
+            : PC->GetHitResultUnderCursorForObjects(PawnObjectTypes, true, PawnHit);
+        if (bPawnHit
             && PawnHit.GetActor() && PawnHit.GetActor() != Owner)
         {
             FVector Dir = PawnHit.Location - StartLocation;
             if (!Dir.IsNearlyZero()) return Dir.GetSafeNormal();
         }
-        // 2순위: 지면 커서
+
         FHitResult CursorHit;
-        if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
+        const bool bCursorHit = Cast<APDPlayerController>(PC)
+            ? Cast<APDPlayerController>(PC)->GetRecoiledHitResult(ECC_Visibility, true, CursorHit)
+            : PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit);
+        if (bCursorHit)
         {
             FVector Dir = CursorHit.Location - StartLocation;
             if (!Dir.IsNearlyZero()) return Dir.GetSafeNormal();
         }
     }
 
-    // ── 폴백: Owner 전방 벡터 ───────────────────────────────────────────
+
     return Owner->GetActorForwardVector();
 }
-
-

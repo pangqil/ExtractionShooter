@@ -1,12 +1,12 @@
 #include "Ability/GA_ReloadAbility.h"
 
 #include "Characters/PDPlayerCharacter.h"
-#include "GameplayTag/PDGameplayTags.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 
 UGA_ReloadAbility::UGA_ReloadAbility()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
 void UGA_ReloadAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -15,12 +15,6 @@ void UGA_ReloadAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
 
 	APDPlayerCharacter* Char = Cast<APDPlayerCharacter>(GetPDCharacter());
 	APDRangedWeaponBase* Weapon = Char ? Cast<APDRangedWeaponBase>(Char->GetCurrentWeapon()) : nullptr;
@@ -31,9 +25,20 @@ void UGA_ReloadAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	WeaponPtr = Weapon;
+	if (!Weapon->CanReload())
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
 
-	// 장전 완료 델리게이트 구독
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	WeaponPtr = Weapon;
+	Weapon->OnWeaponReloaded.RemoveDynamic(this, &UGA_ReloadAbility::OnWeaponReloaded);
 	Weapon->OnWeaponReloaded.AddDynamic(this, &UGA_ReloadAbility::OnWeaponReloaded);
 
 	Weapon->Reload();
@@ -48,9 +53,10 @@ void UGA_ReloadAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	{
 		WeaponPtr->OnWeaponReloaded.RemoveDynamic(this, &UGA_ReloadAbility::OnWeaponReloaded);
 
-		// 발사 등 외부 원인으로 취소된 경우 리로드 상태 강제 초기화
 		if (bWasCancelled)
+		{
 			WeaponPtr->CancelReload();
+		}
 
 		WeaponPtr.Reset();
 	}

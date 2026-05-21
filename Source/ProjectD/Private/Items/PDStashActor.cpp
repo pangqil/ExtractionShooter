@@ -3,12 +3,14 @@
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Core/PDPlayerController.h"
+#include "Core/PDPlayerState.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDStashComponent.h"
 
 APDStashActor::APDStashActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
 
 	InteractionCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionCollision"));
 	SetRootComponent(InteractionCollision);
@@ -37,6 +39,13 @@ void APDStashActor::Interact_Implementation(AActor* Interactor)
 	APDPlayerController* PlayerController = Cast<APDPlayerController>(InteractingPawn->GetController());
 	if (!PlayerController)
 	{
+		return;
+	}
+
+	if (!PlayerController->IsLocalController())
+	{
+		StashComponent->LoadFromPlayerState(PlayerController->GetPlayerState<APDPlayerState>());
+		PlayerController->ClientOpenStashInterface(StashComponent);
 		return;
 	}
 

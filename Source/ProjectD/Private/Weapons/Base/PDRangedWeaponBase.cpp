@@ -1,14 +1,18 @@
 #include "Weapons/Base/PDRangedWeaponBase.h"
-#include "Weapons/PDCartridge.h"
+#include "Characters/PDPlayerCharacter.h"
 
 #include "Components/SkeletalMeshComponent.h"
-#include "Particles/ParticleSystemComponent.h"
-
 #include "Animation/AnimInstance.h"
+#include "Animation/PDAnimInstance.h"
 #include "Interfaces/PDDamageable.h"
 #include "Items/PDInventoryComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "Core/PDPlayerController.h"
+
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "GameplayTag/PDGameplayTags.h"
+#include "GameFramework/Character.h"
+#include "Net/UnrealNetwork.h"
 
 APDRangedWeaponBase::APDRangedWeaponBase()
 {
@@ -18,36 +22,51 @@ void APDRangedWeaponBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// CurrentAmmo가 BP에서 직접 설정된 경우 그대로 사용, 0이면 MaxAmmo로 채움
+
 	if (CurrentAmmo == 0 && LevelStats.IsValidIndex(0))
 		CurrentAmmo = LevelStats[0].MaxAmmo;
+}
+
+void APDRangedWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDRangedWeaponBase, CurrentAmmo);
+	DOREPLIFETIME(APDRangedWeaponBase, ReserveAmmo);
+	DOREPLIFETIME(APDRangedWeaponBase, bIsReloading);
 }
 
 void APDRangedWeaponBase::Fire_Implementation() {}
 
 void APDRangedWeaponBase::Reload_Implementation()
 {
-	if (bIsReloading) return;
-	if (CurrentAmmo >= GetCurrentStats().MaxAmmo) return;
-	if (!HasAmmoToReload()) return;
+	if (!HasAuthority()) return;
+	if (!CanReload())
+	{
+		return;
+	}
 
 	bIsReloading = true;
+	BroadcastAmmoChanged();
 
-	// 캐릭터 애니메이션은 AnimInstance가 이 델리게이트를 구독해서 처리
-	OnWeaponReloadStarted.Broadcast(this);
 
-	if (ReloadMontage && WeaponMesh && WeaponMesh->GetAnimInstance())
+	MulticastOnWeaponReloadStarted();
+
+	const float ReloadDuration = GetReloadDuration();
+	ExecuteReloadCue(ReloadDuration);
+
+	if (ReloadDuration <= KINDA_SMALL_NUMBER)
 	{
-		PlayWeaponMontage(ReloadMontage);
-		BindMontageEndedForReload(ReloadMontage);
+		FinishReload();
+		return;
 	}
-	else
-	{
-		GetWorldTimerManager().SetTimer(
-			ReloadHandle, this,
-			&APDRangedWeaponBase::FinishReload,
-			GetCurrentStats().ReloadTime, false);
-	}
+
+	GetWorldTimerManager().SetTimer(
+		ReloadHandle,
+		this,
+		&APDRangedWeaponBase::FinishReload,
+		ReloadDuration,
+		false);
 }
 
 void APDRangedWeaponBase::OnEquip_Implementation(AActor* NewOwner)
@@ -57,17 +76,26 @@ void APDRangedWeaponBase::OnEquip_Implementation(AActor* NewOwner)
 	if (CurrentAmmo == 0 && !LevelStats.IsEmpty())
 		CurrentAmmo = LevelStats[0].MaxAmmo;
 
-	// 캐릭터 Equip 몽타주는 PDAnimInstance가 OnWeaponEquipped에서 담당.
+	BroadcastAmmoChanged();
+
+
 }
 
 void APDRangedWeaponBase::OnUnequip_Implementation()
 {
 	Super::OnUnequip_Implementation();
 
+	const bool bWasReloading = bIsReloading;
 	GetWorldTimerManager().ClearTimer(FireCooldownHandle);
 	GetWorldTimerManager().ClearTimer(ReloadHandle);
 	bIsReloading = false;
 	bCanFire = true;
+	BroadcastAmmoChanged();
+
+	if (HasAuthority() && bWasReloading)
+	{
+		OnWeaponReloaded.Broadcast(this);
+	}
 }
 
 bool APDRangedWeaponBase::CanFire() const
@@ -75,25 +103,39 @@ bool APDRangedWeaponBase::CanFire() const
 	return bCanFire && !bIsReloading && CurrentAmmo > 0;
 }
 
-void APDRangedWeaponBase::ApplyDamage(AActor* HitActor, float DamageAmount)
+bool APDRangedWeaponBase::CanReload() const
+{
+	return !bIsReloading
+		&& CurrentAmmo < GetCurrentStats().MaxAmmo
+		&& HasAmmoToReload();
+}
+
+void APDRangedWeaponBase::RefreshAmmoChanged()
+{
+	BroadcastAmmoChanged();
+}
+
+void APDRangedWeaponBase::ApplyDamage(AActor* HitActor, float DamageAmount, const FHitResult& HitResult)
 {
 	if (!HitActor) return;
 	if (!HitActor->Implements<UPDDamageable>()) return;
-	if (IPDDamageable::Execute_GetCurrentHealth(HitActor) <= 0.f) return;
 
 	FPDDamageInfo DamageInfo;
 	DamageInfo.BaseDamage = DamageAmount;
 	DamageInfo.Instigator = GetWeaponOwner();
 	DamageInfo.DamageTypeClass = nullptr;
+	DamageInfo.HitResult = HitResult;
 
 	IPDDamageable::Execute_ApplyDamage(HitActor, DamageInfo);
 }
 
 void APDRangedWeaponBase::PostFire()
 {
+	if (!HasAuthority()) return;
 	--CurrentAmmo;
 	bCanFire = false;
-	OnWeaponFired.Broadcast(this);
+	BroadcastAmmoChanged();
+	MulticastOnWeaponFired();
 
 	ApplyRecoil();
 
@@ -110,33 +152,78 @@ void APDRangedWeaponBase::ResetFireCooldown()
 
 void APDRangedWeaponBase::CancelReload()
 {
+	if (!HasAuthority()) return;
 	GetWorldTimerManager().ClearTimer(ReloadHandle);
 	StopWeaponMontage(ReloadMontage);
+	if (const APawn* OwnerPawn = Cast<APawn>(WeaponOwner.Get()))
+	{
+		if (const ACharacter* OwnerCharacter = Cast<ACharacter>(OwnerPawn))
+		{
+			if (USkeletalMeshComponent* CharacterMesh = OwnerCharacter->GetMesh())
+			{
+				if (UPDAnimInstance* AnimInst = Cast<UPDAnimInstance>(CharacterMesh->GetAnimInstance()))
+				{
+					AnimInst->StopReloadMontageForWeapon(this);
+				}
+			}
+		}
+	}
 	bIsReloading = false;
+	BroadcastAmmoChanged();
 }
 
 void APDRangedWeaponBase::FinishReload()
 {
+	if (!HasAuthority()) return;
 	const int32 MaxAmmo = GetCurrentStats().MaxAmmo;
 	const int32 Needed = MaxAmmo - CurrentAmmo;
+	if (Needed <= 0)
+	{
+		bIsReloading = false;
+		BroadcastAmmoChanged();
+		OnWeaponReloaded.Broadcast(this);
+		return;
+	}
 
 	if (!AmmoItemID.IsNone())
 	{
 		UPDInventoryComponent* Inv = GetOwnerInventory();
+		int32 InventoryAmmo = 0;
 		if (Inv)
 		{
-			const int32 ToAdd = FMath::Min(Needed, GetAvailableAmmoCount());
+			for (const FPDInventorySlot& Slot : Inv->Items)
+			{
+				if (!Slot.IsEmpty() && Slot.ItemData.ItemID == AmmoItemID)
+				{
+					InventoryAmmo += Slot.Quantity;
+				}
+			}
+		}
+		if (Inv && InventoryAmmo > 0)
+		{
+			const int32 ToAdd = FMath::Min(Needed, InventoryAmmo);
 			if (ToAdd > 0)
 			{
 				Inv->RemoveItem(AmmoItemID, ToAdd);
 				CurrentAmmo += ToAdd;
 			}
 		}
-		else { CurrentAmmo = MaxAmmo; }
+		else
+		{
+			const int32 ToAdd = FMath::Min(Needed, ReserveAmmo);
+			ReserveAmmo -= ToAdd;
+			CurrentAmmo += ToAdd;
+		}
 	}
-	else { CurrentAmmo = MaxAmmo; }
+	else
+	{
+		const int32 ToAdd = FMath::Min(Needed, ReserveAmmo);
+		ReserveAmmo -= ToAdd;
+		CurrentAmmo += ToAdd;
+	}
 
 	bIsReloading = false;
+	BroadcastAmmoChanged();
 	OnWeaponReloaded.Broadcast(this);
 }
 
@@ -179,105 +266,121 @@ void APDRangedWeaponBase::OnReloadMontageEnded(UAnimMontage* Montage, bool bInte
 	if (!bInterrupted)
 		FinishReload();
 	else
+	{
 		bIsReloading = false;
+		BroadcastAmmoChanged();
+	}
+}
+
+void APDRangedWeaponBase::MulticastOnWeaponFired_Implementation()
+{
+	OnWeaponFired.Broadcast(this);
+}
+
+void APDRangedWeaponBase::MulticastOnWeaponReloadStarted_Implementation()
+{
+	OnWeaponReloadStarted.Broadcast(this);
 }
 
 void APDRangedWeaponBase::ApplyRecoil()
 {
-	// 에임 Yaw 오프셋 — PlayerController에 누적
+
 	if (APDPlayerController* PDPC = Cast<APDPlayerController>(GetOwnerPlayerController()))
-	{
-		// 한 방향으로 누적(+방향). 회복은 TickRecoilRecovery에서 0으로 수렴.
-		// 랜덤 좌우는 서로 상쇄되어 체감이 없으므로 단방향 누적 사용.
-		const float CurrentOffset = PDPC->GetRecoilYawOffset();
-		const float Remaining = MaxRecoilYaw - CurrentOffset;
-		const float Delta = FMath::Min(RecoilYawPerShot, FMath::Max(0.f, Remaining));
-
-		if (Delta > 0.f)
-			PDPC->AddRecoilOffset(Delta);
-	}
+		PDPC->AddRecoilOffset(RecoilYawPerShot);
 }
 
-void APDRangedWeaponBase::PlayFireEffects()
+void APDRangedWeaponBase::ExecuteFireCue(const FVector& MuzzleLoc, const FVector& TraceEnd)
 {
-	if (MuzzleFlashEffect)
+	UAbilitySystemComponent* ASCComp = GetOwnerASC();
+	if (!ASCComp)
 	{
-		UGameplayStatics::SpawnEmitterAttached(
-			MuzzleFlashEffect,
-			WeaponMesh,
-			MuzzleSocketName,
-			FVector::ZeroVector,
-			FRotator::ZeroRotator,
-			EAttachLocation::SnapToTarget,
-			true);
+		return;
 	}
 
-	if (FireSound)
+
+
+	FGameplayCueParameters Params;
+	Params.Location              = MuzzleLoc;
+	Params.TargetAttachComponent = WeaponMesh;
+	Params.SourceObject          = this;
+	Params.EffectCauser          = this;
+	Params.Instigator            = GetWeaponOwner();
+	const bool bHasTracerTarget = !TraceEnd.IsZero() && !TraceEnd.Equals(MuzzleLoc);
+	Params.Normal                = bHasTracerTarget ? (TraceEnd - MuzzleLoc).GetSafeNormal() : FVector::ZeroVector;
+	Params.RawMagnitude          = bHasTracerTarget ? FVector::Dist(MuzzleLoc, TraceEnd) : 0.f;
+	ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Weapon_Fire, Params);
+}
+
+void APDRangedWeaponBase::ExecuteImpactCue(const FHitResult& Hit)
+{
+	UAbilitySystemComponent* ASCComp = GetOwnerASC();
+	if (!ASCComp) return;
+
+
+
+
+	FGameplayCueParameters Params;
+	Params.Location          = Hit.ImpactPoint;
+	Params.Normal            = Hit.ImpactNormal;
+	Params.RawMagnitude      = Cast<APawn>(Hit.GetActor()) ? 1.f : 0.f;
+	Params.PhysicalMaterial  = Hit.PhysMaterial;
+	Params.SourceObject      = this;
+	Params.EffectCauser      = this;
+	Params.Instigator        = GetWeaponOwner();
+	ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Weapon_Impact, Params);
+}
+
+void APDRangedWeaponBase::ExecuteReloadCue(float ReloadDuration)
+{
+	UAbilitySystemComponent* ASCComp = GetOwnerASC();
+	if (!ASCComp) return;
+
+	FGameplayCueParameters Params;
+	Params.Location = WeaponMesh ? WeaponMesh->GetComponentLocation() : GetActorLocation();
+	Params.TargetAttachComponent = WeaponMesh;
+	Params.SourceObject = this;
+	Params.EffectCauser = this;
+	Params.Instigator = GetWeaponOwner();
+	Params.RawMagnitude = ReloadDuration;
+	ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Weapon_Reload, Params);
+}
+
+float APDRangedWeaponBase::GetReloadDuration() const
+{
+	if (const APawn* OwnerPawn = Cast<APawn>(WeaponOwner.Get()))
 	{
-		UGameplayStatics::SpawnSoundAttached(
-			FireSound,
-			WeaponMesh,
-			MuzzleSocketName);
+		if (const ACharacter* OwnerCharacter = Cast<ACharacter>(OwnerPawn))
+		{
+			if (const USkeletalMeshComponent* CharacterMesh = OwnerCharacter->GetMesh())
+			{
+				if (const UPDAnimInstance* AnimInst = Cast<UPDAnimInstance>(CharacterMesh->GetAnimInstance()))
+				{
+					const float AnimReloadDuration = AnimInst->GetReloadMontageDurationForWeapon(const_cast<APDRangedWeaponBase*>(this));
+					if (AnimReloadDuration > 0.f)
+					{
+						return AnimReloadDuration;
+					}
+				}
+			}
+		}
 	}
+
+	if (ReloadMontage)
+	{
+		return ReloadMontage->GetPlayLength();
+	}
+
+	return GetCurrentStats().ReloadTime;
 }
 
-void APDRangedWeaponBase::SpawnBeamEffect(const FVector& Start, const FVector& End)
-{
-	if (!BeamParticle || !GetWorld()) return;
 
-	// Beam emitter: 시작점에 스폰 후 Target 파라미터로 끝점 지정
-	UParticleSystemComponent* BeamComp = UGameplayStatics::SpawnEmitterAtLocation(
-		GetWorld(), BeamParticle, Start, FRotator::ZeroRotator, true);
-	if (BeamComp)
-		BeamComp->SetVectorParameter(FName("Target"), End);
-}
-
-void APDRangedWeaponBase::SpawnTracerEffect(const FVector& Start, const FVector& End)
-{
-	if (!TracerEffect || !GetWorld()) return;
-
-	FVector Dir = (End - Start).GetSafeNormal();
-	UGameplayStatics::SpawnEmitterAtLocation(
-		GetWorld(), TracerEffect, Start, Dir.Rotation());
-}
-
-void APDRangedWeaponBase::SpawnImpactEffect(const FHitResult& Hit)
-{
-	if (!HitImpactEffect || !GetWorld()) return;
-
-	UGameplayStatics::SpawnEmitterAtLocation(
-		GetWorld(),
-		HitImpactEffect,
-		Hit.ImpactPoint,
-		Hit.ImpactNormal.Rotation());
-}
-
-void APDRangedWeaponBase::PlayHitSound(const FHitResult& Hit)
-{
-	// 피격 대상이 Pawn이면 HitBodySound, 아니면 HitSurfaceSound
-	USoundBase* Sound = Cast<APawn>(Hit.GetActor()) ? HitBodySound : HitSurfaceSound;
-	if (Sound)
-		UGameplayStatics::PlaySoundAtLocation(GetWorld(), Sound, Hit.ImpactPoint);
-}
-
-void APDRangedWeaponBase::SpawnCartridge()
-{
-	if (!CartridgeClass || !WeaponMesh) return;
-	if (!WeaponMesh->DoesSocketExist(CartridgeEjectSocketName)) return;
-
-	const FTransform EjectTransform = WeaponMesh->GetSocketTransform(CartridgeEjectSocketName);
-	GetWorld()->SpawnActor<APDCartridge>(
-		CartridgeClass,
-		EjectTransform.GetLocation(),
-		EjectTransform.GetRotation().Rotator());
-}
 
 APlayerController* APDRangedWeaponBase::GetOwnerPlayerController() const
 {
-	if (!WeaponOwner.IsValid()) return nullptr;
-	// WeaponOwner는 AActor*로 저장되어 있어 AActor::GetInstigatorController()가 호출됨.
-	// 이 함수는 Actor의 Instigator 필드(미설정)를 통해 반환하므로 nullptr이 됨.
-	// APawn::GetController()를 직접 사용해야 실제 PlayerController를 얻을 수 있다.
+	if (!IsValid(WeaponOwner)) return nullptr;
+
+
+
 	if (APawn* OwnerPawn = Cast<APawn>(WeaponOwner.Get()))
 		return Cast<APlayerController>(OwnerPawn->GetController());
 	return nullptr;
@@ -285,26 +388,64 @@ APlayerController* APDRangedWeaponBase::GetOwnerPlayerController() const
 
 UPDInventoryComponent* APDRangedWeaponBase::GetOwnerInventory() const
 {
-	if (!WeaponOwner.IsValid()) return nullptr;
+	if (!IsValid(WeaponOwner)) return nullptr;
+	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(WeaponOwner.Get()))
+	{
+		return PlayerCharacter->GetInventoryComponent();
+	}
 	return WeaponOwner->FindComponentByClass<UPDInventoryComponent>();
+}
+
+UAbilitySystemComponent* APDRangedWeaponBase::GetOwnerASC() const
+{
+	if (!IsValid(WeaponOwner)) return nullptr;
+	return UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(WeaponOwner.Get());
 }
 
 bool APDRangedWeaponBase::HasAmmoToReload() const
 {
-	if (AmmoItemID.IsNone()) return true;
-	UPDInventoryComponent* Inv = GetOwnerInventory();
-	if (!Inv) return true;
-	return Inv->HasItem(AmmoItemID, 1);
+	return GetAvailableAmmoCount() > 0;
 }
 
 int32 APDRangedWeaponBase::GetAvailableAmmoCount() const
 {
-	if (AmmoItemID.IsNone()) return INT32_MAX;
-	UPDInventoryComponent* Inv = GetOwnerInventory();
-	if (!Inv) return INT32_MAX;
+	if (AmmoItemID.IsNone()) return ReserveAmmo;
+
+	const UPDInventoryComponent* Inv = GetOwnerInventory();
+	if (!Inv) return ReserveAmmo;
+
 	int32 Total = 0;
 	for (const FPDInventorySlot& Slot : Inv->Items)
+	{
 		if (!Slot.IsEmpty() && Slot.ItemData.ItemID == AmmoItemID)
+		{
 			Total += Slot.Quantity;
-	return Total;
+		}
+	}
+	return Total > 0 ? Total : ReserveAmmo;
+}
+
+void APDRangedWeaponBase::BroadcastAmmoChanged()
+{
+	OnWeaponAmmoChanged.Broadcast(
+		this,
+		CurrentAmmo,
+		GetCurrentStats().MaxAmmo,
+		GetAvailableAmmoCount(),
+		bIsReloading);
+}
+
+void APDRangedWeaponBase::OnRep_CurrentAmmo()
+{
+	BroadcastAmmoChanged();
+}
+
+void APDRangedWeaponBase::OnRep_ReserveAmmo()
+{
+	BroadcastAmmoChanged();
+}
+
+void APDRangedWeaponBase::OnRep_IsReloading()
+{
+	BroadcastAmmoChanged();
 }

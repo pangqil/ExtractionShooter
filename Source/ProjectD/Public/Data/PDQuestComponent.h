@@ -6,10 +6,38 @@
 #include "Engine/DataTable.h"
 #include "PDQuestComponent.generated.h"
 
+class FLifetimeProperty;
 class UPDInventoryComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnQuestUpdated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnQuestStateChanged, FName, QuestID, EPDQuestState, NewState);
+
+USTRUCT()
+struct FPDReplicatedQuestObjectiveProgress
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FName ProgressKey = NAME_None;
+
+	UPROPERTY()
+	int32 Amount = 0;
+};
+
+USTRUCT()
+struct FPDReplicatedQuestProgress
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FPDQuestData QuestData;
+
+	UPROPERTY()
+	TArray<FPDReplicatedQuestObjectiveProgress> ObjectiveProgress;
+
+	UPROPERTY()
+	EPDQuestState State = EPDQuestState::Inactive;
+};
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class PROJECTD_API UPDQuestComponent : public UActorComponent
@@ -25,7 +53,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Quest")
 	TArray<FPDQuestProgress> ActiveQuests;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Quest")
+	UPROPERTY(ReplicatedUsing=OnRep_TrackedQuestID, EditAnywhere, BlueprintReadWrite, Category="PD|Quest")
 	FName TrackedQuestID;
 
 	UPROPERTY(BlueprintAssignable, Category="PD|Quest")
@@ -98,6 +126,19 @@ public:
 	float GetQuestProgressRatio(FName QuestID) const;
 
 private:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_ReplicatedActiveQuests();
+
+	UFUNCTION()
+	void OnRep_TrackedQuestID();
+
+	UPROPERTY(ReplicatedUsing=OnRep_ReplicatedActiveQuests)
+	TArray<FPDReplicatedQuestProgress> ReplicatedActiveQuests;
+
+	void SyncActiveQuestsToReplication();
+
 	FPDQuestProgress* FindQuest(FName QuestID);
 	const FPDQuestProgress* FindQuest(FName QuestID) const;
 	const FPDQuestData* FindQuestData(FName QuestID) const;

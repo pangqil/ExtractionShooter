@@ -1,6 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
+#include "GameplayTagContainer.h"
 #include "GameFramework/PlayerController.h"
 #include "Type/Types.h"
 #include "PDPlayerController.generated.h"
@@ -23,6 +25,11 @@ class UPDActivatableBase;
 class UUserWidget;
 class UPDNotificationWidget;
 class UPDInventoryComponent;
+class UPDEquipmentComponent;
+class UPDQuickSlotComponent;
+class UPDQuestComponent;
+class UPDPlayerUIManagerComponent;
+class APDPlayerState;
 class APDWeaponBase;
 class APDRifle;
 class UPDRootLayout;
@@ -43,8 +50,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Raid")
 	void RequestExtraction();
 
+	UFUNCTION(Server, Reliable)
+	void ServerRequestExtraction();
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void OpenStashInterface(UPDStashComponent* StashSource);
+
+	UFUNCTION(Client, Reliable)
+	void ClientOpenStashInterface(UPDStashComponent* StashSource);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void CloseStashInterface();
@@ -52,12 +65,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	bool IsStashInterfaceOpen() const;
 
-	// 현재 열린 박스의 컴포넌트. stash 인터페이스가 닫혀있으면 nullptr.
+
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
-	FORCEINLINE UPDStashComponent* GetActiveStashComponent() const { return ActiveStashComponent.Get(); }
+	UPDStashComponent* GetActiveStashComponent() const;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void OpenMarketInterface(UPDMarketComponent* MarketComponent);
+
+	UFUNCTION(Client, Reliable)
+	void ClientOpenMarketInterface(UPDMarketComponent* MarketComponent);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void CloseMarketInterface();
@@ -67,6 +83,27 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	bool SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity = 1);
+
+	UFUNCTION(Server, Reliable)
+	void ServerBuyMarketEntry(UPDMarketComponent* MarketComponent, int32 EntryIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSellInventorySlotToMarket(UPDMarketComponent* MarketComponent, int32 SlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerUpgradeStash(UPDStashComponent* StashComponent);
+
+	UFUNCTION(Server, Reliable)
+	void ServerStoreInventorySlotQuantityToStash(UPDStashComponent* StashComponent, int32 SourceSlotIndex, int32 TargetStashSlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTakeStashSlotQuantity(UPDStashComponent* StashComponent, int32 StashSlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTakeStashSlotQuantityToInventorySlot(UPDStashComponent* StashComponent, int32 StashSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerMoveStashSlotQuantity(UPDStashComponent* StashComponent, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
 	void OpenEquipmentModificationInterface();
@@ -79,6 +116,24 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Notification")
 	void ShowNotification(const FText& Message, float Duration = 2.f);
+
+	UFUNCTION(BlueprintPure, Category = "PD|UI")
+	UPDPlayerUIManagerComponent* GetUIManagerComponent() const { return UIManagerComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|PlayerData")
+	APDPlayerState* GetPDPlayerState() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|PlayerData")
+	UPDInventoryComponent* GetPlayerInventoryComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|PlayerData")
+	UPDEquipmentComponent* GetPlayerEquipmentComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|PlayerData")
+	UPDQuickSlotComponent* GetPlayerQuickSlotComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|PlayerData")
+	UPDQuestComponent* GetPlayerQuestComponent() const;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Quest")
 	void OpenQuestInterface();
@@ -95,7 +150,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDHUDWidget> HUDClass;
 
-	/** 레이어드 UI의 루트. BP에서 WBP_RootLayout 지정. 미지정 시 레이어드 API 미작동(legacy 경로는 정상). */
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDRootLayout> RootLayoutClass;
 
@@ -106,10 +161,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "PD|Input")
 	TObjectPtr<UPDInputConfig> InputConfig;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ping")
 	TObjectPtr<UPDPingInputComponent> PingInputComp;
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="WorldMap")
 	TSubclassOf<UPDWorldMapWidget> WorldMapClass;
 
@@ -144,23 +199,54 @@ protected:
 	virtual void OnUnPossess() override;
 
 public:
-	/**
-	 * 무기 발사 시 호출. 에임 Yaw 오프셋을 누적시켜 캐릭터가 커서 방향에서 밀리게 함.
-	 * YawDelta > 0 → 우측, < 0 → 좌측. 무기에서 랜덤 부호 결정 후 넘겨줌.
-	 */
+
 	void AddRecoilOffset(float YawDelta);
 
 	FORCEINLINE float GetRecoilYawOffset() const { return RecoilYawOffset; }
+	bool GetRecoiledHitResult(ECollisionChannel TraceChannel, bool bTraceComplex, FHitResult& OutHit) const;
+	bool GetRecoiledHitResultForObjects(const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, bool bTraceComplex, FHitResult& OutHit) const;
+	bool GetCachedAimWorldLocation(FVector& OutLocation) const;
+
+	UFUNCTION(Server, Reliable)
+	void ServerTryActivateAbilityByTag(FGameplayTag InputTag);
+
+	UFUNCTION(Server, Reliable)
+	void ServerCancelAbilityByTag(FGameplayTag InputTag);
+
+	UFUNCTION(Server, Reliable)
+	void ServerHandleGameplayEvent(FGameplayTag EventTag);
+
+	UFUNCTION(Server, Reliable)
+	void ServerToggleFireMode();
+
+	UFUNCTION(Server, Unreliable)
+	void ServerSetAimWorldLocation(FVector AimLocation, FVector FireAimLocation);
+
+	void OnFireReleased();
 
 private:
-	/** 현재 누적된 에임 Yaw 오프셋 (도). UpdateAimRotation에서 회전에 더해짐. */
-	float RecoilYawOffset = 0.f;
 
-	/** 초당 회복 속도 (도/초). BP_PlayerController 디테일에서 조정. */
+	float RecoilYawOffset = 0.f;
+	FVector2D RecoilCursorOffset = FVector2D::ZeroVector;
+
+
 	UPROPERTY(EditDefaultsOnly, Category="PD|Recoil", meta=(ClampMin="0.0"))
 	float RecoilRecoverySpeed = 10.f;
 
+	UPROPERTY(EditDefaultsOnly, Category="PD|Recoil", meta=(ClampMin="0.0"))
+	float RecoilCursorPixelsPerDegree = 18.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Recoil", meta=(ClampMin="0.0"))
+	float RecoilCursorHorizontalRatio = 0.35f;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|Recoil", meta=(ClampMin="0.0"))
+	float MaxRecoilCursorOffset = 120.f;
+
+	FVector CachedAimWorldLocation = FVector::ZeroVector;
+	bool bHasCachedAimWorldLocation = false;
+
 	void TickRecoilRecovery(float DeltaTime);
+	bool GetRecoiledMousePosition(FVector2D& OutMousePosition) const;
 
 	void UseQuickSlot(int32 SlotIndex);
 
@@ -168,64 +254,33 @@ private:
 	void OnJump();
 	void OnAbilityInputPressed(FGameplayTag InputTag);
 	void OnAbilityInputReleased(FGameplayTag InputTag);
+	void CancelAbilityByInputTag(FGameplayTag InputTag);
 	void UpdateAimRotation();
 
 	void ToggleInventory();
 	void ToggleQuest();
 	void TryInteract();
-	
+	void StopInteract();
+
 	void OnToggleWorldMap();
 
 	bool IsGameplayInputBlockedByModalUI() const;
 	bool ShouldAllowMovementWhileUIOpen() const;
 	void SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus = nullptr);
 
-	UPROPERTY(Transient)
-	TObjectPtr<UPDInventoryWidget> InventoryWidgetInstance;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UPDStashWidget> StashWidgetInstance;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|UI", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDPlayerUIManagerComponent> UIManagerComponent;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UPDMarketWidget> MarketWidgetInstance;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UUserWidget> EquipmentModificationWidgetInstance;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UPDNotificationWidget> NotificationWidgetInstance;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryComponent> BoundInventoryNotificationComponent;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UPDQuestWindowWidget> QuestWindowWidgetInstance;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UPDMarketComponent> ActiveMarketComponent;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UPDHUDWidget> HUDInstance;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UPDRootLayout> RootLayoutInstance;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UPDWorldMapWidget> WorldMapInstance;
-
-	// OpenStashInterface 시 캐시. 박스가 파괴되어도 TWeakObjectPtr가 자동 무효화.
-	TWeakObjectPtr<UPDStashComponent> ActiveStashComponent;
-
-	bool bIsGameplayInputBlockedByModalUI = false;
-	bool bMouseCursorVisibleBeforeModalUI = false;
-	bool bMouseClickEventsEnabledBeforeModalUI = false;
-	bool bMouseOverEventsEnabledBeforeModalUI = false;
-
-	/** Subsystem의 OnEffectiveUIStateChanged 콜백. 입력 모드/시스템 커서/크로스헤어 visibility 일괄 적용. */
 	void ApplyEffectiveUIState(EWidgetInputMode Mode);
 
 	void OnFirePressed();
-	void OnFireReleased();
 	void OnReload();
 	void OnInteract();
 	void OnSwitchSlot1();
@@ -242,7 +297,6 @@ private:
 	void SelectQuickslot(int32 Index);
 	void OnToggleFireMode();
 	void OnDropWeapon();
-	void OnCoverPressed();
 	void OnAimPressed();
 	void UpdateCrosshair();
 

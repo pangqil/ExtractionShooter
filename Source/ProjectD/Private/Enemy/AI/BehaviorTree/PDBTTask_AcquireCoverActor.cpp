@@ -24,7 +24,6 @@ EBTNodeResult::Type UPDBTTask_AcquireCoverActor::ExecuteTask(UBehaviorTreeCompon
 
 	if (!Cover->TryOccupy(Pawn))
 	{
-		// 다른 동료가 먼저 잡았을 수 있음 — 폴백 쪽으로.
 		return EBTNodeResult::Failed;
 	}
 

@@ -275,17 +275,11 @@ struct FPDPlayerData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TraderReputationLevel = 1;
-
-	/**
-	 * 레이드 입장 시 들고 가는 아이템 목록.
-	 * 허브에서 로드아웃 확정 시 스태시에서 빼서 여기 저장.
-	 * StartRaid() 안에서 플레이어 인벤토리로 이전 후 클리어.
-	 */
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FPDInventorySlot> RaidLoadout;
 
-	/** 레이드에 들고 가는 골드. 사망 시 소실, 탈출 성공 시 PlayerData.Gold 에 합산. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 RaidGold = 0;
 };
 
@@ -350,6 +344,9 @@ struct FBodyPartMapping
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FName HitBoxName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FName> HitBoxNames;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EBodyPart BodyPart = EBodyPart::None;

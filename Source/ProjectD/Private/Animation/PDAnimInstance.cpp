@@ -27,25 +27,14 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Cache.Direction=UKismetMathLibrary::NormalizedDeltaRotator(
 		UKismetMathLibrary::MakeRotFromX(Velocity),
 		OwnerCharacter->GetActorRotation()).Yaw;
-	
+
 	Cache.bIsAiming=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Aiming);
 	Cache.AimYaw=0.f;
 	Cache.AimPitch=0.f;
-	Cache.bIsInCover=CachedASC->HasMatchingGameplayTag(PDGameplayTags::Cover_Active);
-	Cache.bIsCoverAiming=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_CoverAim);
-	Cache.bIsMeleeEquipped=CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Melee);
-
-
-	if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Rifle))
-		Cache.WeaponType=EWeaponType::Rifle;
-	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Shotgun))
-		Cache.WeaponType=EWeaponType::Shotgun;
-	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Sniper))
-		Cache.WeaponType=EWeaponType::Sniper;
-	else if (CachedASC->HasMatchingGameplayTag(PDGameplayTags::Weapon_Type_Melee))
-		Cache.WeaponType=EWeaponType::Melee;
-	else
-		Cache.WeaponType=EWeaponType::None;
+	Cache.bIsDowned=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Downed);
+	Cache.bIsSprinting=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Sprinting);
+	Cache.WeaponType=OwnerCharacter->GetReplicatedWeaponType();
+	Cache.bIsMeleeEquipped=Cache.WeaponType == EWeaponType::Melee;
 
 	APDWeaponBase* Weapon=OwnerCharacter->GetCurrentWeapon();
 	if (!IsValid(Weapon)||!IsValid(Weapon->GetWeaponMesh()))
@@ -77,16 +66,16 @@ void UPDAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 	WeaponType=Cache.WeaponType;
 	LeftHandIKTarget=Cache.LeftHandIKTarget;
 	LeftHandIKAlpha=Cache.LeftHandIKAlpha;
-	bIsInCover=Cache.bIsInCover;
-	bIsCoverAiming=Cache.bIsCoverAiming;
 	bIsMeleeEquipped=Cache.bIsMeleeEquipped;
+	bIsDowned=Cache.bIsDowned;
+	bIsSprinting=Cache.bIsSprinting;
 }
 
-// ── 무기 이벤트 바인딩 ──────────────────────────────────────────────────────
+
 
 void UPDAnimInstance::OnWeaponEquipped(APDRangedWeaponBase* Weapon)
 {
-	OnWeaponUnequipped(BoundWeapon.Get());   // 이전 무기 바인딩 해제
+	OnWeaponUnequipped(BoundWeapon.Get());
 
 	if (!Weapon) return;
 	BoundWeapon = Weapon;
@@ -94,7 +83,7 @@ void UPDAnimInstance::OnWeaponEquipped(APDRangedWeaponBase* Weapon)
 	Weapon->OnWeaponFired.AddDynamic(this, &UPDAnimInstance::HandleWeaponFired);
 	Weapon->OnWeaponReloadStarted.AddDynamic(this, &UPDAnimInstance::HandleWeaponReloadStarted);
 
-	// Equip 중 발사 차단
+
 	Weapon->bCanFire = false;
 
 	const FPDWeaponAnimSet* Set = GetAnimSetForWeapon(Weapon);
@@ -104,14 +93,14 @@ void UPDAnimInstance::OnWeaponEquipped(APDRangedWeaponBase* Weapon)
 		if (Set->EquipStartSection != NAME_None)
 			Montage_JumpToSection(Set->EquipStartSection, Set->EquipMontage);
 
-		// 몽타주 종료 시 발사 허용
+
 		FOnMontageEnded EndDelegate;
 		EndDelegate.BindUObject(this, &UPDAnimInstance::OnEquipMontageEnded);
 		Montage_SetEndDelegate(EndDelegate, Set->EquipMontage);
 	}
 	else
 	{
-		// 몽타주 없으면 즉시 해제
+
 		Weapon->bCanFire = true;
 	}
 }
@@ -152,6 +141,26 @@ void UPDAnimInstance::HandleWeaponReloadStarted(APDWeaponBase* Weapon)
 	}
 }
 
+float UPDAnimInstance::GetReloadMontageDurationForWeapon(APDWeaponBase* Weapon) const
+{
+	if (const FPDWeaponAnimSet* Set = GetAnimSetForWeapon(Weapon))
+	{
+		return Set->ReloadMontage ? Set->ReloadMontage->GetPlayLength() : 0.f;
+	}
+	return 0.f;
+}
+
+void UPDAnimInstance::StopReloadMontageForWeapon(APDWeaponBase* Weapon, float BlendOutTime)
+{
+	if (const FPDWeaponAnimSet* Set = GetAnimSetForWeapon(Weapon))
+	{
+		if (Set->ReloadMontage)
+		{
+			Montage_Stop(BlendOutTime, Set->ReloadMontage);
+		}
+	}
+}
+
 const FPDWeaponAnimSet* UPDAnimInstance::GetAnimSetForWeapon(APDWeaponBase* Weapon) const
 {
 	if (!Weapon) return nullptr;
@@ -166,7 +175,7 @@ const FPDWeaponAnimSet* UPDAnimInstance::GetAnimSetForWeapon(APDWeaponBase* Weap
 	return nullptr;
 }
 
-// ── 피격 반응 ────────────────────────────────────────────────────────────────
+
 
 void UPDAnimInstance::PlayHitReaction()
 {
@@ -179,4 +188,21 @@ void UPDAnimInstance::PlayHitReaction()
 	if (Available.IsEmpty()) return;
 
 	Montage_Play(Available[FMath::RandRange(0, Available.Num() - 1)]);
+}
+
+void UPDAnimInstance::PlayGetUpMontage()
+{
+	if (!GetUpMontage) return;
+
+	Montage_Play(GetUpMontage);
+}
+
+float UPDAnimInstance::GetGetUpMontageDuration() const
+{
+	if (GetUpDuration > KINDA_SMALL_NUMBER)
+	{
+		return GetUpDuration;
+	}
+
+	return GetUpMontage ? GetUpMontage->GetPlayLength() : 0.f;
 }

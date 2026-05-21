@@ -9,6 +9,7 @@ class UPDInventoryComponent;
 class UPDEquipmentComponent;
 class UPDStashComponent;
 class UCharacterMovementComponent;
+class APDPlayerCharacter;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnQuickSlotsChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnQuickSlotSelectionChanged, int32, NewIndex);
@@ -26,7 +27,7 @@ class PROJECTD_API UPDQuickSlotComponent : public UActorComponent
 public:
 	UPDQuickSlotComponent();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|QuickSlot")
+	UPROPERTY(ReplicatedUsing=OnRep_QuickSlotItems, EditAnywhere, BlueprintReadWrite, Category="PD|QuickSlot")
 	TArray<FPDInventorySlot> QuickSlotItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|QuickSlot")
@@ -158,13 +159,51 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
 	UFUNCTION()
 	void HandleInventoryChanged();
 
+	UFUNCTION()
+	void OnRep_QuickSlotItems();
+
+	UFUNCTION()
+	void OnRep_SelectedIndex();
+
+	UFUNCTION()
+	void OnRep_ConsumableUseState();
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetSelectedIndex(int32 NewIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerResetQuickSlots();
+
+	UFUNCTION(Server, Reliable)
+	void ServerMoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerStoreInventorySlotQuantityToSlot(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 TargetQuickSlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerRemoveItemFromSlot(int32 SlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerUseQuickSlot(int32 SlotIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerUseInventoryConsumableSlot(int32 InventorySlotIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerEquipInventoryWeaponSlot(int32 InventorySlotIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerCancelConsumableUse();
+
 	UPDInventoryComponent* FindOwnerInventory() const;
 	UPDEquipmentComponent* FindOwnerEquipment() const;
+	APDPlayerCharacter* FindOwnerPlayerCharacter() const;
 	int32 GetInventoryItemQuantity(FName ItemID) const;
 	int32 GetAvailableItemQuantity(const FPDItemData& ItemData) const;
 	int32 FindEmptySlotForItem(const FPDItemData& ItemData) const;
@@ -183,12 +222,21 @@ private:
 	void StartWeaponQuickSlotCooldown(int32 SlotIndex);
 	void FinishWeaponQuickSlotCooldown();
 
+	UPROPERTY(ReplicatedUsing=OnRep_SelectedIndex)
 	int32 SelectedIndex = INDEX_NONE;
+
+	UPROPERTY(ReplicatedUsing=OnRep_ConsumableUseState)
 	bool bIsUsingConsumable = false;
+
+	UPROPERTY(ReplicatedUsing=OnRep_ConsumableUseState)
 	int32 UsingConsumableSlotIndex = INDEX_NONE;
+
 	FPDInventorySlot PendingConsumableSlot;
 	FTimerHandle ConsumableUseTimerHandle;
+	UPROPERTY(Replicated)
 	float ConsumableUseStartTime = 0.f;
+
+	UPROPERTY(Replicated)
 	float ConsumableUseEndTime = 0.f;
 	float CachedMaxWalkSpeed = 0.f;
 	bool bMoveSpeedAdjusted = false;

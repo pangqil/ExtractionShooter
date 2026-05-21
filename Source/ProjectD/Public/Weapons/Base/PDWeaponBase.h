@@ -11,6 +11,9 @@
 class APDWeaponBase;
 class USphereComponent;
 class USoundBase;
+class UGCN_Weapon_Equip;
+class UGCN_Weapon_Swing;
+class UGCN_Weapon_MeleeHit;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponLevelChanged, APDWeaponBase*, Weapon, int32, NewLevel);
 
@@ -25,49 +28,66 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// ── 컴포넌트 ──────────────────────────────────────────────────────────────
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
 	TObjectPtr<USkeletalMeshComponent> WeaponMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
 	TObjectPtr<USphereComponent> PickupCollision;
 
-	// ── 설정 ──────────────────────────────────────────────────────────────────
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
 	FGameplayTag WeaponTypeTag;
 
-	/** 인벤토리 아이템 ID. DT_Items 행 이름과 일치해야 함. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
+
+	UPROPERTY(ReplicatedUsing=OnRep_WeaponIdentity, EditAnywhere, BlueprintReadOnly, Category="Weapon")
 	FName ItemID;
 
-	/** 무기 장착 시 링크할 애님 레이어 클래스. */
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation")
 	TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation")
 	FName LeftHandGripSocket = TEXT("LeftHandGrip");
 
-	/** 레벨별 스탯 배열. [0]=Lv1, [1]=Lv2 … */
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Stats")
 	TArray<FWeaponLevelStats> LevelStats;
 
-	/** 무기 꺼낼 때 재생 */
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|FX")
 	TObjectPtr<USoundBase> EquipSound;
 
-	// C++ 서브클래스 생성자에서 설정. 에디터 미노출 (태그로 대체 예정)
+
+	UPROPERTY(ReplicatedUsing=OnRep_WeaponIdentity, EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
 	EWeaponType WeaponType = EWeaponType::None;
 
-	// ── 런타임 상태 (읽기 전용) ───────────────────────────────────────────────
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
 	int32 CurrentLevel = 1;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	UPROPERTY(ReplicatedUsing=OnRep_Dropped, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
 	bool bIsDropped = false;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
-	TWeakObjectPtr<AActor> WeaponOwner;
+	UPROPERTY(ReplicatedUsing=OnRep_WeaponOwner, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	TObjectPtr<AActor> WeaponOwner;
+
+	UFUNCTION()
+	void OnRep_Dropped();
+
+	UFUNCTION()
+	void OnRep_WeaponOwner();
+
+	UFUNCTION()
+	void OnRep_WeaponIdentity();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastOnPickedUp();
+
+	void ApplyReplicatedWeaponOwner();
+	void ApplyPickedUpPresentation();
 
 public:
 	UPROPERTY(BlueprintAssignable, Category="Weapon")
@@ -103,7 +123,7 @@ public:
 	const FWeaponLevelStats& GetCurrentStats() const;
 
 	FORCEINLINE int32              GetCurrentLevel()        const { return CurrentLevel; }
-	FORCEINLINE EWeaponType        GetWeaponType()          const { return WeaponType; }  // C++ 내부용, 태그로 대체 예정
+	FORCEINLINE EWeaponType        GetWeaponType()          const { return WeaponType; }
 	FORCEINLINE AActor*            GetWeaponOwner()         const { return WeaponOwner.Get(); }
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh()     const { return WeaponMesh; }
 	FORCEINLINE FGameplayTag       GetWeaponTypeTag()       const { return WeaponTypeTag; }
@@ -113,4 +133,8 @@ public:
 
 protected:
 	FVector GetAimDirectionFromOwner(const FVector& StartLocation) const;
+
+	friend class UGCN_Weapon_Equip;
+	friend class UGCN_Weapon_Swing;
+	friend class UGCN_Weapon_MeleeHit;
 };

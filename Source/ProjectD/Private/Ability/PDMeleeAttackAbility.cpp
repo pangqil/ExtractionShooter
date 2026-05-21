@@ -7,7 +7,21 @@
 #include "GameplayTag/PDGameplayTags.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
-#include "Kismet/GameplayStatics.h"
+#include "AbilitySystemComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+
+namespace
+{
+	int32 GetMeleeHitScore(const FHitResult& Hit)
+	{
+		int32 Score=0;
+		if (Hit.bBlockingHit) Score+=1;
+		if (!Hit.MyBoneName.IsNone()) Score+=2;
+		if (!Hit.BoneName.IsNone()) Score+=4;
+		if (Hit.GetComponent() && Hit.GetComponent()->IsA<USkeletalMeshComponent>()) Score+=8;
+		return Score;
+	}
+}
 
 UPDMeleeAttackAbility::UPDMeleeAttackAbility()
 {
@@ -35,13 +49,20 @@ void UPDMeleeAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 	HitActors.Reset();
 
-	// 공격 시작 — Swing 사운드
+
 	APDPlayerCharacter* SwingChar = Cast<APDPlayerCharacter>(GetPDCharacter());
-	if (APDMeleeWeaponBase* SwingWeapon = SwingChar
-		? Cast<APDMeleeWeaponBase>(SwingChar->GetCurrentWeapon()) : nullptr)
+	if (SwingChar)
 	{
-		if (USoundBase* Sound = SwingWeapon->GetSwingSound())
-			UGameplayStatics::SpawnSoundAttached(Sound, SwingChar->GetMesh());
+		if (UAbilitySystemComponent* ASCComp = GetAbilitySystemComponentFromActorInfo())
+		{
+			FGameplayCueParameters Params;
+			Params.Location = SwingChar->GetActorLocation();
+			Params.TargetAttachComponent = SwingChar->GetMesh();
+			Params.SourceObject = SwingChar->GetCurrentWeapon();
+			Params.EffectCauser = SwingChar->GetCurrentWeapon();
+			Params.Instigator = SwingChar;
+			ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Weapon_Swing, Params);
+		}
 	}
 
 	const FName Section=AttackSections[FMath::RandRange(0, AttackSections.Num()-1)];
@@ -83,41 +104,83 @@ void UPDMeleeAttackAbility::PerformSweep()
 {
 	APDPlayerCharacter* Char=Cast<APDPlayerCharacter>(GetPDCharacter());
 	if (!Char) return;
+	if (!Char->HasAuthority()) return;
 
 	APDWeaponBase* WeaponBase=Char->GetCurrentWeapon();
-	if (!WeaponBase) return;
+	if (!WeaponBase)
+	{
+		return;
+	}
 
 	APDMeleeWeaponBase* Weapon=Cast<APDMeleeWeaponBase>(WeaponBase);
-	if (!Weapon) return;
+	if (!Weapon)
+	{
+		return;
+	}
 
 	const float Damage=Weapon->GetCurrentStats().Damage;
 	const float SweepRadius=Weapon->GetSweepRadius();
 	const float SweepRange=Weapon->GetSweepRange();
 	const FName HitSocketName=Weapon->GetHitSocketName();
 
-	const FVector Start=Char->GetMesh()->GetSocketLocation(HitSocketName);
+	const bool bHasHitSocket = Char->GetMesh() && Char->GetMesh()->DoesSocketExist(HitSocketName);
+	const FVector Start = bHasHitSocket
+		? Char->GetMesh()->GetSocketLocation(HitSocketName)
+		: Char->GetActorLocation() + Char->GetActorForwardVector() * 60.f + FVector(0.f, 0.f, 50.f);
 	const FVector End=Start+Char->GetActorForwardVector()*SweepRange;
 
 	TArray<FHitResult> Hits;
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(Char);
-	GetWorld()->SweepMultiByChannel(Hits, Start, End, FQuat::Identity,
-		ECC_Pawn, FCollisionShape::MakeSphere(SweepRadius), Params);
+	FCollisionObjectQueryParams ObjectParams;
+	ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+	GetWorld()->SweepMultiByObjectType(Hits, Start, End, FQuat::Identity,
+		ObjectParams, FCollisionShape::MakeSphere(SweepRadius), Params);
 
 	bool bPlayedHitSound = false;
+	TMap<AActor*, FHitResult> BestHits;
 	for (const FHitResult& Hit : Hits)
 	{
 		AActor* HitActor=Hit.GetActor();
 		if (!IsValid(HitActor) || HitActors.Contains(HitActor)) continue;
-		if (!HitActor->Implements<UPDDamageable>()) continue;
+		if (!HitActor->Implements<UPDDamageable>())
+		{
+			continue;
+		}
+
+		if (FHitResult* ExistingHit=BestHits.Find(HitActor))
+		{
+			if (GetMeleeHitScore(Hit)>GetMeleeHitScore(*ExistingHit))
+			{
+				*ExistingHit=Hit;
+			}
+			continue;
+		}
+
+		BestHits.Add(HitActor, Hit);
+	}
+
+	for (const auto& Pair : BestHits)
+	{
+		AActor* HitActor=Pair.Key;
+		const FHitResult& Hit=Pair.Value;
+		if (!IsValid(HitActor)) continue;
 
 		HitActors.Add(HitActor);
 
-		// 첫 명중 시 Hit 사운드 (여러 명 동시 히트 시 중복 방지)
+
 		if (!bPlayedHitSound)
 		{
-			if (USoundBase* Sound = Weapon->GetHitSound())
-				UGameplayStatics::PlaySoundAtLocation(GetWorld(), Sound, Hit.ImpactPoint);
+			if (UAbilitySystemComponent* ASCComp = GetAbilitySystemComponentFromActorInfo())
+			{
+				FGameplayCueParameters CueParams;
+				CueParams.Location = Hit.ImpactPoint;
+				CueParams.Normal   = Hit.ImpactNormal;
+				CueParams.SourceObject = Weapon;
+				CueParams.EffectCauser = Weapon;
+				CueParams.Instigator = Char;
+				ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Weapon_MeleeHit, CueParams);
+			}
 			bPlayedHitSound = true;
 		}
 

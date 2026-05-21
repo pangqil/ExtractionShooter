@@ -7,7 +7,6 @@
 
 APDEliteSoldier::APDEliteSoldier()
 {
-	// 풀오토 자동 점화는 비활성 — 발사는 SetPeeking 으로만.
 	bAutoFireOnAttackRequested = false;
 }
 
@@ -16,7 +15,6 @@ void APDEliteSoldier::SetInCover(APDCoverBase* NewCover)
 	APDCoverBase* Prev = CurrentCover.Get();
 	if (Prev == NewCover) return;
 
-	// 피크 중이었다면 먼저 종료(발사 루프 정지 보장).
 	if (bIsPeeking)
 	{
 		SetPeeking(false);
@@ -28,7 +26,7 @@ void APDEliteSoldier::SetInCover(APDCoverBase* NewCover)
 	}
 
 	CurrentCover = NewCover;
-	bIsInCover = (NewCover != nullptr);
+	bIsInCover = NewCover != nullptr;
 
 	if (NewCover)
 	{
@@ -61,9 +59,7 @@ void APDEliteSoldier::ThrowGrenadeAt_Implementation(const FVector& TargetLocatio
 {
 	if (!GrenadeClass)
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[%s] ThrowGrenadeAt: GrenadeClass 미지정 — BP override 또는 GrenadeClass 슬롯 설정 필요."),
-			*GetName());
+		UE_LOG(LogTemp, Warning, TEXT("[%s] ThrowGrenadeAt: GrenadeClass is not set."), *GetName());
 		return;
 	}
 
@@ -86,13 +82,11 @@ void APDEliteSoldier::ThrowGrenadeAt_Implementation(const FVector& TargetLocatio
 	Params.Instigator = this;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-	// 궤적/폭발/데미지는 GrenadeClass 측 책임(ProjectileMovementComponent 등).
 	World->SpawnActor<AActor>(GrenadeClass, SpawnLoc, SpawnRot, Params);
 }
 
 void APDEliteSoldier::OnEnterState_Dead()
 {
-	// 부모(APDSoldier::OnEnterState_Dead) 가 fire 루프 정지 + 무기 정리를 수행하기 전 cover 점유 해제.
 	if (CurrentCover.IsValid())
 	{
 		SetInCover(nullptr);

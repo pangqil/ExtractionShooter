@@ -5,6 +5,7 @@
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "Components/TextBlock.h"
+#include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDMarketComponent.h"
@@ -27,10 +28,6 @@ void UPDMarketWidget::NativeDestruct()
 void UPDMarketWidget::InitializeMarket(UPDMarketComponent* InMarketComponent)
 {
 	MarketComponent = InMarketComponent;
-	if (MarketComponent)
-	{
-		MarketComponent->SyncTraderReputationFromSave();
-	}
 	BindMarketChanged();
 	RefreshMarketInfo();
 	RefreshMarketGoods();
@@ -41,9 +38,10 @@ void UPDMarketWidget::RefreshMarketInfo()
 {
 	ResolveMarketInfoTextBlocks();
 
-	const int32 CurrentLevel = MarketComponent ? FMath::Max(1, MarketComponent->TraderReputationLevel) : 1;
-	const int32 CurrentExp = MarketComponent ? MarketComponent->GetCurrentTraderLevelDisplayExp() : 0;
-	const int32 NextRequiredExp = MarketComponent ? MarketComponent->GetNextTraderLevelDisplayRequiredExp() : 0;
+	const UPDInventoryComponent* BuyerInventory = FindInventoryComponent();
+	const int32 CurrentLevel = MarketComponent ? MarketComponent->GetTraderReputationLevelForInventory(BuyerInventory) : 1;
+	const int32 CurrentExp = MarketComponent ? MarketComponent->GetCurrentTraderLevelDisplayExpForInventory(BuyerInventory) : 0;
+	const int32 NextRequiredExp = MarketComponent ? MarketComponent->GetNextTraderLevelDisplayRequiredExpForInventory(BuyerInventory) : 0;
 
 	const bool bIsMaxMarketLevel = (NextRequiredExp <= 0);
 
@@ -92,7 +90,7 @@ void UPDMarketWidget::RefreshMarketGoods()
 	int32 VisibleIndex = 0;
 	for (int32 Index = 0; Index < MarketComponent->Goods.Num(); ++Index)
 	{
-		if (!MarketComponent->ShouldShowEntry(Index))
+		if (!MarketComponent->ShouldShowEntryForInventory(Index, BuyerInventory))
 		{
 			continue;
 		}
@@ -168,6 +166,14 @@ void UPDMarketWidget::ResolveMarketGridPanel()
 
 UPDInventoryComponent* UPDMarketWidget::FindInventoryComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDInventoryComponent* InventoryComponent = PDController->GetPlayerInventoryComponent())
+		{
+			return InventoryComponent;
+		}
+	}
+
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();

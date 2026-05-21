@@ -2,11 +2,12 @@
 #include "Characters/Base/PDCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
-#include "Kismet/GameplayStatics.h"
 
 UPDRollAbility::UPDRollAbility()
 {
 	InstancingPolicy=EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	NetExecutionPolicy=EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+	ActivationBlockedTags.AddTag(PDGameplayTags::State_Rolling);
 }
 
 void UPDRollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -18,8 +19,8 @@ void UPDRollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	APDCharacterBase* Character=GetPDCharacter();
 	UAbilitySystemComponent* ASC=GetAbilitySystemComponentFromActorInfo();
-	
-	if (ASC&&ASC->HasMatchingGameplayTag(PDGameplayTags::State_Rolling))
+
+	if (!Character || Character->IsDowned() || Character->IsGettingUp() || Character->IsDead())
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -32,14 +33,24 @@ void UPDRollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	}
 
 	const FVector RollDir = GetRollDirection();
+	if (UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement())
+	{
+		MovementComponent->SetMovementMode(MOVE_Walking);
+		MovementComponent->Velocity.Z = 0.f;
+		MovementComponent->SetPlaneConstraintEnabled(true);
+	}
+
 	if (!RollDir.IsNearlyZero())
 		Character->SetActorRotation(RollDir.Rotation());
 
-	if (ASC)
-		ASC->AddLooseGameplayTag(PDGameplayTags::State_Rolling);
-
-	if (RollSound)
-		UGameplayStatics::SpawnSoundAttached(RollSound, Character->GetMesh());
+	if (ASC && RollSound)
+	{
+		FGameplayCueParameters Params;
+		Params.Location = Character->GetActorLocation();
+		Params.TargetAttachComponent = Character->GetMesh();
+		Params.SourceObject = RollSound;
+		ASC->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Character_Roll, Params);
+	}
 
 	BP_OnActivate(RollDir);
 }
@@ -49,15 +60,23 @@ void UPDRollAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	bool bReplicateEndAbility, bool bWasCancelled)
 {
-	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::State_Rolling);
-
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 
 void UPDRollAbility::FinishRoll()
 {
+	if (APDCharacterBase* Character = GetPDCharacter())
+	{
+		if (UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement())
+		{
+			MovementComponent->Velocity.Z = 0.f;
+			if (MovementComponent->IsFalling())
+			{
+				MovementComponent->SetMovementMode(MOVE_Walking);
+			}
+		}
+	}
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 

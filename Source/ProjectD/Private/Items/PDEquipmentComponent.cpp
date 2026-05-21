@@ -1,17 +1,51 @@
 #include "Items/PDEquipmentComponent.h"
 
 #include "Characters/PDPlayerCharacter.h"
+#include "Core/PDPlayerState.h"
 #include "Items/PDInventoryComponent.h"
+#include "Net/UnrealNetwork.h"
 
 UPDEquipmentComponent::UPDEquipmentComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 }
 
 void UPDEquipmentComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	InitializeDefaultSlots();
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		InitializeDefaultSlots();
+	}
+}
+
+void UPDEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UPDEquipmentComponent, ReplicatedEquippedItems);
+}
+
+void UPDEquipmentComponent::OnRep_EquippedItems()
+{
+	RebuildEquippedItemsFromReplication();
+	OnEquipmentChanged.Broadcast();
+}
+
+void UPDEquipmentComponent::ServerEquipItemFromInventory_Implementation(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex)
+{
+	EquipItemFromInventory(InventoryComponent, InventorySlotIndex);
+}
+
+void UPDEquipmentComponent::ServerEquipItemFromInventoryToSlot_Implementation(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDEquipmentSlotType TargetSlotType)
+{
+	EquipItemFromInventoryToSlot(InventoryComponent, InventorySlotIndex, TargetSlotType);
+}
+
+void UPDEquipmentComponent::ServerUnequipItemToInventory_Implementation(UPDInventoryComponent* InventoryComponent, EPDEquipmentSlotType SlotType)
+{
+	UnequipItemToInventory(InventoryComponent, SlotType);
 }
 
 void UPDEquipmentComponent::InitializeDefaultSlots()
@@ -33,10 +67,37 @@ void UPDEquipmentComponent::InitializeDefaultSlots()
 			EquippedItems.Add(SlotType, EmptyItem);
 		}
 	}
+	SyncReplicatedEquippedItems();
+}
+
+void UPDEquipmentComponent::RebuildEquippedItemsFromReplication()
+{
+	EquippedItems.Empty();
+	for (const FPDEquippedItem& EquippedItem : ReplicatedEquippedItems)
+	{
+		if (EquippedItem.SlotType != EPDEquipmentSlotType::None)
+		{
+			EquippedItems.Add(EquippedItem.SlotType, EquippedItem);
+		}
+	}
+}
+
+void UPDEquipmentComponent::SyncReplicatedEquippedItems()
+{
+	ReplicatedEquippedItems.Reset();
+	for (const TPair<EPDEquipmentSlotType, FPDEquippedItem>& Pair : EquippedItems)
+	{
+		ReplicatedEquippedItems.Add(Pair.Value);
+	}
 }
 
 EPDEquipmentSlotType UPDEquipmentComponent::ResolveEquipmentSlotType(const FPDItemData& ItemData) const
 {
+	if (ItemData.WeaponType != EWeaponType::None)
+	{
+		return EPDEquipmentSlotType::Weapon;
+	}
+
 	if (ItemData.ItemType != EPDItemType::Equipment)
 	{
 		return EPDEquipmentSlotType::None;
@@ -45,11 +106,6 @@ EPDEquipmentSlotType UPDEquipmentComponent::ResolveEquipmentSlotType(const FPDIt
 	if (ItemData.EquipmentSlotType != EPDEquipmentSlotType::None)
 	{
 		return ItemData.EquipmentSlotType;
-	}
-
-	if (ItemData.WeaponType != EWeaponType::None)
-	{
-		return EPDEquipmentSlotType::Weapon;
 	}
 
 	return EPDEquipmentSlotType::None;
@@ -78,6 +134,12 @@ FPDInventorySlot UPDEquipmentComponent::GetEquippedSlot(EPDEquipmentSlotType Slo
 
 bool UPDEquipmentComponent::EquipItemFromInventory(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerEquipItemFromInventory(InventoryComponent, InventorySlotIndex);
+		return true;
+	}
+
 	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(InventorySlotIndex))
 	{
 		return false;
@@ -94,13 +156,21 @@ bool UPDEquipmentComponent::EquipItemFromInventory(UPDInventoryComponent* Invent
 
 bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDEquipmentSlotType TargetSlotType)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerEquipItemFromInventoryToSlot(InventoryComponent, InventorySlotIndex, TargetSlotType);
+		return true;
+	}
+
 	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(InventorySlotIndex) || TargetSlotType == EPDEquipmentSlotType::None)
 	{
 		return false;
 	}
 
 	const FPDInventorySlot InventorySlot = InventoryComponent->Items[InventorySlotIndex];
-	if (InventorySlot.IsEmpty() || InventorySlot.ItemData.ItemType != EPDItemType::Equipment || InventorySlot.Quantity != 1)
+	if (InventorySlot.IsEmpty() ||
+		(InventorySlot.ItemData.ItemType != EPDItemType::Equipment && InventorySlot.ItemData.WeaponType == EWeaponType::None) ||
+		InventorySlot.Quantity != 1)
 	{
 		return false;
 	}
@@ -164,6 +234,7 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 		InventoryComponent->Items[InventorySlotIndex].Clear();
 	}
 
+	SyncReplicatedEquippedItems();
 	InventoryComponent->OnInventoryChanged.Broadcast();
 	BroadcastSlotChanged(TargetSlotType);
 	BroadcastModificationApplied(TargetSlotType, EquippedSlot);
@@ -173,6 +244,11 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 
 bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return false;
+	}
+
 	const EPDEquipmentSlotType TargetSlotType = ResolveEquipmentSlotType(ItemData);
 	if (TargetSlotType == EPDEquipmentSlotType::None || IsSlotOccupied(TargetSlotType))
 	{
@@ -195,6 +271,7 @@ bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData)
 	NewEquippedItem.ItemSlot = NewSlot;
 	EquippedItems.Add(TargetSlotType, NewEquippedItem);
 
+	SyncReplicatedEquippedItems();
 	BroadcastSlotChanged(TargetSlotType);
 	BroadcastModificationApplied(TargetSlotType, NewSlot);
 	return true;
@@ -202,6 +279,12 @@ bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData)
 
 bool UPDEquipmentComponent::UnequipItemToInventory(UPDInventoryComponent* InventoryComponent, EPDEquipmentSlotType SlotType)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerUnequipItemToInventory(InventoryComponent, SlotType);
+		return true;
+	}
+
 	if (!InventoryComponent || SlotType == EPDEquipmentSlotType::None)
 	{
 		return false;
@@ -234,6 +317,7 @@ bool UPDEquipmentComponent::UnequipItemToInventory(UPDInventoryComponent* Invent
 
 	RemoveCharacterEquipSideEffects(ItemToReturn);
 	EquippedItem->ItemSlot.Clear();
+	SyncReplicatedEquippedItems();
 	BroadcastSlotChanged(SlotType);
 	return true;
 }
@@ -247,7 +331,16 @@ bool UPDEquipmentComponent::ApplyCharacterEquipSideEffects(const FPDInventorySlo
 		return true;
 	}
 
-	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwner()))
+	APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwner());
+	if (!PlayerCharacter)
+	{
+		if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(GetOwner()))
+		{
+			PlayerCharacter = PDPlayerState->GetPDPlayerCharacter();
+		}
+	}
+
+	if (PlayerCharacter)
 	{
 		return PlayerCharacter->TryAutoEquipWeaponSlot(ItemSlot);
 	}
@@ -263,7 +356,16 @@ void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDInventorySl
 		return;
 	}
 
-	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwner()))
+	APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwner());
+	if (!PlayerCharacter)
+	{
+		if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(GetOwner()))
+		{
+			PlayerCharacter = PDPlayerState->GetPDPlayerCharacter();
+		}
+	}
+
+	if (PlayerCharacter)
 	{
 		PlayerCharacter->RemoveEquippedWeaponItem(ItemData);
 	}

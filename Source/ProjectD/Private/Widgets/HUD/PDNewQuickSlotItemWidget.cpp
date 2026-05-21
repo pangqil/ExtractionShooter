@@ -14,6 +14,7 @@
 #include "Animation/WidgetAnimation.h"
 #include "Materials/MaterialInterface.h"
 #include "Core/PDPlayerController.h"
+#include "GameFramework/Pawn.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDQuickSlotComponent.h"
 #include "Items/PDStashComponent.h"
@@ -303,6 +304,14 @@ void UPDNewQuickSlotItemWidget::PlayCooldownReadyFlash()
 
 UPDInventoryComponent* UPDNewQuickSlotItemWidget::FindInventoryComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDInventoryComponent* InventoryComponent = PDController->GetPlayerInventoryComponent())
+		{
+			return InventoryComponent;
+		}
+	}
+
 	if (APawn* Pawn = GetOwningPlayerPawn())
 	{
 		return Pawn->FindComponentByClass<UPDInventoryComponent>();

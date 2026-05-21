@@ -5,6 +5,33 @@
 UPDEquipmentModificationComponent::UPDEquipmentModificationComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
+}
+
+void UPDEquipmentModificationComponent::BeginPlay()
+{
+	Super::BeginPlay();
+}
+
+void UPDEquipmentModificationComponent::ServerTryModifyInventorySlotWithBoost_Implementation(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDModificationBoostType BoostType)
+{
+	FPDModificationPreview Preview;
+	EPDModificationResult Result = EPDModificationResult::InvalidInventory;
+	TryModifyInventorySlotWithBoost(InventoryComponent, InventorySlotIndex, BoostType, Preview, Result);
+}
+
+void UPDEquipmentModificationComponent::ClientModificationFinished_Implementation(int32 InventorySlotIndex, int32 NewModificationLevel, bool bSuccess, EPDModificationResult Result)
+{
+	OnModificationFinished.Broadcast(InventorySlotIndex, NewModificationLevel, bSuccess, Result);
+}
+
+void UPDEquipmentModificationComponent::BroadcastModificationFinished(int32 InventorySlotIndex, int32 NewModificationLevel, bool bSuccess, EPDModificationResult Result)
+{
+	OnModificationFinished.Broadcast(InventorySlotIndex, NewModificationLevel, bSuccess, Result);
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		ClientModificationFinished(InventorySlotIndex, NewModificationLevel, bSuccess, Result);
+	}
 }
 
 int32 UPDEquipmentModificationComponent::ConvertModificationLevelToGasLevel(int32 ModificationLevel) const
@@ -303,30 +330,37 @@ bool UPDEquipmentModificationComponent::TryModifyInventorySlot(UPDInventoryCompo
 
 bool UPDEquipmentModificationComponent::TryModifyInventorySlotWithBoost(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDModificationBoostType BoostType, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerTryModifyInventorySlotWithBoost(InventoryComponent, InventorySlotIndex, BoostType);
+		OutResult = EPDModificationResult::Success;
+		return true;
+	}
+
 	if (!CanModifyInventorySlotWithBoost(InventoryComponent, InventorySlotIndex, BoostType, OutPreview, OutResult))
 	{
-		OnModificationFinished.Broadcast(InventorySlotIndex, 0, false, OutResult);
+		BroadcastModificationFinished(InventorySlotIndex, 0, false, OutResult);
 		return false;
 	}
 
 	if (!InventoryComponent->SpendGold(OutPreview.GoldCost))
 	{
 		OutResult = EPDModificationResult::NotEnoughGold;
-		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
+		BroadcastModificationFinished(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
 		return false;
 	}
 
 	if (!ConsumeRequiredMaterials(InventoryComponent, OutPreview.RequiredMaterials))
 	{
 		OutResult = EPDModificationResult::NotEnoughMaterials;
-		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
+		BroadcastModificationFinished(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
 		return false;
 	}
 
 	if (!OutPreview.BoostItemID.IsNone() && OutPreview.BoostItemQuantity > 0 && !InventoryComponent->RemoveItem(OutPreview.BoostItemID, OutPreview.BoostItemQuantity))
 	{
 		OutResult = EPDModificationResult::NotEnoughMaterials;
-		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
+		BroadcastModificationFinished(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
 		return false;
 	}
 
@@ -344,6 +378,6 @@ bool UPDEquipmentModificationComponent::TryModifyInventorySlotWithBoost(UPDInven
 	}
 
 	InventoryComponent->OnInventoryChanged.Broadcast();
-	OnModificationFinished.Broadcast(InventorySlotIndex, Slot.ModificationLevel, bSuccess, OutResult);
+	BroadcastModificationFinished(InventorySlotIndex, Slot.ModificationLevel, bSuccess, OutResult);
 	return bSuccess;
 }

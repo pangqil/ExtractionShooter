@@ -32,15 +32,15 @@ struct FPDMarketLevelData : public FTableRowBase
 {
 	GENERATED_BODY()
 
-	// 1부터 시작하는 마켓 레벨.
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
 	int32 Level = 1;
 
-	// 해당 레벨에 도달하기 위해 필요한 누적 마켓 경험치.
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
 	int32 RequiredExp = 0;
 
-	// 해당 레벨에서 구매 가능한 최대 아이템 등급.
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
 	EPDItemGrade MaxPurchasableGrade = EPDItemGrade::Grade1;
 };
@@ -55,17 +55,17 @@ public:
 
 	virtual void BeginPlay() override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
+	UPROPERTY(ReplicatedUsing=OnRep_MarketData, EditAnywhere, BlueprintReadWrite, Category="PD|Market")
 	TArray<FPDMarketEntry> Goods;
 
-	// DT_MarketLevelData를 지정하면 마켓 레벨/필요 EXP/구매 가능 등급을 데이터테이블에서 관리합니다.
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level")
 	TObjectPtr<UDataTable> MarketLevelDataTable = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="0"))
+	UPROPERTY(ReplicatedUsing=OnRep_MarketData, EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="0"))
 	int32 TraderReputationExp = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="1"))
+	UPROPERTY(ReplicatedUsing=OnRep_MarketData, EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="1"))
 	int32 TraderReputationLevel = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="0"))
@@ -74,7 +74,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level", meta=(ClampMin="0"))
 	int32 SellReputationExpPercent = 2;
 
-	// 아이템 Price 기준 판매 비율. 기본값 0.35 = 구매 기준가의 35%.
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Price", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float SellPriceRate = 0.35f;
 
@@ -106,11 +106,20 @@ public:
 	bool CanBuyEntry(int32 EntryIndex) const;
 
 	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	bool CanBuyEntryForInventory(int32 EntryIndex, const UPDInventoryComponent* BuyerInventory) const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	bool CanBuyItemData(const FPDItemData& ItemData) const;
 
-	// 현재 레벨에서 구매 가능하거나 다음 레벨에 잠금 표시(????)할 상품이면 true.
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	bool CanBuyItemDataForInventory(const FPDItemData& ItemData, const UPDInventoryComponent* BuyerInventory) const;
+
+
 	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	bool ShouldShowEntry(int32 EntryIndex) const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	bool ShouldShowEntryForInventory(int32 EntryIndex, const UPDInventoryComponent* BuyerInventory) const;
 
 	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	int32 GetRequiredTraderLevelForGrade(EPDItemGrade ItemGrade) const;
@@ -131,7 +140,19 @@ public:
 	int32 GetCurrentTraderLevelDisplayExp() const;
 
 	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	int32 GetCurrentTraderLevelDisplayExpForInventory(const UPDInventoryComponent* BuyerInventory) const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
 	int32 GetNextTraderLevelDisplayRequiredExp() const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	int32 GetNextTraderLevelDisplayRequiredExpForInventory(const UPDInventoryComponent* BuyerInventory) const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	int32 GetTraderReputationExpForInventory(const UPDInventoryComponent* BuyerInventory) const;
+
+	UFUNCTION(BlueprintPure, Category="PD|Market|Level")
+	int32 GetTraderReputationLevelForInventory(const UPDInventoryComponent* BuyerInventory) const;
 
 	UFUNCTION(BlueprintCallable, Category="PD|Market|Level")
 	void AddTraderReputationExp(int32 Amount);
@@ -143,9 +164,17 @@ public:
 	void RecalculateTraderReputationLevel();
 
 private:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_MarketData();
+
 	FPDMarketEntry* FindEntryByItemID(FName ItemID);
 	const UDataTable* GetResolvedMarketLevelDataTable() const;
 	const FPDMarketLevelData* FindMarketLevelDataByLevel(int32 Level) const;
+	class APDPlayerState* GetPlayerStateFromInventory(const UPDInventoryComponent* InventoryComponent) const;
+	int32 CalculateTraderReputationLevelFromExp(int32 ReputationExp) const;
+	void AddTraderReputationExpForInventory(UPDInventoryComponent* InventoryComponent, int32 Amount);
 	void LoadTraderReputationFromSave();
 	void SaveTraderReputationToSave() const;
 	int32 CalculateReputationReward(int32 TotalPrice, int32 Percent) const;

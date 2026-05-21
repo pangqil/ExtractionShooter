@@ -2,7 +2,9 @@
 #include "Components/BoxComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Core/PDGameInstance.h"
+#include "Core/PDGameMode.h"
 #include "Core/PDPlayerController.h"
+#include "Core/PDPlayerState.h"
 
 APDRaidEntryPortal::APDRaidEntryPortal()
 {
@@ -23,6 +25,11 @@ void APDRaidEntryPortal::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AAc
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
 	bool bFromSweep, const FHitResult& SweepResult)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	APawn* Pawn = Cast<APawn>(OtherActor);
 	if (!Pawn) return;
 
@@ -36,10 +43,21 @@ void APDRaidEntryPortal::EnterRaid(APlayerController* PC)
 {
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
 	if (!GI) return;
-	
-	const FPDPlayerData& Data = GI->GetPlayerData();
-	GI->ConfirmRaidLoadout(Data.StashItems, Data.Gold);
 
-	// 연출
+	APDPlayerState* PDPlayerState = PC ? PC->GetPlayerState<APDPlayerState>() : nullptr;
+	if (!PDPlayerState) return;
+
+	const FString SaveKey = GI->GetSaveKeyForController(PC);
+	const FPDPlayerData Data = GI->LoadPlayerDataFromDisk(SaveKey, PC->IsLocalController());
+	PDPlayerState->InitializePersistentData(Data);
+	PDPlayerState->ConfirmRaidLoadout(Data.StashItems, Data.Gold);
+
+	GI->SavePlayerDataToDisk(SaveKey, PDPlayerState->GetPersistentData());
+
 	OnRaidEntryTriggered(PC);
+
+	if (APDGameMode* GameMode = GetWorld()->GetAuthGameMode<APDGameMode>())
+	{
+		GameMode->TravelToRaidLevel(RaidLevelName);
+	}
 }

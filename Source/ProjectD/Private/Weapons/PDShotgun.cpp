@@ -1,38 +1,49 @@
 #include "Weapons/PDShotgun.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
+#include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 
 APDShotgun::APDShotgun()
 {
     WeaponType = EWeaponType::Shotgun;
 
-    LevelStats.Add({ 15.f, 0.80f,  800.f, 6, 2.5f, 0.80f }); // Lv1
-    LevelStats.Add({ 20.f, 0.75f,  900.f, 8, 2.2f, 0.83f }); // Lv2
-    LevelStats.Add({ 28.f, 0.70f, 1000.f, 8, 2.0f, 0.87f }); // Lv3
+    LevelStats.Add({ 15.f, 0.80f,  800.f, 6, 2.5f, 0.80f });
+    LevelStats.Add({ 20.f, 0.75f,  900.f, 8, 2.2f, 0.83f });
+    LevelStats.Add({ 28.f, 0.70f, 1000.f, 8, 2.0f, 0.87f });
 }
 
 void APDShotgun::Fire_Implementation()
 {
+    if (!HasAuthority()) return;
     if (!CanFire()) return;
+
+    const FVector MuzzleLoc = WeaponMesh->DoesSocketExist(MuzzleSocketName)
+        ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
+        : GetActorLocation();
+
+
+    ExecuteFireCue(MuzzleLoc, FVector::ZeroVector);
+
 
     TArray<FHitResult> Hits;
     PerformPelletTraces(Hits);
 
-    // 동일 액터에 중복 데미지 방지
-    TSet<AActor*> HitActors;
+
+    TSet<AActor*> DamagedActors;
     for (const FHitResult& Hit : Hits)
     {
         AActor* HitActor = Hit.GetActor();
-        if (!HitActor || HitActors.Contains(HitActor)) continue;
+        if (!HitActor) continue;
 
-        HitActors.Add(HitActor);
-        ApplyDamage(HitActor, GetCurrentStats().Damage);
-        SpawnImpactEffect(Hit);
-        PlayHitSound(Hit);
+        if (!DamagedActors.Contains(HitActor))
+        {
+            DamagedActors.Add(HitActor);
+            ApplyDamage(HitActor, GetCurrentStats().Damage, Hit);
+        }
+
+        ExecuteImpactCue(Hit);
     }
 
-    PlayFireEffects();
-    SpawnCartridge();
     PlayWeaponMontage(FireMontage);
     PostFire();
 }
@@ -61,9 +72,20 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
     float TraceLength = GetCurrentStats().Range;
     if (PC)
     {
-        FHitResult CursorHit;
-        if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
-            TraceLength = FVector::Dist(Start, CursorHit.Location);
+        FVector AimLocation;
+        if (const APDPlayerController* PDPC = Cast<APDPlayerController>(PC);
+            PDPC && PDPC->GetCachedAimWorldLocation(AimLocation))
+        {
+            TraceLength = FVector::Dist(Start, AimLocation);
+        }
+        else
+        {
+            FHitResult CursorHit;
+            if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
+            {
+                TraceLength = FVector::Dist(Start, CursorHit.Location);
+            }
+        }
     }
 
     FCollisionQueryParams Params;
@@ -81,7 +103,5 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
         const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params);
 
         if (bHit) OutHits.Add(Hit);
-        SpawnBeamEffect(Start, bHit ? Hit.Location : End);
-        SpawnTracerEffect(Start, bHit ? Hit.Location : End);
     }
 }

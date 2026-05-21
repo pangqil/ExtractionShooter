@@ -21,7 +21,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Inventory")
 	TObjectPtr<UDataTable> ItemDataTable;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
+	UPROPERTY(ReplicatedUsing=OnRep_Items, EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	TArray<FPDInventorySlot> Items;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
@@ -30,7 +30,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	int32 GridRows = 4;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
+	UPROPERTY(ReplicatedUsing=OnRep_Gold, EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	int32 Gold = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory", meta = (ClampMin = "0.0"))
@@ -122,4 +122,23 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_Items();
+
+	UFUNCTION()
+	void OnRep_Gold();
+
+	UFUNCTION(Server, Reliable)
+	void ServerRemoveItemFromSlot(int32 SlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerDropItemFromSlot(int32 SlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerUseItemFromSlot(int32 SlotIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerMoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 };

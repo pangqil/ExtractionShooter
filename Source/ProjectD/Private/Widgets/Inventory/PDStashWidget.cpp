@@ -6,6 +6,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Characters/PDPlayerCharacter.h"
 #include "Components/Button.h"
+#include "Core/PDPlayerController.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/UniformGridPanel.h"
@@ -58,8 +59,8 @@ void UPDStashWidget::RefreshStashGrid()
 	}
 
 	StashGridPanel->ClearChildren();
-	// ScrollBox 안에서는 UniformGridPanel이 부모 높이에 맞춰 셀을 늘려 보일 수 있으므로,
-	// 패널 쪽 슬롯 기본값을 명확히 고정한다. Padding은 GridSlot이 아니라 Panel 속성이다.
+
+
 	StashGridPanel->SetSlotPadding(FMargin(0.f));
 	StashGridPanel->SetMinDesiredSlotWidth(StashSlotWidth);
 	StashGridPanel->SetMinDesiredSlotHeight(StashSlotHeight);
@@ -72,7 +73,7 @@ void UPDStashWidget::RefreshStashGrid()
 
 	UPDStashComponent* StashComponent = FindStashComponent();
 
-	// 창고 업그레이드가 반영되도록 실제 컴포넌트의 열/행을 우선 사용한다.
+
 	const int32 Columns = FMath::Max(1, StashComponent ? StashComponent->GridColumns : FallbackGridColumns);
 	const int32 Rows = FMath::Max(1, StashComponent ? StashComponent->GridRows : FallbackGridRows);
 	const int32 SlotCount = Columns * Rows;
@@ -80,8 +81,8 @@ void UPDStashWidget::RefreshStashGrid()
 	TArray<int32> DisplaySlotIndices;
 	if (StashComponent)
 	{
-		// 현재 탭 아이템을 먼저 모아 보여주고, 남는 칸은 실제 빈 스태시 슬롯 인덱스로 매핑한다.
-		// 그래야 빈 칸에 드롭해도 INDEX_NONE이 아니라 실제 스태시 슬롯으로 이동된다.
+
+
 		for (int32 RealSlotIndex = 0; RealSlotIndex < StashComponent->StashItems.Num(); ++RealSlotIndex)
 		{
 			const FPDInventorySlot& StashSlotData = StashComponent->StashItems[RealSlotIndex];
@@ -145,7 +146,7 @@ void UPDStashWidget::RefreshStashGrid()
 
 			if (USizeBoxSlot* SizeBoxSlot = Cast<USizeBoxSlot>(SlotSizeBox->AddChild(CreatedSlotWidget)))
 			{
-				// 슬롯 BP를 120x120 셀 중앙에 작은 DesiredSize로 배치하지 말고, 셀을 꽉 채우게 한다.
+
 				SizeBoxSlot->SetHorizontalAlignment(HAlign_Fill);
 				SizeBoxSlot->SetVerticalAlignment(VAlign_Fill);
 				SizeBoxSlot->SetPadding(FMargin(0.f));
@@ -156,8 +157,8 @@ void UPDStashWidget::RefreshStashGrid()
 		UUniformGridSlot* GridSlot = StashGridPanel->AddChildToUniformGrid(GridChildWidget, DisplayIndex / Columns, DisplayIndex % Columns);
 		if (GridSlot)
 		{
-			// Fill로 두면 ScrollBox/UniformGridPanel의 남는 높이를 받아 슬롯이 세로로 늘어날 수 있다.
-			// SizeBox가 가진 120x120 크기만 사용하도록 좌상단 정렬로 고정한다.
+
+
 			GridSlot->SetHorizontalAlignment(HAlign_Left);
 			GridSlot->SetVerticalAlignment(VAlign_Top);
 		}
@@ -504,6 +505,14 @@ UPDStashComponent* UPDStashWidget::FindStashComponent() const
 
 UPDInventoryComponent* UPDStashWidget::FindInventoryComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDInventoryComponent* InventoryComponent = PDController->GetPlayerInventoryComponent())
+		{
+			return InventoryComponent;
+		}
+	}
+
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();
@@ -514,6 +523,14 @@ UPDInventoryComponent* UPDStashWidget::FindInventoryComponent() const
 
 UPDQuickSlotComponent* UPDStashWidget::FindQuickSlotComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDQuickSlotComponent* QuickSlotComponent = PDController->GetPlayerQuickSlotComponent())
+		{
+			return QuickSlotComponent;
+		}
+	}
+
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDQuickSlotComponent>();
@@ -576,7 +593,7 @@ void UPDStashWidget::HandleStashSlotItemDropped(UPDInventorySlotWidget* SlotWidg
 		return;
 	}
 
-	// Stash should only store real inventory/stash items. Ignore quick-slot references.
+
 	if (DragOperation->SourceContainerType == EPDItemContainerType::QuickSlot)
 	{
 		return;
@@ -609,24 +626,13 @@ void UPDStashWidget::TakeStashSlotQuantity(int32 SlotIndex, int32 Quantity)
 		return;
 	}
 
-	// 무기 아이템이고 해당 슬롯이 비어있으면 인벤토리 우회하여 즉시 장착.
-	if (const FPDInventorySlot* SourceSlot = FindStashSlot(SlotIndex))
+	if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
 	{
-		if (SourceSlot->ItemData.WeaponClass)
+		const AActor* StashOwner = StashComponent->GetOwner();
+		if (!StashOwner || !StashOwner->HasAuthority())
 		{
-			if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwningPlayerPawn()))
-			{
-				if (PlayerCharacter->TryAutoEquipWeaponSlot(*SourceSlot))
-				{
-					StashComponent->StashItems[SlotIndex].Quantity -= 1;
-					if (StashComponent->StashItems[SlotIndex].Quantity <= 0)
-					{
-						StashComponent->StashItems[SlotIndex].Clear();
-					}
-					StashComponent->OnStashChanged.Broadcast();
-					return;
-				}
-			}
+			PlayerController->ServerTakeStashSlotQuantity(StashComponent, SlotIndex, Quantity);
+			return;
 		}
 	}
 
@@ -652,15 +658,33 @@ void UPDStashWidget::ExecuteStashSlotTransfer(EPDItemContainerType SourceContain
 	case EPDItemContainerType::Inventory:
 		if (UPDInventoryComponent* InventoryComponent = FindInventoryComponent())
 		{
+			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+			{
+				const AActor* StashOwner = StashComponent->GetOwner();
+				if (!StashOwner || !StashOwner->HasAuthority())
+				{
+					PlayerController->ServerStoreInventorySlotQuantityToStash(StashComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+					return;
+				}
+			}
 			StashComponent->StoreInventorySlotQuantityToSlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
 		}
 		break;
 	case EPDItemContainerType::Stash:
+		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+		{
+			const AActor* StashOwner = StashComponent->GetOwner();
+			if (!StashOwner || !StashOwner->HasAuthority())
+			{
+				PlayerController->ServerMoveStashSlotQuantity(StashComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+				return;
+			}
+		}
 		StashComponent->MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
 		break;
 	case EPDItemContainerType::QuickSlot:
-		// Quick slots are shortcuts to inventory items, not storage items.
-		// Dropping a quick slot into stash is intentionally ignored.
+
+
 		break;
 	default:
 		break;

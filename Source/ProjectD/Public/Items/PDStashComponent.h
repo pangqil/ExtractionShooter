@@ -16,6 +16,14 @@ enum class EPDStashUpgradeResult : uint8
 	InvalidConfig UMETA(DisplayName = "Invalid Config")
 };
 
+UENUM(BlueprintType)
+enum class EPDStashPersistenceMode : uint8
+{
+	Transient UMETA(DisplayName = "Transient World Stash"),
+	PlayerStatePersistent UMETA(DisplayName = "Player State Persistent Save"),
+	GameInstanceLegacy UMETA(DisplayName = "Game Instance Legacy Save")
+};
+
 USTRUCT(BlueprintType)
 struct FPDStashUpgradeData
 {
@@ -43,23 +51,26 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Stash")
 	TObjectPtr<UDataTable> ItemDataTable;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
+	UPROPERTY(ReplicatedUsing=OnRep_StashItems, EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
 	TArray<FPDInventorySlot> StashItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
 	int32 GridColumns = 5;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
+	UPROPERTY(ReplicatedUsing=OnRep_StashConfig, EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
 	int32 GridRows = 4;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
 	int32 BaseGridRows = 4;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
+	UPROPERTY(ReplicatedUsing=OnRep_StashConfig, EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
 	int32 CurrentUpgradeLevel = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash")
 	TArray<FPDStashUpgradeData> UpgradeData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Stash|Persistence")
+	EPDStashPersistenceMode PersistenceMode = EPDStashPersistenceMode::Transient;
 
 	UPROPERTY(BlueprintAssignable, Category="PD|Stash")
 	FPDOnStashChanged OnStashChanged;
@@ -107,7 +118,18 @@ public:
 	void LoadFromGameInstance();
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	void LoadFromPlayerState(class APDPlayerState* PlayerState);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	void SaveToGameInstance();
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	void SaveToPlayerState(class APDPlayerState* PlayerState, bool bSaveToDisk = true);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	void PersistIfNeeded();
+
+	void PersistIfNeededForInventory(const UPDInventoryComponent* InventoryComponent);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	int32 AddItemPartial(const FPDItemData& ItemData, int32 Quantity = 1);
@@ -148,4 +170,11 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_StashItems();
+
+	UFUNCTION()
+	void OnRep_StashConfig();
 };

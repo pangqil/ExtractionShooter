@@ -1,18 +1,46 @@
 #include "Characters/PDPlayerCharacter.h"
+#include "AbilitySystemComponent.h"
 #include "AttributeSet/PDAttributeSet.h"
 #include "Camera/CameraComponent.h"
 #include "Component/PDVisionComponent.h"
 #include "Component/PDInteractionComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/PDGameInstance.h"
+#include "Core/PDPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "GameplayTag/PDGameplayTags.h"
 #include "Items/PDQuickSlotComponent.h"
-#include "Items/PDEquipmentComponent.h"
 #include "Items/PDEquipmentModificationComponent.h"
+#include "Interfaces/PDInteractable.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Animation/PDAnimInstance.h"
+#include "Net/UnrealNetwork.h"
+
+namespace
+{
+	constexpr float PDPlayerCameraArmLength = 1333.333f;
+	constexpr float PDPlayerCameraPitch = -60.f;
+
+	bool IsInteractTargetInRange(const AActor* Interactor, const AActor* TargetActor, float MaxInteractDistance)
+	{
+		if (!Interactor || !TargetActor)
+		{
+			return false;
+		}
+
+		const FVector InteractorLocation = Interactor->GetActorLocation();
+		const float MaxDistanceSq = FMath::Square(FMath::Max(0.f, MaxInteractDistance));
+		if (FVector::DistSquared(InteractorLocation, TargetActor->GetActorLocation()) <= MaxDistanceSq)
+		{
+			return true;
+		}
+
+		const FBox Bounds = TargetActor->GetComponentsBoundingBox(true);
+		return Bounds.IsValid && Bounds.ComputeSquaredDistanceToPoint(InteractorLocation) <= MaxDistanceSq;
+	}
+}
 
 APDPlayerCharacter::APDPlayerCharacter()
 {
@@ -32,8 +60,8 @@ APDPlayerCharacter::APDPlayerCharacter()
 	CameraBoom=CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->SetUsingAbsoluteRotation(true);
-	CameraBoom->TargetArmLength=800.f;
-	CameraBoom->SetRelativeRotation(FRotator(-60.f, 0.f, 0.f));
+	CameraBoom->TargetArmLength=PDPlayerCameraArmLength;
+	CameraBoom->SetRelativeRotation(FRotator(PDPlayerCameraPitch, 0.f, 0.f));
 	CameraBoom->bDoCollisionTest=false;
 
 	TopDownCameraComponent=CreateDefaultSubobject<UCameraComponent>(TEXT("TopDownCamera"));
@@ -43,38 +71,190 @@ APDPlayerCharacter::APDPlayerCharacter()
 	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
 	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
 
-	QuickSlotComponent=CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
-	EquipmentComponent=CreateDefaultSubobject<UPDEquipmentComponent>(TEXT("EquipmentComponent"));
 	EquipmentModificationComponent=CreateDefaultSubobject<UPDEquipmentModificationComponent>(TEXT("EquipmentModificationComponent"));
 
 	PrimaryActorTick.bCanEverTick=true;
 	PrimaryActorTick.bStartWithTickEnabled=true;
 	WeaponSlots.SetNum(4);
 
-	
-	// Player 팀. AI 의 GetTeamAttitudeTowards 에서 적대 판정의 기준이 됨.
+
+
 	TeamID = 1;
+}
+
+void APDPlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDPlayerCharacter, WeaponSlots);
+	DOREPLIFETIME(APDPlayerCharacter, CurrentSlot);
+	DOREPLIFETIME(APDPlayerCharacter, ReplicatedWeaponType);
+	DOREPLIFETIME(APDPlayerCharacter, ReplicatedAimWorldLocation);
+	DOREPLIFETIME(APDPlayerCharacter, bHasReplicatedAimWorldLocation);
 }
 
 void APDPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (CameraBoom)
+	{
+		CameraBoom->TargetArmLength = PDPlayerCameraArmLength;
+		CameraBoom->SetWorldRotation(FRotator(PDPlayerCameraPitch, 0.f, 0.f));
+	}
+
+	GetOrCreateInteractionComponent();
 	 if (ASC)
         {
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Shotgun, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Sniper,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Melee,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);
-        }
+	        }
 	LinkDefaultAnimLayer();
 	GetCharacterMovement()->bAllowPhysicsRotationDuringAnimRootMotion = false;
 
-	if (UPDGameInstance* GI=GetGameInstance<UPDGameInstance>())
+	if (HasAuthority())
 	{
-		if (GI->ConsumePendingResetToBase())
+		if (UPDGameInstance* GI=GetGameInstance<UPDGameInstance>())
 		{
-			ResetToBase();
+			if (GI->ConsumePendingResetToBase())
+			{
+				ResetToBase();
+			}
 		}
+	}
+}
+
+UPDInteractionComponent* APDPlayerCharacter::GetOrCreateInteractionComponent()
+{
+	if (InteractionComponent)
+	{
+		return InteractionComponent;
+	}
+
+	InteractionComponent = FindComponentByClass<UPDInteractionComponent>();
+	if (InteractionComponent)
+	{
+		return InteractionComponent;
+	}
+
+	InteractionComponent = NewObject<UPDInteractionComponent>(this, TEXT("InteractionComponent_Runtime"));
+	if (InteractionComponent)
+	{
+		AddInstanceComponent(InteractionComponent);
+		InteractionComponent->RegisterComponent();
+	}
+
+	return InteractionComponent;
+}
+
+UPDInventoryComponent* APDPlayerCharacter::GetInventoryComponent() const
+{
+	if (const APDPlayerState* PDPlayerState = GetPlayerState<APDPlayerState>())
+	{
+		return PDPlayerState->GetInventoryComponent();
+	}
+
+	return nullptr;
+}
+
+UPDQuickSlotComponent* APDPlayerCharacter::GetQuickSlotComponent() const
+{
+	if (const APDPlayerState* PDPlayerState = GetPlayerState<APDPlayerState>())
+	{
+		return PDPlayerState->GetQuickSlotComponent();
+	}
+
+	return nullptr;
+}
+
+UPDEquipmentComponent* APDPlayerCharacter::GetEquipmentComponent() const
+{
+	if (const APDPlayerState* PDPlayerState = GetPlayerState<APDPlayerState>())
+	{
+		return PDPlayerState->GetEquipmentComponent();
+	}
+
+	return nullptr;
+}
+
+UPDQuestComponent* APDPlayerCharacter::GetQuestComponent() const
+{
+	if (const APDPlayerState* PDPlayerState = GetPlayerState<APDPlayerState>())
+	{
+		return PDPlayerState->GetQuestComponent();
+	}
+
+	return nullptr;
+}
+
+void APDPlayerCharacter::OnRep_WeaponSlots()
+{
+	SyncWeaponPresentation();
+}
+
+void APDPlayerCharacter::OnRep_CurrentSlot()
+{
+	SyncWeaponPresentation();
+}
+
+void APDPlayerCharacter::OnRep_ReplicatedWeaponType()
+{
+	SyncWeaponTypeTags(ReplicatedWeaponType);
+	SyncWeaponPresentation();
+}
+
+void APDPlayerCharacter::SyncWeaponPresentation()
+{
+	UPDAnimInstance* AnimInst = GetMesh()
+		? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
+
+	APDWeaponBase* CurrentWeapon = nullptr;
+	const int32 CurrentIndex = CurrentSlot != EWeaponSlot::None
+		? static_cast<int32>(CurrentSlot) : INDEX_NONE;
+
+	for (int32 Index = 0; Index < WeaponSlots.Num(); ++Index)
+	{
+		APDWeaponBase* Weapon = WeaponSlots[Index];
+		if (!IsValid(Weapon)) continue;
+
+		const bool bIsCurrent = Index == CurrentIndex;
+
+		Weapon->SetActorHiddenInGame(!bIsCurrent);
+		if (bIsCurrent)
+		{
+			CurrentWeapon = Weapon;
+		}
+	}
+
+	if (LifeState == EPDLifeState::Dead)
+	{
+		return;
+	}
+	if (LifeState == EPDLifeState::Downed)
+	{
+		LinkDownedAnimLayer();
+		return;
+	}
+	if (LifeState == EPDLifeState::GettingUp)
+	{
+		return;
+	}
+
+	if (CurrentWeapon)
+	{
+		AttachActorToWeaponSocket(CurrentWeapon);
+		CurrentWeapon->SetActorHiddenInGame(false);
+		ApplyWeaponAnimationLayer(CurrentWeapon);
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(CurrentWeapon));
+		}
+	}
+	else
+	{
+		ApplyWeaponAnimationLayerForType(ReplicatedWeaponType);
 	}
 }
 
@@ -83,12 +263,30 @@ void APDPlayerCharacter::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	if (CameraBoom)
-		CameraBoom->SetWorldRotation(FRotator(-60.f, 0.f, 0.f));
+		CameraBoom->SetWorldRotation(FRotator(PDPlayerCameraPitch, 0.f, 0.f));
 }
 
 void APDPlayerCharacter::InitAbilitySystem()
 {
 	Super::InitAbilitySystem();
+	if (!ASC) return;
+
+	if (!bPlayerAbilityDelegatesBound)
+	{
+		if (UPDVisionComponent* Vision=FindComponentByClass<UPDVisionComponent>())
+		{
+			Vision->BindToAttributeSet(ASC);
+		}
+
+		ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetStaminaAttribute())
+			.AddUObject(this, &APDPlayerCharacter::OnStaminaChanged);
+		bPlayerAbilityDelegatesBound = true;
+	}
+
+	if (!HasAuthority() || bPlayerPersistentEffectsApplied)
+	{
+		return;
+	}
 
 	auto ApplyGE=[&](TSubclassOf<UGameplayEffect> GEClass) -> FActiveGameplayEffectHandle
 	{
@@ -100,20 +298,13 @@ void APDPlayerCharacter::InitAbilitySystem()
 		return FActiveGameplayEffectHandle();
 	};
 
-	if (UPDVisionComponent* Vision=FindComponentByClass<UPDVisionComponent>())
-	{
-		Vision->BindToAttributeSet(ASC);
-	}
-
-	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetStaminaAttribute())
-		.AddUObject(this, &APDPlayerCharacter::OnStaminaChanged);
-
 	ApplyGE(StaminaRegenEffectClass);
 	ApplyGE(StaminaRegenBonusEffectClass);
 
 	HungerDecayHandle  = ApplyGE(HungerDecayEffectClass);
 	ThirstDecayHandle  = ApplyGE(ThirstDecayEffectClass);
 	GasMaskDecayHandle = ApplyGE(GasMaskDecayEffectClass);
+	bPlayerPersistentEffectsApplied = true;
 }
 
 void APDPlayerCharacter::OnStaminaChanged(const FOnAttributeChangeData& Data)
@@ -126,6 +317,8 @@ void APDPlayerCharacter::OnStaminaChanged(const FOnAttributeChangeData& Data)
 
 void APDPlayerCharacter::HandleDeath(AActor* Killer)
 {
+	if (IsDead()) return;
+
 	if (APDWeaponBase* CurWeapon=GetCurrentWeapon())
 	{
 		if (UPDAnimInstance* AnimInst = GetMesh()
@@ -146,32 +339,120 @@ void APDPlayerCharacter::HandleDeath(AActor* Killer)
 	Super::HandleDeath(Killer);
 }
 
+void APDPlayerCharacter::OnLifeStateChanged(EPDLifeState OldLifeState, AActor* ContextActor)
+{
+	Super::OnLifeStateChanged(OldLifeState, ContextActor);
+
+	if (LifeState == EPDLifeState::Downed)
+	{
+		if (GetWorld())
+		{
+			GetWorldTimerManager().ClearTimer(GetUpTimerHandle);
+		}
+		LinkDownedAnimLayer();
+		return;
+	}
+
+	if (LifeState == EPDLifeState::GettingUp)
+	{
+		BeginGettingUpPresentation();
+		return;
+	}
+
+	if (LifeState == EPDLifeState::Alive)
+	{
+		if (GetWorld())
+		{
+			GetWorldTimerManager().ClearTimer(GetUpTimerHandle);
+		}
+		ApplyWeaponAnimationLayerForType(ReplicatedWeaponType);
+	}
+}
+
 void APDPlayerCharacter::PickupWeapon(APDWeaponBase* Weapon)
 {
+	if (!HasAuthority())
+	{
+		ServerPickupWeapon(Weapon);
+		return;
+	}
+
 	if (!Weapon) return;
 	EWeaponSlot TargetSlot=GetSlotForWeaponType(Weapon->GetWeaponType());
 	if (TargetSlot==EWeaponSlot::None) return;
 
 	int32 Idx=static_cast<int32>(TargetSlot);
-	// 슬롯이 차있을 때는 호출자(Interact/AutoEquip)에서 인벤토리 경로로 우회해야 한다.
+
 	if (WeaponSlots[Idx]) return;
 
 	WeaponSlots[Idx]=Weapon;
-	Weapon->OnEquip(this);           
+	Weapon->OnEquip(this);
 	Weapon->SetActorHiddenInGame(true);
 	AttachActorToWeaponSocket(Weapon);
 	OnWeaponPickedUp.Broadcast(Weapon);
 
 	if (CurrentSlot==EWeaponSlot::None)
+	{
 		SwitchToSlot(TargetSlot);
+	}
+
+	Weapon->ForceNetUpdate();
+	ForceNetUpdate();
+}
+
+void APDPlayerCharacter::SetSharedAimWorldLocation(const FVector& AimLocation)
+{
+	ReplicatedAimWorldLocation = AimLocation;
+	bHasReplicatedAimWorldLocation = true;
+}
+
+bool APDPlayerCharacter::GetSharedAimWorldLocation(FVector& OutLocation) const
+{
+	if (!bHasReplicatedAimWorldLocation)
+	{
+		return false;
+	}
+
+	OutLocation = ReplicatedAimWorldLocation;
+	return true;
+}
+
+FVector APDPlayerCharacter::GetSharedVisionForwardVector(const FVector& FromLocation) const
+{
+	FVector AimLocation;
+	if (GetSharedAimWorldLocation(AimLocation))
+	{
+		FVector Direction = AimLocation - FromLocation;
+		Direction.Z = 0.f;
+		if (!Direction.IsNearlyZero())
+		{
+			return Direction.GetSafeNormal();
+		}
+	}
+
+	return GetActorForwardVector();
 }
 
 void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 {
-	if (Slot==CurrentSlot) return;
+	if (IsDowned() || IsGettingUp() || IsDead()) return;
 
-	if (QuickSlotComponent)
-		QuickSlotComponent->CancelConsumableUse();
+	if (!HasAuthority())
+	{
+		ServerSwitchToSlot(Slot);
+		return;
+	}
+
+	if (Slot==CurrentSlot)
+	{
+		SyncWeaponPresentation();
+		return;
+	}
+
+	if (UPDQuickSlotComponent* PlayerQuickSlotComponent = GetQuickSlotComponent())
+	{
+		PlayerQuickSlotComponent->CancelConsumableUse();
+	}
 
 	int32 Idx=static_cast<int32>(Slot);
 	if (!WeaponSlots.IsValidIndex(Idx)||!WeaponSlots[Idx]) return;
@@ -190,26 +471,23 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 	CurrentSlot=Slot;
 	APDWeaponBase* NewWeapon=WeaponSlots[Idx];
 	NewWeapon->OnEquip(this);
-	if (ASC)
-	{
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Rifle);
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Shotgun);
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Sniper);
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Melee);
-		ASC->AddLooseGameplayTag(NewWeapon->GetWeaponTypeTag());
-	}
+	ReplicatedWeaponType = NewWeapon->GetWeaponType();
+	SyncWeaponTypeTags(ReplicatedWeaponType);
 	NewWeapon->SetActorHiddenInGame(false);
-	AttachActorToWeaponSocket(NewWeapon);
-
-	// AnimInstance에 장착 통보 — 태그 추가 이후에 호출해야 RaiseMontage 태그 조회 가능
-	if (AnimInst)
-		AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(NewWeapon));
-
+	SyncWeaponPresentation();
 	OnWeaponSwapped.Broadcast(NewWeapon, Slot);
 }
 
 void APDPlayerCharacter::DropCurrentWeapon()
 {
+	if (IsDowned() || IsGettingUp() || IsDead()) return;
+
+	if (!HasAuthority())
+	{
+		ServerDropCurrentWeapon();
+		return;
+	}
+
 	APDWeaponBase* CurWeapon=GetCurrentWeapon();
 	if (!CurWeapon) return;
 
@@ -220,11 +498,13 @@ void APDPlayerCharacter::DropCurrentWeapon()
 	}
 	CurWeapon->OnUnequip();
 	CurWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	// 떨어뜨린 무기를 다시 픽업할 수 있도록 PickupCollision 복구 + 시뮬레이션 ON.
+
 	CurWeapon->SetDropped(true);
 	WeaponSlots[static_cast<int32>(CurrentSlot)]=nullptr;
 	CurrentSlot=EWeaponSlot::None;
-	ASC->RemoveLooseGameplayTag(CurWeapon->GetWeaponTypeTag());
+	ReplicatedWeaponType = EWeaponType::None;
+	SyncWeaponTypeTags(ReplicatedWeaponType);
+	SyncWeaponPresentation();
 }
 
 APDWeaponBase* APDPlayerCharacter::GetCurrentWeapon() const
@@ -254,6 +534,8 @@ EWeaponSlot APDPlayerCharacter::GetSlotForWeaponType(EWeaponType Type) const
 
 bool APDPlayerCharacter::TryAutoEquipWeaponItem(const FPDItemData& ItemData)
 {
+	if (!HasAuthority()) return false;
+
 	FPDInventorySlot TempSlot;
 	TempSlot.ItemData = ItemData;
 	TempSlot.Quantity = 1;
@@ -264,13 +546,15 @@ bool APDPlayerCharacter::TryAutoEquipWeaponItem(const FPDItemData& ItemData)
 
 bool APDPlayerCharacter::TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot)
 {
+	if (!HasAuthority()) return false;
+
 	const FPDItemData& ItemData = ItemSlot.ItemData;
 	if (!ItemData.WeaponClass) return false;
 
 	const EWeaponSlot TargetSlot = GetSlotForWeaponType(ItemData.WeaponType);
 	if (TargetSlot == EWeaponSlot::None) return false;
 
-	// 이미 해당 슬롯에 무기가 있으면 자동 장착 안 함(호출자가 인벤토리로 보내야 함).
+
 	if (GetWeaponInSlot(TargetSlot)) return false;
 
 	UWorld* World = GetWorld();
@@ -285,15 +569,24 @@ bool APDPlayerCharacter::TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot
 		ItemData.WeaponClass, GetActorTransform(), SpawnParams);
 	if (!SpawnedWeapon) return false;
 
-	// 기존 무기/GAS 레벨 시스템은 1부터 시작하므로 +0 개조는 Lv.1로 매핑한다.
+	SpawnedWeapon->ItemID = ItemData.ItemID;
+	if (SpawnedWeapon->WeaponType == EWeaponType::None)
+	{
+		SpawnedWeapon->WeaponType = ItemData.WeaponType;
+	}
+
 	SpawnedWeapon->SetLevel(FMath::Max(1, ItemSlot.ModificationLevel + 1));
 	PickupWeapon(SpawnedWeapon);
+	SpawnedWeapon->ForceNetUpdate();
+	ForceNetUpdate();
 	return true;
 }
 
 
 bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, bool bDestroyWeaponActor)
 {
+	if (!HasAuthority()) return false;
+
 	const EWeaponSlot TargetSlot = GetSlotForWeaponType(ItemData.WeaponType);
 	if (TargetSlot == EWeaponSlot::None)
 	{
@@ -313,14 +606,20 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 
 	if (ASC)
 	{
-		ASC->RemoveLooseGameplayTag(WeaponToRemove->GetWeaponTypeTag());
+		if (ASC->HasMatchingGameplayTag(WeaponToRemove->GetWeaponTypeTag()))
+		{
+			ASC->RemoveLooseGameplayTag(WeaponToRemove->GetWeaponTypeTag());
+		}
 	}
 
 	WeaponSlots[SlotIndex] = nullptr;
 	if (CurrentSlot == TargetSlot)
 	{
 		CurrentSlot = EWeaponSlot::None;
+		ReplicatedWeaponType = EWeaponType::None;
+		SyncWeaponTypeTags(ReplicatedWeaponType);
 	}
+	SyncWeaponPresentation();
 
 	if (bDestroyWeaponActor)
 	{
@@ -332,29 +631,30 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 
 void APDPlayerCharacter::ResetToBase()
 {
+	if (!HasAuthority()) return;
 	if (!ASC || !AttributeSet) return;
-	
+
 	ASC->RemoveActiveGameplayEffect(HungerDecayHandle);
 	ASC->RemoveActiveGameplayEffect(ThirstDecayHandle);
 	ASC->RemoveActiveGameplayEffect(GasMaskDecayHandle);
-	
+
 	auto RemoveDebuff = [&](const FGameplayTag& Tag)
 	{
 		FGameplayTagContainer Tags;
 		Tags.AddTag(Tag);
 		ASC->RemoveActiveEffectsWithTags(Tags);
 	};
-	
+
 	RemoveDebuff(PDGameplayTags::State_Debuff_Starving);
 	RemoveDebuff(PDGameplayTags::State_Debuff_Dehydrated);
 	RemoveDebuff(PDGameplayTags::State_Debuff_GasExposure);
-	
+
 	RemoveDebuff(PDGameplayTags::State_Debuff_Bleeding);
 	RemoveDebuff(PDGameplayTags::State_Debuff_LegDamaged);
 	RemoveDebuff(PDGameplayTags::State_Debuff_LegCrippled);
 	RemoveDebuff(PDGameplayTags::State_Debuff_ArmDamaged);
 	RemoveDebuff(PDGameplayTags::State_Debuff_ArmCrippled);
-	
+
 	ASC->SetNumericAttributeBase(UPDAttributeSet::GetHeadHPAttribute(),  AttributeSet->GetMaxHeadHP());
 	ASC->SetNumericAttributeBase(UPDAttributeSet::GetTorsoHPAttribute(), AttributeSet->GetMaxTorsoHP());
 	ASC->SetNumericAttributeBase(UPDAttributeSet::GetArmLHPAttribute(),  AttributeSet->GetMaxArmLHP());
@@ -375,41 +675,247 @@ void APDPlayerCharacter::ResetToBase()
 			return ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 		return FActiveGameplayEffectHandle();
 	};
-	
+
 	HungerDecayHandle=ApplyGE(HungerDecayEffectClass);
 	ThirstDecayHandle=ApplyGE(ThirstDecayEffectClass);
 	GasMaskDecayHandle=ApplyGE(GasMaskDecayEffectClass);
+
+	ResetLifeStateToAlive(this);
 }
 
 void APDPlayerCharacter::TryInteract()
 {
-	if (QuickSlotComponent)
-		QuickSlotComponent->CancelConsumableUse();
-
-	if (InteractionComponent)
+	if (IsDowned() || IsGettingUp() || IsDead())
 	{
-		InteractionComponent->Interact();
+		return;
 	}
+
+	if (UPDQuickSlotComponent* PlayerQuickSlotComponent = GetQuickSlotComponent())
+	{
+		PlayerQuickSlotComponent->CancelConsumableUse();
+	}
+
+	if (!HasAuthority())
+	{
+		UPDInteractionComponent* ActiveInteractionComponent = GetOrCreateInteractionComponent();
+		AActor* TargetActor = ActiveInteractionComponent ? ActiveInteractionComponent->FindInteractTarget() : nullptr;
+		ActiveInteractTarget = TargetActor;
+		ServerInteractTarget(TargetActor);
+		return;
+	}
+
+	if (UPDInteractionComponent* ActiveInteractionComponent = GetOrCreateInteractionComponent())
+	{
+		AActor* TargetActor = ActiveInteractionComponent->FindInteractTarget();
+		ActiveInteractTarget = TargetActor;
+		if (IsValid(TargetActor) && TargetActor->GetClass()->ImplementsInterface(UPDInteractable::StaticClass()))
+		{
+			IPDInteractable::Execute_Interact(TargetActor, this);
+		}
+	}
+}
+
+void APDPlayerCharacter::StopInteract()
+{
+	AActor* TargetActor = ActiveInteractTarget.Get();
+	ActiveInteractTarget.Reset();
+
+	if (!HasAuthority())
+	{
+		ServerStopInteract(TargetActor);
+		return;
+	}
+
+	if (APDCharacterBase* DownedCharacter = Cast<APDCharacterBase>(TargetActor))
+	{
+		DownedCharacter->CancelReviveInteraction(this);
+	}
+}
+
+bool APDPlayerCharacter::IsInteractingWith(const AActor* TargetActor) const
+{
+	return TargetActor && ActiveInteractTarget.Get() == TargetActor;
+}
+
+void APDPlayerCharacter::ServerTryInteract_Implementation()
+{
+	TryInteract();
+}
+
+void APDPlayerCharacter::ServerInteractTarget_Implementation(AActor* TargetActor)
+{
+	if (UPDQuickSlotComponent* PlayerQuickSlotComponent = GetQuickSlotComponent())
+	{
+		PlayerQuickSlotComponent->CancelConsumableUse();
+	}
+
+	if (IsValid(TargetActor) && TargetActor->GetClass()->ImplementsInterface(UPDInteractable::StaticClass()))
+	{
+		UPDInteractionComponent* ActiveInteractionComponent = GetOrCreateInteractionComponent();
+		const float MaxInteractDistance = ActiveInteractionComponent
+			? ActiveInteractionComponent->InteractDistance + 150.f : 450.f;
+
+		if (IsInteractTargetInRange(this, TargetActor, MaxInteractDistance))
+		{
+			ActiveInteractTarget = TargetActor;
+			IPDInteractable::Execute_Interact(TargetActor, this);
+			return;
+		}
+	}
+
+	if (UPDInteractionComponent* ActiveInteractionComponent = GetOrCreateInteractionComponent())
+	{
+		AActor* FallbackTargetActor = ActiveInteractionComponent->FindInteractTarget();
+		ActiveInteractTarget = FallbackTargetActor;
+		if (IsValid(FallbackTargetActor) && FallbackTargetActor->GetClass()->ImplementsInterface(UPDInteractable::StaticClass()))
+		{
+			IPDInteractable::Execute_Interact(FallbackTargetActor, this);
+		}
+	}
+}
+
+void APDPlayerCharacter::ServerStopInteract_Implementation(AActor* TargetActor)
+{
+	if (APDCharacterBase* DownedCharacter = Cast<APDCharacterBase>(TargetActor))
+	{
+		DownedCharacter->CancelReviveInteraction(this);
+	}
+}
+
+void APDPlayerCharacter::ServerHandleAnimGameplayEvent_Implementation(FGameplayTag EventTag)
+{
+	if (!EventTag.IsValid() || !ASC)
+	{
+		return;
+	}
+
+	FGameplayEventData EventData;
+	EventData.EventTag = EventTag;
+	EventData.Instigator = this;
+	EventData.Target = this;
+	ASC->HandleGameplayEvent(EventTag, &EventData);
+}
+
+void APDPlayerCharacter::ServerPickupWeapon_Implementation(APDWeaponBase* Weapon)
+{
+	PickupWeapon(Weapon);
+}
+
+void APDPlayerCharacter::ServerSwitchToSlot_Implementation(EWeaponSlot Slot)
+{
+	SwitchToSlot(Slot);
+}
+
+void APDPlayerCharacter::ServerDropCurrentWeapon_Implementation()
+{
+	DropCurrentWeapon();
 }
 
 void APDPlayerCharacter::OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[Layer] TagChanged: %s | Count: %d"), *Tag.ToString(), NewCount);
 	if (NewCount==0) return;
-
-	APDWeaponBase* CurWeapon=GetCurrentWeapon();
-	if (!IsValid(CurWeapon))
+	if (LifeState == EPDLifeState::Downed || LifeState == EPDLifeState::GettingUp)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Layer] CurWeapon NULL"));
+		return;
+	}
+	if (LifeState == EPDLifeState::Dead) return;
+
+	ApplyWeaponAnimationLayer(GetCurrentWeapon());
+}
+
+void APDPlayerCharacter::ApplyWeaponAnimationLayer(APDWeaponBase* Weapon)
+{
+	if (!IsValid(Weapon))
+	{
+		ApplyWeaponAnimationLayerForType(ReplicatedWeaponType);
 		return;
 	}
 
-	TSubclassOf<UAnimInstance> LayerClass=CurWeapon->GetWeaponAnimLayerClass();
-	UE_LOG(LogTemp, Warning, TEXT("[Layer] LayerClass: %s"), LayerClass ? *LayerClass->GetName() : TEXT("NULL"));
-
+	TSubclassOf<UAnimInstance> LayerClass=Weapon->GetWeaponAnimLayerClass();
 	if (!LayerClass) { LinkDefaultAnimLayer(); return; }
 	if (USkeletalMeshComponent* SkelMesh=GetMesh())
 		SkelMesh->LinkAnimClassLayers(LayerClass);
+}
+
+void APDPlayerCharacter::ApplyAnimationLayerForTag(const FGameplayTag& LayerTag)
+{
+	if (const TSubclassOf<UAnimInstance>* LayerClass = WeaponAnimLayerMap.Find(LayerTag))
+	{
+		if (*LayerClass)
+		{
+			if (USkeletalMeshComponent* SkelMesh = GetMesh())
+			{
+				SkelMesh->LinkAnimClassLayers(*LayerClass);
+				return;
+			}
+		}
+	}
+
+	LinkDefaultAnimLayer();
+}
+
+void APDPlayerCharacter::ApplyWeaponAnimationLayerForType(EWeaponType WeaponType)
+{
+	FGameplayTag LayerTag;
+	switch (WeaponType)
+	{
+	case EWeaponType::Rifle:
+		LayerTag = PDGameplayTags::Weapon_Type_Rifle;
+		break;
+	case EWeaponType::Shotgun:
+		LayerTag = PDGameplayTags::Weapon_Type_Shotgun;
+		break;
+	case EWeaponType::Sniper:
+		LayerTag = PDGameplayTags::Weapon_Type_Sniper;
+		break;
+	case EWeaponType::Melee:
+		LayerTag = PDGameplayTags::Weapon_Type_Melee;
+		break;
+	default:
+		LinkDefaultAnimLayer();
+		return;
+	}
+
+	ApplyAnimationLayerForTag(LayerTag);
+}
+
+void APDPlayerCharacter::SyncWeaponTypeTags(EWeaponType WeaponType)
+{
+	if (!ASC)
+	{
+		return;
+	}
+
+	auto RemoveLooseTagIfPresent = [this](const FGameplayTag& Tag)
+	{
+		if (ASC->GetTagCount(Tag) > 0)
+		{
+			ASC->RemoveLooseGameplayTag(Tag);
+		}
+	};
+
+	RemoveLooseTagIfPresent(PDGameplayTags::Weapon_Type_Rifle);
+	RemoveLooseTagIfPresent(PDGameplayTags::Weapon_Type_Shotgun);
+	RemoveLooseTagIfPresent(PDGameplayTags::Weapon_Type_Sniper);
+	RemoveLooseTagIfPresent(PDGameplayTags::Weapon_Type_Melee);
+
+	switch (WeaponType)
+	{
+	case EWeaponType::Rifle:
+		ASC->AddLooseGameplayTag(PDGameplayTags::Weapon_Type_Rifle);
+		break;
+	case EWeaponType::Shotgun:
+		ASC->AddLooseGameplayTag(PDGameplayTags::Weapon_Type_Shotgun);
+		break;
+	case EWeaponType::Sniper:
+		ASC->AddLooseGameplayTag(PDGameplayTags::Weapon_Type_Sniper);
+		break;
+	case EWeaponType::Melee:
+		ASC->AddLooseGameplayTag(PDGameplayTags::Weapon_Type_Melee);
+		break;
+	default:
+		break;
+	}
 }
 
 void APDPlayerCharacter::LinkDefaultAnimLayer()
@@ -417,4 +923,63 @@ void APDPlayerCharacter::LinkDefaultAnimLayer()
 	if (!DefaultAnimLayerClass) return;
 	if (USkeletalMeshComponent* SkelMesh=GetMesh())
 		SkelMesh->LinkAnimClassLayers(DefaultAnimLayerClass);
+}
+
+void APDPlayerCharacter::LinkDownedAnimLayer()
+{
+	TSubclassOf<UAnimInstance> LayerClass = DownedAnimLayerClass;
+	if (!LayerClass)
+	{
+		if (const TSubclassOf<UAnimInstance>* MappedLayerClass = WeaponAnimLayerMap.Find(PDGameplayTags::State_Downed))
+		{
+			LayerClass = *MappedLayerClass;
+		}
+	}
+
+	if (!LayerClass)
+	{
+		LinkDefaultAnimLayer();
+		return;
+	}
+
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->LinkAnimClassLayers(LayerClass);
+	}
+}
+
+void APDPlayerCharacter::BeginGettingUpPresentation()
+{
+	if (GetWorld())
+	{
+		GetWorldTimerManager().ClearTimer(GetUpTimerHandle);
+	}
+
+	float GetUpDuration = 0.f;
+	if (UPDAnimInstance* AnimInst = GetMesh() ? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr)
+	{
+		AnimInst->PlayGetUpMontage();
+		GetUpDuration = AnimInst->GetGetUpMontageDuration();
+	}
+
+	if (HasAuthority())
+	{
+		if (GetUpDuration <= KINDA_SMALL_NUMBER)
+		{
+			FinishGettingUp();
+			return;
+		}
+
+		GetWorldTimerManager().SetTimer(
+			GetUpTimerHandle,
+			this,
+			&APDPlayerCharacter::FinishGettingUpFromTimer,
+			GetUpDuration,
+			false);
+	}
+}
+
+void APDPlayerCharacter::FinishGettingUpFromTimer()
+{
+	FinishGettingUp();
 }

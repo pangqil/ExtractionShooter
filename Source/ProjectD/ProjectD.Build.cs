@@ -14,7 +14,8 @@ public class ProjectD : ModuleRules
 			"UMG", "Slate", "SlateCore", "Niagara", "CommonUI", "CommonInput",
 			"PhysicsCore",
 			"PreLoadScreen", "DeveloperSettings",
-			"GeometryCollectionEngine", "ChaosSolverEngine"
+			"GeometryCollectionEngine", "ChaosSolverEngine",
+			"OnlineSubsystem", "OnlineSubsystemUtils", "OnlineSubsystemSteam", "SteamSockets"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

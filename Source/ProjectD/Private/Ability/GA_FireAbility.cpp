@@ -2,12 +2,13 @@
 
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Characters/PDPlayerCharacter.h"
-#include "GameplayTag/PDGameplayTags.h"  // Input_FireReleased 이벤트 전용
+#include "GameplayTag/PDGameplayTags.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 
 UGA_FireAbility::UGA_FireAbility()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
 void UGA_FireAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -17,23 +18,32 @@ void UGA_FireAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
+	APDRangedWeaponBase* Weapon = GetRangedWeapon();
+
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	APDRangedWeaponBase* Weapon = GetRangedWeapon();
-	if (!Weapon || !Weapon->CanFire())
+	if (!Weapon)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// 첫 발 즉시 발사
+	const bool bCanFire = Weapon->CanFire();
+
+	if (!bCanFire)
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+
 	Weapon->Fire();
 
-	// 자동화기: 무기의 bFullAuto 플래그로 판단
+
 	if (Weapon->IsFullAuto())
 	{
 		const float FireRate = Weapon->GetCurrentStats().FireRate;
@@ -43,7 +53,7 @@ void UGA_FireAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 			FireRate, true);
 	}
 
-	// Input.FireReleased 이벤트 대기 → 어빌리티 종료
+
 	UAbilityTask_WaitGameplayEvent* EventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
 		this, PDGameplayTags::Input_FireReleased);
 	EventTask->EventReceived.AddDynamic(this, &UGA_FireAbility::OnFireReleasedEvent);
@@ -72,7 +82,7 @@ void UGA_FireAbility::DoAutoFire()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
-	// CanFire()가 false여도 Weapon->Fire() 내부에서 걸러짐 (탄 소진 등)
+
 	Weapon->Fire();
 }
 

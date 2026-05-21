@@ -1,7 +1,6 @@
 #include "Cover/PDCoverBase.h"
 #include "Components/StaticMeshComponent.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
-#include "Characters/PDPlayerCharacter.h"
 
 APDCoverBase::APDCoverBase()
 {
@@ -13,40 +12,31 @@ APDCoverBase::APDCoverBase()
 	DestructionCollection->SetupAttachment(RootComponent);
 	DestructionCollection->SetHiddenInGame(true);
 	DestructionCollection->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	ValidZone = CreateDefaultSubobject<UBoxComponent>(TEXT("ValidZone"));
-	ValidZone->SetupAttachment(RootComponent);
-	ValidZone->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	ValidZone->SetCollisionResponseToAllChannels(ECR_Ignore);
-	ValidZone->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 }
 
 void APDCoverBase::BeginPlay()
 {
 	Super::BeginPlay();
 	CurrentHP = MaxHP;
-
-	ValidZone->OnComponentBeginOverlap.AddDynamic(this, &APDCoverBase::OnValidZoneBeginOverlap);
-	ValidZone->OnComponentEndOverlap.AddDynamic(this, &APDCoverBase::OnValidZoneEndOverlap);
 }
 
 FVector APDCoverBase::GetSnapLocation(AActor* Requester) const
 {
 	if (!CoverMesh || !Requester) return GetActorLocation();
-	
+
 	const FVector CoverCenter = CoverMesh->GetComponentLocation();
-	
-	FVector ToCharacter = (Requester->GetActorLocation() - CoverCenter);
+
+	FVector ToCharacter = Requester->GetActorLocation() - CoverCenter;
 	ToCharacter.Z = 0.f;
 	ToCharacter = ToCharacter.GetSafeNormal();
-	
+
 	const FBoxSphereBounds Bounds = CoverMesh->CalcBounds(CoverMesh->GetComponentTransform());
 	const FVector Extent = Bounds.BoxExtent;
 	const float HalfExtent = FMath::Abs(ToCharacter.X) * Extent.X
-	                        + FMath::Abs(ToCharacter.Y) * Extent.Y;
+		+ FMath::Abs(ToCharacter.Y) * Extent.Y;
 
 	FVector SnapPos = CoverCenter + ToCharacter * (HalfExtent + CharacterClearance);
-	SnapPos.Z = Requester->GetActorLocation().Z; // 캐릭터 Z 높이 유지
+	SnapPos.Z = Requester->GetActorLocation().Z;
 
 	return SnapPos;
 }
@@ -54,7 +44,7 @@ FVector APDCoverBase::GetSnapLocation(AActor* Requester) const
 FRotator APDCoverBase::GetSnapRotation(AActor* Requester) const
 {
 	if (!Requester) return GetActorRotation();
-	FVector TowardWall = (GetActorLocation() - Requester->GetActorLocation());
+	FVector TowardWall = GetActorLocation() - Requester->GetActorLocation();
 	TowardWall.Z = 0.f;
 	return TowardWall.GetSafeNormal().Rotation();
 }
@@ -69,7 +59,9 @@ bool APDCoverBase::TryOccupy(AActor* Requester)
 void APDCoverBase::Release(AActor* Requester)
 {
 	if (Occupant == Requester)
+	{
 		Occupant = nullptr;
+	}
 }
 
 void APDCoverBase::TakeCoverDamage(float Damage)
@@ -111,20 +103,4 @@ void APDCoverBase::OnDestroyed_Internal()
 	BP_OnCoverDestroyed();
 	OnCoverDestroyed.ExecuteIfBound();
 	Occupant = nullptr;
-}
-
-void APDCoverBase::OnValidZoneBeginOverlap(UPrimitiveComponent* OverlappedComp,
-    AActor* OtherActor, UPrimitiveComponent* OtherComp,
-    int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	if (APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(OtherActor))
-		Player->SetCoverCandidate(this);
-}
-
-void APDCoverBase::OnValidZoneEndOverlap(UPrimitiveComponent* OverlappedComp,
-    AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	if (APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(OtherActor))
-		if (Player->GetCoverCandidate() == this)
-			Player->SetCoverCandidate(nullptr);
 }

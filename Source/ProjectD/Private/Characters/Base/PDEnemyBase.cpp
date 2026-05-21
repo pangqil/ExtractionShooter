@@ -13,20 +13,21 @@
 #include "Items/PDLootItem.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "Component/PDWeaponComponent.h"
+#include "Characters/PDPlayerCharacter.h"
 #include "Data/PDQuestComponent.h"
 #include "GameFramework/Controller.h"
 #include "Weapons/Base/PDWeaponBase.h"
 
 APDEnemyBase::APDEnemyBase()
 {
-	// 적 AI 라 Minimal 로 충분. (큰 데이터는 호스트만 보유)
+
 	if (ASC)
 	{
 		ASC->SetIsReplicated(true);
 		ASC->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 	}
 
-	// Hostile 기본값. 자식(예: PDSoldier)에서 재정의 가능.
+
 	TeamID = 2;
 }
 
@@ -55,7 +56,7 @@ uint8 APDEnemyBase::GetTeamID_Implementation() const
 
 EPDStaminaStatus APDEnemyBase::GetStaminaStatus_Implementation() const
 {
-	// 비-Biped 디폴트. Biped 자식 클래스가 AttributeSet 기반으로 실제 상태 반환.
+
 	return EPDStaminaStatus::None;
 }
 
@@ -82,21 +83,21 @@ void APDEnemyBase::ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo)
 {
 	Super::ApplyDamage_Implementation(DamageInfo);
 
-	// Combat/Dead는 BT가 이미 능동 대응 중이거나 종료된 상태 — 추적 신호 무시.
+
 	if (CurrentState == EPDEnemyState::Combat || CurrentState == EPDEnemyState::Dead) return;
 	if (!IsAlive_Implementation()) return;
 
 	AActor* InstigatorActor = DamageInfo.Instigator.Get();
 	if (!InstigatorActor) return;
 
-	// Controller가 Instigator로 들어온 경우 Pawn으로 보정 (위치 신뢰성 확보).
+
 	if (AController* InstController = Cast<AController>(InstigatorActor))
 	{
 		InstigatorActor = InstController->GetPawn();
 		if (!InstigatorActor) return;
 	}
 
-	// 같은 팀이 가한 데미지는 추적 트리거 무시 (오발/AOE 등).
+
 	if (const IGenericTeamAgentInterface* InstTeam = Cast<IGenericTeamAgentInterface>(InstigatorActor))
 	{
 		if (InstTeam->GetGenericTeamId() == GetGenericTeamId()) return;
@@ -109,7 +110,7 @@ void APDEnemyBase::ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo)
 		Combat->SetLastNoiseLocation(InstigatorActor, HintLocation);
 	}
 
-	// BB 직접 갱신 — AIController는 OnNoiseHintChanged를 구독하지 않으므로 HandleNoiseHeard와 동일 패턴으로 채운다.
+
 	if (AAIController* AICon = Cast<AAIController>(GetController()))
 	{
 		if (UBlackboardComponent* BB = AICon->GetBlackboardComponent())
@@ -122,7 +123,7 @@ void APDEnemyBase::ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo)
 
 void APDEnemyBase::OnEnterState_Dead()
 {
-	// 충돌/이동 정리. 시체가 발사체를 막지 않도록. (StimuliSource 해제는 베이스 HandleDeath 에서.)
+
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -134,11 +135,11 @@ void APDEnemyBase::OnEnterState_Dead()
 		MoveComp->DisableMovement();
 	}
 
-	// 사망 시 드랍 + 시체 컨테이너. 디자이너가 BP 에서 추가 VFX/사운드는 OnLootDropped 로 확장.
+
 	DropLootOnDeath();
 	SpawnCorpseContainer();
 
-	// 0 이하면 영구 보존(시체 컨테이너로 대체되는 시나리오 등) — 그 외에는 LifeSpan 예약.
+
 	if (CorpseDespawnDelay > 0.f)
 	{
 		SetLifeSpan(CorpseDespawnDelay);
@@ -157,7 +158,17 @@ void APDEnemyBase::HandleDeath(AActor* Killer)
 
 	if (QuestOwner)
 	{
-		if (UPDQuestComponent* QuestComponent = QuestOwner->FindComponentByClass<UPDQuestComponent>())
+		UPDQuestComponent* QuestComponent = nullptr;
+		if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(QuestOwner))
+		{
+			QuestComponent = PlayerCharacter->GetQuestComponent();
+		}
+		else
+		{
+			QuestComponent = QuestOwner->FindComponentByClass<UPDQuestComponent>();
+		}
+
+		if (QuestComponent)
 		{
 			const FName EnemyID = !QuestEnemyID.IsNone() ? QuestEnemyID : GetFName();
 			QuestComponent->ReportEnemyKilled(EnemyID, 1);
@@ -200,14 +211,14 @@ void APDEnemyBase::DropLootOnDeath()
 			? FMath::VRand() * FMath::FRandRange(0.f, LootSpawnRadius)
 			: FVector::ZeroVector;
 
-		// Deferred 스폰: BeginPlay(=LoadItemData) 전에 ItemID 와 Quantity 를 주입.
+
 		const FTransform SpawnXform(FRotator::ZeroRotator, Origin + FVector(Offset.X, Offset.Y, 0.f));
 
 		APDLootItem* Item = World->SpawnActorDeferred<APDLootItem>(
 			Entry.ItemClass,
 			SpawnXform,
-			/*Owner=*/this,
-			/*Instigator=*/nullptr,
+			this,
+			nullptr,
 			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 
 		if (Item)

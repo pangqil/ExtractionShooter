@@ -1,7 +1,10 @@
 #include "Data/PDQuestComponent.h"
 
 #include "Core/PDGameInstance.h"
+#include "Core/PDPlayerState.h"
+#include "GameFramework/PlayerController.h"
 #include "Items/PDInventoryComponent.h"
+#include "Net/UnrealNetwork.h"
 
 namespace
 {
@@ -16,6 +19,69 @@ namespace
 UPDQuestComponent::UPDQuestComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
+}
+
+void UPDQuestComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UPDQuestComponent, ReplicatedActiveQuests);
+	DOREPLIFETIME(UPDQuestComponent, TrackedQuestID);
+}
+
+void UPDQuestComponent::OnRep_ReplicatedActiveQuests()
+{
+	ActiveQuests.Reset();
+	for (const FPDReplicatedQuestProgress& ReplicatedProgress : ReplicatedActiveQuests)
+	{
+		FPDQuestProgress RuntimeProgress;
+		RuntimeProgress.QuestData = ReplicatedProgress.QuestData;
+		RuntimeProgress.State = ReplicatedProgress.State;
+
+		for (const FPDReplicatedQuestObjectiveProgress& ProgressEntry : ReplicatedProgress.ObjectiveProgress)
+		{
+			if (!ProgressEntry.ProgressKey.IsNone())
+			{
+				RuntimeProgress.ObjectiveProgress.Add(ProgressEntry.ProgressKey, ProgressEntry.Amount);
+			}
+		}
+
+		ActiveQuests.Add(RuntimeProgress);
+	}
+
+	OnQuestUpdated.Broadcast();
+}
+
+void UPDQuestComponent::OnRep_TrackedQuestID()
+{
+	OnQuestUpdated.Broadcast();
+}
+
+void UPDQuestComponent::SyncActiveQuestsToReplication()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	ReplicatedActiveQuests.Reset();
+	for (const FPDQuestProgress& RuntimeProgress : ActiveQuests)
+	{
+		FPDReplicatedQuestProgress ReplicatedProgress;
+		ReplicatedProgress.QuestData = RuntimeProgress.QuestData;
+		ReplicatedProgress.State = RuntimeProgress.State;
+
+		for (const TPair<FName, int32>& Pair : RuntimeProgress.ObjectiveProgress)
+		{
+			FPDReplicatedQuestObjectiveProgress ProgressEntry;
+			ProgressEntry.ProgressKey = Pair.Key;
+			ProgressEntry.Amount = Pair.Value;
+			ReplicatedProgress.ObjectiveProgress.Add(ProgressEntry);
+		}
+
+		ReplicatedActiveQuests.Add(ReplicatedProgress);
+	}
 }
 
 bool UPDQuestComponent::AddQuest(const FPDQuestData& QuestData)
@@ -206,7 +272,11 @@ bool UPDQuestComponent::GiveReward(FName QuestID, UPDInventoryComponent* Invento
 
 	if (QuestProgress->QuestData.Reward.RewardTraderReputationExp > 0)
 	{
-		if (UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr)
+		if (APDPlayerState* PDPlayerState = Cast<APDPlayerState>(GetOwner()))
+		{
+			PDPlayerState->AddTraderReputationExp(QuestProgress->QuestData.Reward.RewardTraderReputationExp);
+		}
+		else if (UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr)
 		{
 			GI->SetTraderReputationExp(GI->GetTraderReputationExp() + QuestProgress->QuestData.Reward.RewardTraderReputationExp);
 		}
@@ -233,6 +303,7 @@ bool UPDQuestComponent::SetTrackedQuest(FName QuestID)
 	}
 
 	TrackedQuestID = QuestID;
+	SyncActiveQuestsToReplication();
 	OnQuestUpdated.Broadcast();
 	return true;
 }
@@ -242,6 +313,7 @@ void UPDQuestComponent::ClearTrackedQuest()
 	if (!TrackedQuestID.IsNone())
 	{
 		TrackedQuestID = NAME_None;
+		SyncActiveQuestsToReplication();
 		OnQuestUpdated.Broadcast();
 	}
 }
@@ -475,6 +547,12 @@ int32 UPDQuestComponent::GetInventoryAndStashItemCount(FName ItemID, const UPDIn
 		}
 	}
 
+	if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(GetOwner()))
+	{
+		TotalQuantity += PDPlayerState->CountPersistentStashItems(ItemID, bCountAnyItem);
+		return TotalQuantity;
+	}
+
 	const UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr;
 	if (GI)
 	{
@@ -543,6 +621,22 @@ int32 UPDQuestComponent::RemoveQuestItemsFromStash(FName ItemID, int32 Quantity)
 		return 0;
 	}
 
+	const bool bRemoveAnyItem = IsAnyQuestTarget(ItemID);
+	if (APDPlayerState* PDPlayerState = Cast<APDPlayerState>(GetOwner()))
+	{
+		const int32 RemovedQuantity = PDPlayerState->RemovePersistentStashItems(ItemID, Quantity, bRemoveAnyItem);
+		if (RemovedQuantity > 0)
+		{
+			if (UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr)
+			{
+				GI->SavePlayerDataToDisk(
+					GI->GetSaveKeyForController(Cast<APlayerController>(PDPlayerState->GetOwner())),
+					PDPlayerState->GetPersistentData());
+			}
+		}
+		return RemovedQuantity;
+	}
+
 	UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr;
 	if (!GI)
 	{
@@ -550,7 +644,6 @@ int32 UPDQuestComponent::RemoveQuestItemsFromStash(FName ItemID, int32 Quantity)
 	}
 
 	TArray<FPDInventorySlot> StashItems = GI->GetStashItems();
-	const bool bRemoveAnyItem = IsAnyQuestTarget(ItemID);
 	int32 RemainingQuantity = Quantity;
 	int32 RemovedQuantity = 0;
 
@@ -689,6 +782,8 @@ void UPDQuestComponent::RefreshQuestState(FPDQuestProgress& QuestProgress)
 
 void UPDQuestComponent::BroadcastQuestUpdated(FName QuestID, EPDQuestState PreviousState, EPDQuestState NewState)
 {
+	SyncActiveQuestsToReplication();
+
 	if (PreviousState != NewState)
 	{
 		OnQuestStateChanged.Broadcast(QuestID, NewState);

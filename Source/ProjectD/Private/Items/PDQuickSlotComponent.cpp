@@ -1,9 +1,12 @@
 #include "Items/PDQuickSlotComponent.h"
 
+#include "Characters/PDPlayerCharacter.h"
+#include "Core/PDPlayerState.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDStashComponent.h"
+#include "Weapons/Base/PDWeaponBase.h"
 
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
@@ -11,10 +14,87 @@
 #include "TimerManager.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Net/UnrealNetwork.h"
 
 UPDQuickSlotComponent::UPDQuickSlotComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
+}
+
+void UPDQuickSlotComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UPDQuickSlotComponent, QuickSlotItems);
+	DOREPLIFETIME(UPDQuickSlotComponent, SelectedIndex);
+	DOREPLIFETIME(UPDQuickSlotComponent, bIsUsingConsumable);
+	DOREPLIFETIME(UPDQuickSlotComponent, UsingConsumableSlotIndex);
+	DOREPLIFETIME(UPDQuickSlotComponent, ConsumableUseStartTime);
+	DOREPLIFETIME(UPDQuickSlotComponent, ConsumableUseEndTime);
+}
+
+void UPDQuickSlotComponent::OnRep_QuickSlotItems()
+{
+	OnQuickSlotsChanged.Broadcast();
+}
+
+void UPDQuickSlotComponent::OnRep_SelectedIndex()
+{
+	OnSelectionChanged.Broadcast(SelectedIndex);
+}
+
+void UPDQuickSlotComponent::OnRep_ConsumableUseState()
+{
+	if (!bIsUsingConsumable)
+	{
+		RestoreConsumableMoveSpeed();
+	}
+}
+
+void UPDQuickSlotComponent::ServerSetSelectedIndex_Implementation(int32 NewIndex)
+{
+	SetSelectedIndex(NewIndex);
+}
+
+void UPDQuickSlotComponent::ServerResetQuickSlots_Implementation()
+{
+	ResetQuickSlots();
+}
+
+void UPDQuickSlotComponent::ServerMoveSlotQuantityToSlot_Implementation(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+}
+
+void UPDQuickSlotComponent::ServerStoreInventorySlotQuantityToSlot_Implementation(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 TargetQuickSlotIndex, int32 Quantity)
+{
+	StoreInventorySlotQuantityToSlot(SourceInventory, SourceSlotIndex, TargetQuickSlotIndex, Quantity);
+}
+
+void UPDQuickSlotComponent::ServerRemoveItemFromSlot_Implementation(int32 SlotIndex, int32 Quantity)
+{
+	RemoveItemFromSlot(SlotIndex, Quantity);
+}
+
+void UPDQuickSlotComponent::ServerUseQuickSlot_Implementation(int32 SlotIndex)
+{
+	UseQuickSlot(SlotIndex);
+}
+
+void UPDQuickSlotComponent::ServerUseInventoryConsumableSlot_Implementation(int32 InventorySlotIndex)
+{
+	UseInventoryConsumableSlot(InventorySlotIndex);
+}
+
+void UPDQuickSlotComponent::ServerEquipInventoryWeaponSlot_Implementation(int32 InventorySlotIndex)
+{
+	EquipInventoryWeaponSlot(InventorySlotIndex);
+}
+
+void UPDQuickSlotComponent::ServerCancelConsumableUse_Implementation()
+{
+	CancelConsumableUse();
 }
 
 void UPDQuickSlotComponent::SetWeaponSlotCount(int32 NewCount)
@@ -25,6 +105,12 @@ void UPDQuickSlotComponent::SetWeaponSlotCount(int32 NewCount)
 
 void UPDQuickSlotComponent::SetSelectedIndex(int32 NewIndex)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerSetSelectedIndex(NewIndex);
+		return;
+	}
+
 	if (SelectedIndex == NewIndex)
 	{
 		return;
@@ -92,6 +178,21 @@ UPDEquipmentComponent* UPDQuickSlotComponent::FindOwnerEquipment() const
 	return nullptr;
 }
 
+APDPlayerCharacter* UPDQuickSlotComponent::FindOwnerPlayerCharacter() const
+{
+	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwner()))
+	{
+		return PlayerCharacter;
+	}
+
+	if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(GetOwner()))
+	{
+		return PDPlayerState->GetPDPlayerCharacter();
+	}
+
+	return nullptr;
+}
+
 int32 UPDQuickSlotComponent::GetInventoryItemQuantity(FName ItemID) const
 {
 	if (ItemID.IsNone())
@@ -120,7 +221,7 @@ int32 UPDQuickSlotComponent::GetInventoryItemQuantity(FName ItemID) const
 int32 UPDQuickSlotComponent::GetAvailableItemQuantity(const FPDItemData& ItemData) const
 {
 	int32 Quantity = GetInventoryItemQuantity(ItemData.ItemID);
-	if (ItemData.ItemType == EPDItemType::Equipment && IsEquippedItem(ItemData))
+	if ((ItemData.ItemType == EPDItemType::Equipment || ItemData.WeaponType != EWeaponType::None) && IsEquippedItem(ItemData))
 	{
 		++Quantity;
 	}
@@ -178,6 +279,16 @@ int32 UPDQuickSlotComponent::FindWeaponQuickSlotByItemID(FName ItemID) const
 
 bool UPDQuickSlotComponent::IsEquippedItem(const FPDItemData& ItemData) const
 {
+	if (ItemData.WeaponType != EWeaponType::None)
+	{
+		if (const APDPlayerCharacter* PlayerCharacter = FindOwnerPlayerCharacter())
+		{
+			const EWeaponSlot WeaponSlot = PlayerCharacter->GetSlotForWeaponType(ItemData.WeaponType);
+			const APDWeaponBase* Weapon = PlayerCharacter->GetWeaponInSlot(WeaponSlot);
+			return Weapon && Weapon->GetItemID() == ItemData.ItemID;
+		}
+	}
+
 	const UPDEquipmentComponent* EquipmentComponent = FindOwnerEquipment();
 	if (!EquipmentComponent || ItemData.ItemID.IsNone())
 	{
@@ -229,6 +340,12 @@ bool UPDQuickSlotComponent::SyncQuickSlotsWithInventory()
 
 void UPDQuickSlotComponent::HandleInventoryChanged()
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		OnQuickSlotsChanged.Broadcast();
+		return;
+	}
+
 	if (SyncQuickSlotsWithInventory())
 	{
 		OnQuickSlotsChanged.Broadcast();
@@ -267,7 +384,8 @@ bool UPDQuickSlotComponent::CanAssignItemToSlot(const FPDItemData& ItemData, int
 
 	if (IsWeaponQuickSlot(SlotIndex))
 	{
-		return ItemData.ItemType == EPDItemType::Equipment && ItemData.EquipmentSlotType == EPDEquipmentSlotType::Weapon;
+		return ItemData.WeaponType != EWeaponType::None ||
+			(ItemData.ItemType == EPDItemType::Equipment && ItemData.EquipmentSlotType == EPDEquipmentSlotType::Weapon);
 	}
 
 	return IsConsumableQuickSlot(SlotIndex) && ItemData.ItemType == EPDItemType::Consumable;
@@ -288,6 +406,11 @@ int32 UPDQuickSlotComponent::FindEmptySlotForItem(const FPDItemData& ItemData) c
 
 void UPDQuickSlotComponent::InitializeQuickSlots()
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
 	const int32 MaxSlotCount = GetMaxSlotCount();
 
 	if (MaxSlotCount <= 0)
@@ -319,6 +442,12 @@ void UPDQuickSlotComponent::InitializeQuickSlots()
 
 void UPDQuickSlotComponent::ResetQuickSlots()
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerResetQuickSlots();
+		return;
+	}
+
 	QuickSlotItems.SetNum(GetMaxSlotCount());
 
 	for (FPDInventorySlot& Slot : QuickSlotItems)
@@ -331,6 +460,11 @@ void UPDQuickSlotComponent::ResetQuickSlots()
 
 int32 UPDQuickSlotComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return 0;
+	}
+
 	if (QuickSlotItems.Num() != GetMaxSlotCount())
 	{
 		InitializeQuickSlots();
@@ -342,6 +476,11 @@ int32 UPDQuickSlotComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 int32 UPDQuickSlotComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return 0;
+	}
+
 	if (ItemData.ItemID.IsNone() || Quantity <= 0)
 	{
 		return 0;
@@ -363,7 +502,7 @@ int32 UPDQuickSlotComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 		return 0;
 	}
 
-	if (ItemData.ItemType == EPDItemType::Equipment)
+	if (ItemData.ItemType == EPDItemType::Equipment || ItemData.WeaponType != EWeaponType::None)
 	{
 		TargetSlot.ItemData = ItemData;
 		TargetSlot.Quantity = 1;
@@ -384,6 +523,12 @@ int32 UPDQuickSlotComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 
 bool UPDQuickSlotComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerMoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+		return true;
+	}
+
 	if (QuickSlotItems.Num() != GetMaxSlotCount())
 	{
 		InitializeQuickSlots();
@@ -419,6 +564,12 @@ bool UPDQuickSlotComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 
 
 bool UPDQuickSlotComponent::StoreInventorySlotQuantityToSlot(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 TargetQuickSlotIndex, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerStoreInventorySlotQuantityToSlot(SourceInventory, SourceSlotIndex, TargetQuickSlotIndex, Quantity);
+		return true;
+	}
+
 	if (!SourceInventory || SourceInventory->Items.Num() != SourceInventory->GetMaxSlotCount())
 	{
 		if (SourceInventory)
@@ -478,6 +629,12 @@ bool UPDQuickSlotComponent::TakeQuickSlotQuantityToStashSlot(UPDStashComponent* 
 
 bool UPDQuickSlotComponent::RemoveItemFromSlot(int32 SlotIndex, int32 Quantity)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerRemoveItemFromSlot(SlotIndex, Quantity);
+		return true;
+	}
+
 	if (!QuickSlotItems.IsValidIndex(SlotIndex))
 	{
 		return false;
@@ -495,6 +652,12 @@ bool UPDQuickSlotComponent::RemoveItemFromSlot(int32 SlotIndex, int32 Quantity)
 
 bool UPDQuickSlotComponent::UseInventoryConsumableSlot(int32 InventorySlotIndex)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerUseInventoryConsumableSlot(InventorySlotIndex);
+		return true;
+	}
+
 	if (bIsUsingConsumable)
 	{
 		return false;
@@ -517,6 +680,12 @@ bool UPDQuickSlotComponent::UseInventoryConsumableSlot(int32 InventorySlotIndex)
 
 bool UPDQuickSlotComponent::EquipInventoryWeaponSlot(int32 InventorySlotIndex)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerEquipInventoryWeaponSlot(InventorySlotIndex);
+		return true;
+	}
+
 	const UPDInventoryComponent* InventoryComponent = FindOwnerInventory();
 	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(InventorySlotIndex))
 	{
@@ -524,7 +693,9 @@ bool UPDQuickSlotComponent::EquipInventoryWeaponSlot(int32 InventorySlotIndex)
 	}
 
 	const FPDInventorySlot Slot = InventoryComponent->Items[InventorySlotIndex];
-	if (Slot.IsEmpty() || Slot.ItemData.ItemType != EPDItemType::Equipment || Slot.ItemData.EquipmentSlotType != EPDEquipmentSlotType::Weapon)
+	if (Slot.IsEmpty() ||
+		(Slot.ItemData.WeaponType == EWeaponType::None &&
+			(Slot.ItemData.ItemType != EPDItemType::Equipment || Slot.ItemData.EquipmentSlotType != EPDEquipmentSlotType::Weapon)))
 	{
 		return false;
 	}
@@ -535,6 +706,12 @@ bool UPDQuickSlotComponent::EquipInventoryWeaponSlot(int32 InventorySlotIndex)
 
 bool UPDQuickSlotComponent::UseQuickSlot(int32 SlotIndex)
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerUseQuickSlot(SlotIndex);
+		return true;
+	}
+
 	if (QuickSlotItems.Num() != GetMaxSlotCount())
 	{
 		InitializeQuickSlots();
@@ -581,6 +758,21 @@ bool UPDQuickSlotComponent::UseWeaponQuickSlot(int32 SlotIndex, const FPDInvento
 		return false;
 	}
 
+	if (APDPlayerCharacter* PlayerCharacter = FindOwnerPlayerCharacter())
+	{
+		const EWeaponSlot WeaponSlot = PlayerCharacter->GetSlotForWeaponType(Slot.ItemData.WeaponType);
+		if (APDWeaponBase* Weapon = PlayerCharacter->GetWeaponInSlot(WeaponSlot))
+		{
+			if (Weapon->GetItemID() == Slot.ItemData.ItemID || Weapon->GetWeaponType() == Slot.ItemData.WeaponType)
+			{
+				PlayerCharacter->SwitchToSlot(WeaponSlot);
+				SetSelectedIndex(SlotIndex);
+				StartWeaponQuickSlotCooldown(SlotIndex);
+				return true;
+			}
+		}
+	}
+
 	const int32 InventorySlotIndex = FindInventorySlotByItemID(Slot.ItemData.ItemID);
 	if (InventorySlotIndex == INDEX_NONE)
 	{
@@ -607,7 +799,9 @@ bool UPDQuickSlotComponent::EquipWeaponFromInventorySlot(int32 InventorySlotInde
 	}
 
 	const FPDInventorySlot InventorySlot = InventoryComponent->Items[InventorySlotIndex];
-	if (InventorySlot.IsEmpty() || InventorySlot.ItemData.ItemType != EPDItemType::Equipment || InventorySlot.ItemData.EquipmentSlotType != EPDEquipmentSlotType::Weapon)
+	if (InventorySlot.IsEmpty() ||
+		(InventorySlot.ItemData.WeaponType == EWeaponType::None &&
+			(InventorySlot.ItemData.ItemType != EPDItemType::Equipment || InventorySlot.ItemData.EquipmentSlotType != EPDEquipmentSlotType::Weapon)))
 	{
 		return false;
 	}
@@ -617,7 +811,18 @@ bool UPDQuickSlotComponent::EquipWeaponFromInventorySlot(int32 InventorySlotInde
 		return false;
 	}
 
-	const bool bEquipped = EquipmentComponent->EquipItemFromInventoryToSlot(InventoryComponent, InventorySlotIndex, EPDEquipmentSlotType::Weapon);
+	bool bEquipped = false;
+	if (InventorySlot.ItemData.WeaponType != EWeaponType::None)
+	{
+		if (APDPlayerCharacter* PlayerCharacter = FindOwnerPlayerCharacter())
+		{
+			bEquipped = PlayerCharacter->TryAutoEquipWeaponSlot(InventorySlot);
+		}
+	}
+	else
+	{
+		bEquipped = EquipmentComponent->EquipItemFromInventoryToSlot(InventoryComponent, InventorySlotIndex, EPDEquipmentSlotType::Weapon);
+	}
 	if (!bEquipped)
 	{
 		return false;
@@ -727,7 +932,13 @@ bool UPDQuickSlotComponent::ConsumeItem(const FPDInventorySlot& Slot)
 
 	if (Slot.ItemData.UseEffect)
 	{
-		UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+		AActor* EffectTarget = GetOwner();
+		if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(GetOwner()))
+		{
+			EffectTarget = PDPlayerState->GetPDPlayerCharacter();
+		}
+
+		UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(EffectTarget);
 		if (ASC)
 		{
 			FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
@@ -743,6 +954,12 @@ bool UPDQuickSlotComponent::ConsumeItem(const FPDInventorySlot& Slot)
 
 bool UPDQuickSlotComponent::CancelConsumableUse()
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		ServerCancelConsumableUse();
+		return true;
+	}
+
 	if (!bIsUsingConsumable)
 	{
 		return false;
@@ -842,6 +1059,14 @@ void UPDQuickSlotComponent::RestoreConsumableMoveSpeed()
 UCharacterMovementComponent* UPDQuickSlotComponent::FindOwnerMovementComponent() const
 {
 	const ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+	if (!OwnerCharacter)
+	{
+		if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(GetOwner()))
+		{
+			OwnerCharacter = PDPlayerState->GetPDPlayerCharacter();
+		}
+	}
+
 	return OwnerCharacter ? OwnerCharacter->GetCharacterMovement() : nullptr;
 }
 

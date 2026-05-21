@@ -10,22 +10,28 @@ APDSniper::APDSniper()
     DefaultFOV = 90.f;
     ZoomedFOV  = 40.f;
 
-    LevelStats.Add({ 80.f,  1.5f,  8000.f, 5, 3.0f, 1.0f }); // Lv1
-    LevelStats.Add({ 120.f, 1.3f, 10000.f, 5, 2.7f, 1.0f }); // Lv2
-    LevelStats.Add({ 180.f, 1.2f, 15000.f, 5, 2.5f, 1.0f }); // Lv3
+    LevelStats.Add({ 80.f,  1.5f,  8000.f, 5, 3.0f, 1.0f });
+    LevelStats.Add({ 120.f, 1.3f, 10000.f, 5, 2.7f, 1.0f });
+    LevelStats.Add({ 180.f, 1.2f, 15000.f, 5, 2.5f, 1.0f });
 }
 
 void APDSniper::Fire_Implementation()
 {
+    if (!HasAuthority()) return;
     if (!CanFire()) return;
     if (!ProjectileClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("PDSniper: ProjectileClass 미설정"));
         return;
     }
 
-    PlayFireEffects();
-    SpawnCartridge();
+    const FVector MuzzleLoc = WeaponMesh->DoesSocketExist(MuzzleSocketName)
+        ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
+        : GetActorLocation();
+
+
+
+    ExecuteFireCue(MuzzleLoc, FVector::ZeroVector);
+
     SpawnProjectile(CanPenetrate());
 
     if (BoltActionMontage)
@@ -45,7 +51,7 @@ void APDSniper::Fire_Implementation()
 
 void APDSniper::OnBoltActionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-    // 볼트 액션 완료 후 처리 필요 시 여기서
+
 }
 
 void APDSniper::ToggleZoom()

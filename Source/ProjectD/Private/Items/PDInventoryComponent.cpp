@@ -1,12 +1,70 @@
 #include "Items/PDInventoryComponent.h"
 
+#include "Core/PDPlayerState.h"
 #include "Data/PDQuestComponent.h"
+#include "Characters/PDPlayerCharacter.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDEquipmentComponent.h"
+#include "Items/PDQuickSlotComponent.h"
+#include "Net/UnrealNetwork.h"
+
+namespace
+{
+	UPDQuestComponent* FindOwnerQuestComponent(const UActorComponent* Component)
+	{
+		if (!Component || !Component->GetOwner())
+		{
+			return nullptr;
+		}
+
+		if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(Component->GetOwner()))
+		{
+			return PDPlayerState->GetQuestComponent();
+		}
+
+		return Component->GetOwner()->FindComponentByClass<UPDQuestComponent>();
+	}
+
+	UPDEquipmentComponent* FindOwnerEquipmentComponent(const UActorComponent* Component)
+	{
+		if (!Component || !Component->GetOwner())
+		{
+			return nullptr;
+		}
+
+		if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(Component->GetOwner()))
+		{
+			return PDPlayerState->GetEquipmentComponent();
+		}
+
+		return Component->GetOwner()->FindComponentByClass<UPDEquipmentComponent>();
+	}
+
+	APDPlayerCharacter* FindOwnerPlayerCharacter(const UActorComponent* Component)
+	{
+		if (!Component || !Component->GetOwner())
+		{
+			return nullptr;
+		}
+
+		if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(Component->GetOwner()))
+		{
+			return PlayerCharacter;
+		}
+
+		if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(Component->GetOwner()))
+		{
+			return PDPlayerState->GetPDPlayerCharacter();
+		}
+
+		return nullptr;
+	}
+}
 
 UPDInventoryComponent::UPDInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 }
 
 void UPDInventoryComponent::BeginPlay()
@@ -16,13 +74,53 @@ void UPDInventoryComponent::BeginPlay()
 	InitializeInventory();
 }
 
+void UPDInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UPDInventoryComponent, Items);
+	DOREPLIFETIME(UPDInventoryComponent, Gold);
+}
+
+void UPDInventoryComponent::OnRep_Items()
+{
+	OnInventoryChanged.Broadcast();
+}
+
+void UPDInventoryComponent::OnRep_Gold()
+{
+	OnInventoryChanged.Broadcast();
+}
+
+void UPDInventoryComponent::ServerRemoveItemFromSlot_Implementation(int32 SlotIndex, int32 Quantity)
+{
+	RemoveItemFromSlot(SlotIndex, Quantity);
+}
+
+void UPDInventoryComponent::ServerDropItemFromSlot_Implementation(int32 SlotIndex, int32 Quantity)
+{
+	DropItemFromSlot(SlotIndex, Quantity);
+}
+
+void UPDInventoryComponent::ServerUseItemFromSlot_Implementation(int32 SlotIndex)
+{
+	UseItemFromSlot(SlotIndex);
+}
+
+void UPDInventoryComponent::ServerMoveSlotQuantityToSlot_Implementation(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+}
+
 bool UPDInventoryComponent::AddItem(const FPDItemData& ItemData, int32 Quantity)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
 	return AddItemPartial(ItemData, Quantity) > 0;
 }
 
 bool UPDInventoryComponent::AddItemByID(FName ItemID, int32 Quantity)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
 	if (!ItemDataTable || ItemID.IsNone()) return false;
 
 	TArray<FPDItemData*> Rows;
@@ -39,6 +137,7 @@ bool UPDInventoryComponent::AddItemByID(FName ItemID, int32 Quantity)
 
 bool UPDInventoryComponent::RemoveItem(FName ItemID, int32 Quantity)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
 	if (ItemID.IsNone() || Quantity <= 0 || !HasItem(ItemID, Quantity))
 	{
 		return false;
@@ -69,6 +168,12 @@ bool UPDInventoryComponent::RemoveItem(FName ItemID, int32 Quantity)
 
 bool UPDInventoryComponent::RemoveItemFromSlot(int32 SlotIndex, int32 Quantity)
 {
+	if (!GetOwner()) return false;
+	if (!GetOwner()->HasAuthority())
+	{
+		ServerRemoveItemFromSlot(SlotIndex, Quantity);
+		return true;
+	}
 	if (!Items.IsValidIndex(SlotIndex) || Quantity <= 0)
 	{
 		return false;
@@ -94,6 +199,12 @@ bool UPDInventoryComponent::RemoveItemFromSlot(int32 SlotIndex, int32 Quantity)
 
 bool UPDInventoryComponent::DropItemFromSlot(int32 SlotIndex, int32 Quantity)
 {
+	if (!GetOwner()) return false;
+	if (!GetOwner()->HasAuthority())
+	{
+		ServerDropItemFromSlot(SlotIndex, Quantity);
+		return true;
+	}
 	if (!Items.IsValidIndex(SlotIndex) || Quantity <= 0)
 	{
 		return false;
@@ -111,7 +222,7 @@ bool UPDInventoryComponent::DropItemFromSlot(int32 SlotIndex, int32 Quantity)
 
 	if (bDropped)
 	{
-		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
+		if (UPDQuestComponent* QuestComponent = FindOwnerQuestComponent(this))
 		{
 			QuestComponent->ReportItemDropped(ItemID, DropAmount);
 		}
@@ -122,6 +233,12 @@ bool UPDInventoryComponent::DropItemFromSlot(int32 SlotIndex, int32 Quantity)
 
 bool UPDInventoryComponent::UseItemFromSlot(int32 SlotIndex)
 {
+	if (!GetOwner()) return false;
+	if (!GetOwner()->HasAuthority())
+	{
+		ServerUseItemFromSlot(SlotIndex);
+		return true;
+	}
 	if (!Items.IsValidIndex(SlotIndex))
 	{
 		return false;
@@ -168,6 +285,7 @@ bool UPDInventoryComponent::HasItem(FName ItemID, int32 Quantity) const
 
 void UPDInventoryComponent::AddGold(int32 Amount)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 	if (Amount > 0)
 	{
 		Gold += Amount;
@@ -177,6 +295,7 @@ void UPDInventoryComponent::AddGold(int32 Amount)
 
 bool UPDInventoryComponent::SpendGold(int32 Amount)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
 	if (Amount <= 0 || Gold < Amount)
 	{
 		return false;
@@ -208,7 +327,7 @@ float UPDInventoryComponent::GetMaxWeight() const
 {
 	float MaxWeight = FMath::Max(0.f, BaseCarryWeight);
 
-	if (const UPDEquipmentComponent* EquipmentComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDEquipmentComponent>() : nullptr)
+	if (const UPDEquipmentComponent* EquipmentComponent = FindOwnerEquipmentComponent(this))
 	{
 		const FPDInventorySlot EquippedBagSlot = EquipmentComponent->GetEquippedSlot(EPDEquipmentSlotType::Bag);
 		if (!EquippedBagSlot.IsEmpty())
@@ -290,6 +409,7 @@ int32 UPDInventoryComponent::FindEmptySlot() const
 
 int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return 0;
 	if (Items.Num() != GetMaxSlotCount())
 	{
 		InitializeInventory();
@@ -311,7 +431,7 @@ int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 	{
 		OnInventoryChanged.Broadcast();
 
-		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
+		if (UPDQuestComponent* QuestComponent = FindOwnerQuestComponent(this))
 		{
 			QuestComponent->ReportItemAcquired(ItemData.ItemID, AddedQuantity);
 			if (ItemData.bIsQuestItem)
@@ -326,6 +446,12 @@ int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 
 bool UPDInventoryComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
 {
+	if (!GetOwner()) return false;
+	if (!GetOwner()->HasAuthority())
+	{
+		ServerMoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+		return true;
+	}
 	if (Items.Num() != GetMaxSlotCount())
 	{
 		InitializeInventory();
@@ -347,6 +473,7 @@ bool UPDInventoryComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 
 
 int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quantity)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return 0;
 	if (ItemData.ItemID.IsNone() || Quantity <= 0)
 	{
 		return 0;
@@ -354,32 +481,63 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 	int32 RemainingQuantity = Quantity;
 	int32 AddedQuantity = 0;
+	bool bEquippedFromThisAdd = false;
 
-	if (ItemData.ItemType == EPDItemType::Equipment)
+	auto HandleAddedItem = [&](int32 InAddedQuantity)
 	{
-		if (UPDEquipmentComponent* EquipmentComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDEquipmentComponent>() : nullptr)
+		OnInventoryChanged.Broadcast();
+
+		if (ItemData.WeaponType != EWeaponType::None)
+		{
+			if (APDPlayerCharacter* PlayerCharacter = FindOwnerPlayerCharacter(this))
+			{
+				if (!bEquippedFromThisAdd)
+				{
+					FPDInventorySlot WeaponSlot;
+					WeaponSlot.ItemData = ItemData;
+					WeaponSlot.Quantity = 1;
+					WeaponSlot.bIsEmpty = false;
+					WeaponSlot.ModificationLevel = 0;
+
+					bEquippedFromThisAdd = PlayerCharacter->TryAutoEquipWeaponSlot(WeaponSlot);
+				}
+
+				if (bEquippedFromThisAdd)
+				{
+					if (UPDQuickSlotComponent* QuickSlotComponent = PlayerCharacter->GetQuickSlotComponent())
+					{
+						QuickSlotComponent->AddItemPartial(ItemData, 1);
+					}
+				}
+			}
+		}
+
+		if (UPDQuestComponent* QuestComponent = FindOwnerQuestComponent(this))
+		{
+			QuestComponent->ReportItemAcquired(ItemData.ItemID, InAddedQuantity);
+			if (ItemData.bIsQuestItem)
+			{
+				QuestComponent->ReportQuestItemAcquired(ItemData.ItemID, InAddedQuantity);
+			}
+		}
+	};
+
+	if (ItemData.ItemType == EPDItemType::Equipment || ItemData.WeaponType != EWeaponType::None)
+	{
+		if (UPDEquipmentComponent* EquipmentComponent = FindOwnerEquipmentComponent(this))
 		{
 			if (EquipmentComponent->TryEquipNewItem(ItemData))
 			{
 				RemainingQuantity -= 1;
 				AddedQuantity += 1;
+				bEquippedFromThisAdd = true;
 			}
 		}
 	}
 
 	if (RemainingQuantity <= 0)
 	{
-		OnInventoryChanged.Broadcast();
-
-		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
-		{
-			QuestComponent->ReportItemAcquired(ItemData.ItemID, AddedQuantity);
-			if (ItemData.bIsQuestItem)
-			{
-				QuestComponent->ReportQuestItemAcquired(ItemData.ItemID, AddedQuantity);
-			}
-		}
-
+		HandleAddedItem(AddedQuantity);
 		return AddedQuantity;
 	}
 
@@ -407,17 +565,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 				if (RemainingQuantity <= 0)
 				{
-					OnInventoryChanged.Broadcast();
-
-					if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
-					{
-						QuestComponent->ReportItemAcquired(ItemData.ItemID, AddedQuantity);
-						if (ItemData.bIsQuestItem)
-						{
-							QuestComponent->ReportQuestItemAcquired(ItemData.ItemID, AddedQuantity);
-						}
-					}
-
+					HandleAddedItem(AddedQuantity);
 					return AddedQuantity;
 				}
 			}
@@ -446,16 +594,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 	if (AddedQuantity > 0)
 	{
-		OnInventoryChanged.Broadcast();
-
-		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
-		{
-			QuestComponent->ReportItemAcquired(ItemData.ItemID, AddedQuantity);
-			if (ItemData.bIsQuestItem)
-			{
-				QuestComponent->ReportQuestItemAcquired(ItemData.ItemID, AddedQuantity);
-			}
-		}
+		HandleAddedItem(AddedQuantity);
 	}
 
 	return AddedQuantity;
@@ -464,6 +603,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 int32 UPDInventoryComponent::AddSlotPartial(const FPDInventorySlot& SourceSlot)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return 0;
 	if (SourceSlot.IsEmpty() || SourceSlot.Quantity <= 0)
 	{
 		return 0;
@@ -501,6 +641,11 @@ int32 UPDInventoryComponent::AddSlotPartial(const FPDInventorySlot& SourceSlot)
 
 void UPDInventoryComponent::InitializeInventory()
 {
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
 	const int32 MaxSlotCount = GetMaxSlotCount();
 
 	if (MaxSlotCount <= 0)
@@ -524,6 +669,7 @@ void UPDInventoryComponent::InitializeInventory()
 
 void UPDInventoryComponent::ResetInventory()
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 	Items.SetNum(GetMaxSlotCount());
 
 	for (FPDInventorySlot& Slot : Items)

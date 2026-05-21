@@ -194,7 +194,7 @@ int32 UPDMarketItemWidget::GetUnitPrice() const
 
 bool UPDMarketItemWidget::IsLocked() const
 {
-	return MarketComponent && !MarketComponent->CanBuyEntry(EntryIndex);
+	return MarketComponent && !MarketComponent->CanBuyEntryForInventory(EntryIndex, BuyerInventory);
 }
 
 int32 UPDMarketItemWidget::GetRequiredTraderLevel() const

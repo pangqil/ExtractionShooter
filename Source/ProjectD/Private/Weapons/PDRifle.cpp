@@ -1,47 +1,71 @@
 #include "Weapons/PDRifle.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Core/PDPlayerController.h"
+#include "Net/UnrealNetwork.h"
 
 APDRifle::APDRifle()
 {
     WeaponType = EWeaponType::Rifle;
     bFullAuto  = true;
 
-    LevelStats.Add({ 20.f, 0.12f, 1500.f, 30, 2.0f, 0.90f }); // Lv1
-    LevelStats.Add({ 28.f, 0.10f, 1700.f, 35, 1.8f, 0.93f }); // Lv2
-    LevelStats.Add({ 38.f, 0.08f, 2000.f, 40, 1.5f, 0.96f }); // Lv3
+    LevelStats.Add({ 20.f, 0.12f, 1500.f, 30, 2.0f, 0.90f });
+    LevelStats.Add({ 28.f, 0.10f, 1700.f, 35, 1.8f, 0.93f });
+    LevelStats.Add({ 38.f, 0.08f, 2000.f, 40, 1.5f, 0.96f });
+}
+
+void APDRifle::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(APDRifle, FireMode);
 }
 
 void APDRifle::Fire_Implementation()
 {
-    UE_LOG(LogTemp, Warning, TEXT("Fire called! CanFire: %d, Ammo: %d"),
-        CanFire(), CurrentAmmo);
-
-    if (!CanFire()) return;
-
-    FHitResult Hit;
-    if (PerformLineTrace(Hit))
+    if (!HasAuthority()) return;
+    if (!CanFire())
     {
-        ApplyDamage(Hit.GetActor(), GetCurrentStats().Damage);
-        SpawnImpactEffect(Hit);
-        PlayHitSound(Hit);
+        return;
     }
 
-    PlayFireEffects();
-    SpawnCartridge();
+    FHitResult Hit;
+    FVector TraceEnd;
+    const bool bHit = PerformLineTrace(Hit, TraceEnd);
+
+    if (bHit)
+        ApplyDamage(Hit.GetActor(), GetCurrentStats().Damage, Hit);
+
+    const FVector MuzzleLoc = WeaponMesh->DoesSocketExist(MuzzleSocketName)
+        ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
+        : GetActorLocation();
+
+
+    ExecuteFireCue(MuzzleLoc, bHit ? Hit.ImpactPoint : TraceEnd);
+
+
+    if (bHit)
+        ExecuteImpactCue(Hit);
+
     PlayWeaponMontage(FireMontage);
     PostFire();
 }
 
 void APDRifle::ToggleFireMode()
 {
+    if (!HasAuthority()) return;
+
     FireMode = (FireMode == EFireMode::Auto)
         ? EFireMode::Single : EFireMode::Auto;
 
     OnFireModeChanged.Broadcast(FireMode);
 }
 
-bool APDRifle::PerformLineTrace(FHitResult& OutHit)
+void APDRifle::OnRep_FireMode()
+{
+    OnFireModeChanged.Broadcast(FireMode);
+}
+
+bool APDRifle::PerformLineTrace(FHitResult& OutHit, FVector& OutTraceEnd)
 {
     const FWeaponLevelStats& Stats = GetCurrentStats();
     AActor* WeaponOwnerActor = GetWeaponOwner();
@@ -60,25 +84,33 @@ bool APDRifle::PerformLineTrace(FHitResult& OutHit)
     float TraceLength = Stats.Range;
     if (PC)
     {
-        FHitResult CursorHit;
-        if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
-            TraceLength = FVector::Dist(Start, CursorHit.Location);
+        FVector AimLocation;
+        if (const APDPlayerController* PDPC = Cast<APDPlayerController>(PC);
+            PDPC && PDPC->GetCachedAimWorldLocation(AimLocation))
+        {
+            TraceLength = FVector::Dist(Start, AimLocation);
+        }
+        else
+        {
+            FHitResult CursorHit;
+            if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
+            {
+                TraceLength = FVector::Dist(Start, CursorHit.Location);
+            }
+        }
     }
-    // 반동은 캐릭터 회전(RecoilYawOffset)으로 처리됨.
-    // 총알 스프레드는 무기 Accuracy 기반 랜덤만 남김.
+
     const float TotalSpread = FMath::DegreesToRadians((1.f - Stats.Accuracy) * 5.f);
-    const FVector ShootDir = FMath::VRandCone(AimDir, TotalSpread);
-    const FVector End = Start + ShootDir * TraceLength;
+    const FVector ShootDir  = FMath::VRandCone(AimDir, TotalSpread);
+    OutTraceEnd              = Start + ShootDir * TraceLength;
 
-    FCollisionQueryParams Params;
-    Params.AddIgnoredActor(this);
-    Params.AddIgnoredActor(WeaponOwnerActor);
-    Params.bTraceComplex = true;
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(this);
+    QueryParams.AddIgnoredActor(WeaponOwnerActor);
+    QueryParams.bTraceComplex = true;
 
-    const bool bHit = GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, ECC_Pawn, Params);
-
-    SpawnBeamEffect(Start, bHit ? OutHit.Location : End);
-    SpawnTracerEffect(Start, bHit ? OutHit.Location : End);
+    const bool bHit = GetWorld()->LineTraceSingleByChannel(OutHit, Start, OutTraceEnd, ECC_Pawn, QueryParams);
+    if (bHit) OutTraceEnd = OutHit.ImpactPoint;
 
     return bHit;
 }

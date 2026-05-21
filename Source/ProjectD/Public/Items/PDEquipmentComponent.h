@@ -56,9 +56,24 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
+	UFUNCTION()
+	void OnRep_EquippedItems();
+
+	UFUNCTION(Server, Reliable)
+	void ServerEquipItemFromInventory(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerEquipItemFromInventoryToSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDEquipmentSlotType TargetSlotType);
+
+	UFUNCTION(Server, Reliable)
+	void ServerUnequipItemToInventory(UPDInventoryComponent* InventoryComponent, EPDEquipmentSlotType SlotType);
+
 	void InitializeDefaultSlots();
+	void RebuildEquippedItemsFromReplication();
+	void SyncReplicatedEquippedItems();
 	bool ApplyCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const;
 	void RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const;
 	int32 ConvertModificationLevelToGasLevel(int32 ModificationLevel) const;
@@ -67,4 +82,7 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Equipment", meta = (AllowPrivateAccess = "true"))
 	TMap<EPDEquipmentSlotType, FPDEquippedItem> EquippedItems;
+
+	UPROPERTY(ReplicatedUsing=OnRep_EquippedItems)
+	TArray<FPDEquippedItem> ReplicatedEquippedItems;
 };

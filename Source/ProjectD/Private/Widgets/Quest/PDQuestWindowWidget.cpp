@@ -6,6 +6,7 @@
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Core/PDPlayerController.h"
 #include "Data/PDQuestComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDInventoryComponent.h"
@@ -325,12 +326,28 @@ bool UPDQuestWindowWidget::GetSelectedQuestData(FPDQuestData& OutQuestData, FPDQ
 
 UPDQuestComponent* UPDQuestWindowWidget::FindQuestComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDQuestComponent* PlayerQuestComponent = PDController->GetPlayerQuestComponent())
+		{
+			return PlayerQuestComponent;
+		}
+	}
+
 	APawn* Pawn = GetOwningPlayerPawn();
 	return Pawn ? Pawn->FindComponentByClass<UPDQuestComponent>() : nullptr;
 }
 
 UPDInventoryComponent* UPDQuestWindowWidget::FindInventoryComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDInventoryComponent* PlayerInventoryComponent = PDController->GetPlayerInventoryComponent())
+		{
+			return PlayerInventoryComponent;
+		}
+	}
+
 	APawn* Pawn = GetOwningPlayerPawn();
 	return Pawn ? Pawn->FindComponentByClass<UPDInventoryComponent>() : nullptr;
 }

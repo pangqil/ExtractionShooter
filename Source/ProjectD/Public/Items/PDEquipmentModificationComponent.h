@@ -88,6 +88,16 @@ public:
 	bool TryModifyInventorySlotWithBoost(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDModificationBoostType BoostType, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult);
 
 protected:
+	virtual void BeginPlay() override;
+
+	UFUNCTION(Server, Reliable)
+	void ServerTryModifyInventorySlotWithBoost(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDModificationBoostType BoostType);
+
+	UFUNCTION(Client, Reliable)
+	void ClientModificationFinished(int32 InventorySlotIndex, int32 NewModificationLevel, bool bSuccess, EPDModificationResult Result);
+
+	void BroadcastModificationFinished(int32 InventorySlotIndex, int32 NewModificationLevel, bool bSuccess, EPDModificationResult Result);
+
 	float GetCurveValue(FName RowName, int32 TargetLevel, float DefaultValue) const;
 	float NormalizeSuccessRate(float RawRate) const;
 	int32 GetGoldCostFromRecipe(int32 TargetLevel) const;

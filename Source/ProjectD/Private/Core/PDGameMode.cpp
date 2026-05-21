@@ -1,20 +1,52 @@
 #include "Core/PDGameMode.h"
 #include "Core/PDGameState.h"
 #include "Core/PDGameInstance.h"
+#include "Core/PDPlayerState.h"
 #include "Items/PDInventoryComponent.h"
 #include "GameFramework/Pawn.h"
 #include "TimerManager.h"
 
 APDGameMode::APDGameMode()
 {
+	PlayerStateClass = APDPlayerState::StaticClass();
+	bUseSeamlessTravel = true;
+}
+
+void APDGameMode::PostLogin(APlayerController* NewPlayer)
+{
+	Super::PostLogin(NewPlayer);
+	InitializePlayerStateFromSave(NewPlayer);
 }
 
 void APDGameMode::StartRaid()
 {
-	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
 		InitializePlayerInventoryFromLoadout(PC);
+	}
 
 	SetRaidState(ERaidState::InProgress);
+}
+
+void APDGameMode::TravelToRaidLevel(FName RaidMapName)
+{
+	if (RaidMapName.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("APDGameMode::TravelToRaidLevel: RaidMapName is not set."));
+		return;
+	}
+
+	StartRaid();
+	GetWorld()->ServerTravel(RaidMapName.ToString());
+}
+
+void APDGameMode::TravelToBaseLevel(bool bMarkResetPending)
+{
+	if (UPDGameInstance* GI = GetGameInstance<UPDGameInstance>())
+	{
+		GI->TravelToBaseLevel(bMarkResetPending);
+	}
 }
 
 void APDGameMode::RequestExtraction(APlayerController* PC)
@@ -22,6 +54,7 @@ void APDGameMode::RequestExtraction(APlayerController* PC)
 	if (!PC||CurrentRaidState!=ERaidState::InProgress) return;
 	SetRaidState(ERaidState::Extracting);
 	EndRaid(true);
+	ScheduleReturnToBaseTravel(ExtractionToTravelDelay);
 }
 
 void APDGameMode::EndRaid(bool bSuccess)
@@ -32,12 +65,22 @@ void APDGameMode::EndRaid(bool bSuccess)
 
 	if (bSuccess)
 	{
-		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* PC = It->Get();
 			TransferPlayerInventoryToStash(PC);
+			SavePlayerStateToDisk(PC);
+		}
 	}
-	if (GI) GI->SaveToDisk();
+	else if (GI)
+	{
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			SavePlayerStateToDisk(It->Get());
+		}
+	}
 
-	// BP 연출 훅 — BP에서 결과 UI + OpenLevel 처리
+
 	OnRaidEnded(bSuccess);
 }
 
@@ -45,18 +88,23 @@ void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
 {
 	if (!PC) return;
 	EndRaid(false);
-	GetWorldTimerManager().SetTimer(
-		DeathTravelTimerHandle,
-		this, &APDGameMode::HandleDeathTravel,
-		DeathToTravelDelay, false);
+	ScheduleReturnToBaseTravel(DeathToTravelDelay);
 }
 
-void APDGameMode::HandleDeathTravel()
+void APDGameMode::HandleReturnToBaseTravel()
 {
-	if (UPDGameInstance* GI=GetGameInstance<UPDGameInstance>())
-	{
-		GI->TravelToBaseLevel(true);
-	}
+	TravelToBaseLevel(true);
+}
+
+void APDGameMode::ScheduleReturnToBaseTravel(float Delay)
+{
+	GetWorldTimerManager().ClearTimer(ReturnToBaseTravelTimerHandle);
+	GetWorldTimerManager().SetTimer(
+		ReturnToBaseTravelTimerHandle,
+		this,
+		&APDGameMode::HandleReturnToBaseTravel,
+		FMath::Max(0.f, Delay),
+		false);
 }
 
 void APDGameMode::SetRaidState(ERaidState NewState)
@@ -68,81 +116,69 @@ void APDGameMode::SetRaidState(ERaidState NewState)
 }
 
 
+void APDGameMode::InitializePlayerStateFromSave(APlayerController* PC)
+{
+	if (!PC)
+	{
+		return;
+	}
+
+	APDPlayerState* PDPlayerState = PC->GetPlayerState<APDPlayerState>();
+	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
+	if (!PDPlayerState || !GI)
+	{
+		return;
+	}
+
+	PDPlayerState->InitializePersistentData(GI->LoadPlayerDataFromDisk(GI->GetSaveKeyForController(PC), PC->IsLocalController()));
+}
+
+void APDGameMode::SavePlayerStateToDisk(APlayerController* PC)
+{
+	if (!PC)
+	{
+		return;
+	}
+
+	APDPlayerState* PDPlayerState = PC->GetPlayerState<APDPlayerState>();
+	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
+	if (!PDPlayerState || !GI)
+	{
+		return;
+	}
+
+	GI->SavePlayerDataToDisk(GI->GetSaveKeyForController(PC), PDPlayerState->GetPersistentData());
+}
+
 void APDGameMode::InitializePlayerInventoryFromLoadout(APlayerController* PC)
 {
 	if (!PC) return;
-	APawn* Pawn = PC->GetPawn();
-	if (!Pawn) return;
 
-	UPDInventoryComponent* Inventory = Pawn->FindComponentByClass<UPDInventoryComponent>();
+	APDPlayerState* PDPlayerState = PC->GetPlayerState<APDPlayerState>();
+	UPDInventoryComponent* Inventory = PDPlayerState ? PDPlayerState->GetInventoryComponent() : nullptr;
 	if (!Inventory) return;
 
-	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
-	if (!GI) return;
-	
 	Inventory->ResetInventory();
 
-	for (const FPDInventorySlot& Slot : GI->GetRaidLoadout())
+	for (const FPDInventorySlot& Slot : PDPlayerState->GetRaidLoadout())
 	{
 		if (!Slot.IsEmpty())
+		{
 			Inventory->AddItem(Slot.ItemData, Slot.Quantity);
+		}
 	}
-	
-	Inventory->Gold = GI->GetRaidGold();
-	GI->ClearRaidLoadout();
+
+	Inventory->Gold = PDPlayerState->GetRaidGold();
+	PDPlayerState->ClearRaidLoadout();
 }
 
 void APDGameMode::TransferPlayerInventoryToStash(APlayerController* PC)
 {
 	if (!PC) return;
-	APawn* Pawn = PC->GetPawn();
-	if (!Pawn) return;
 
-	UPDInventoryComponent* Inventory = Pawn->FindComponentByClass<UPDInventoryComponent>();
+	APDPlayerState* PDPlayerState = PC->GetPlayerState<APDPlayerState>();
+	UPDInventoryComponent* Inventory = PDPlayerState ? PDPlayerState->GetInventoryComponent() : nullptr;
 	if (!Inventory) return;
 
-	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
-	if (!GI) return;
-	
-	TArray<FPDInventorySlot> StashItems = GI->GetStashItems();
-
-	for (const FPDInventorySlot& RaidSlot : Inventory->Items)
-	{
-		if (RaidSlot.IsEmpty()) continue;
-
-		int32 Remaining = RaidSlot.Quantity;
-		
-		if (RaidSlot.ItemData.MaxStack > 1)
-		{
-			for (FPDInventorySlot& StashSlot : StashItems)
-			{
-				if (StashSlot.IsEmpty()) continue;
-				if (StashSlot.ItemData.ItemID != RaidSlot.ItemData.ItemID) continue;
-				int32 Space = StashSlot.ItemData.MaxStack - StashSlot.Quantity;
-				if (Space <= 0) continue;
-				int32 ToAdd = FMath::Min(Space, Remaining);
-				StashSlot.Quantity += ToAdd;
-				StashSlot.bIsEmpty  = false;
-				Remaining          -= ToAdd;
-				if (Remaining <= 0) break;
-			}
-		}
-		
-		while (Remaining > 0)
-		{
-			FPDInventorySlot NewSlot;
-			NewSlot.ItemData          = RaidSlot.ItemData;
-			NewSlot.ModificationLevel = RaidSlot.ModificationLevel;
-			NewSlot.Quantity          = FMath::Min(Remaining, FMath::Max(1, RaidSlot.ItemData.MaxStack));
-			NewSlot.bIsEmpty          = false;
-			StashItems.Add(NewSlot);
-			Remaining -= NewSlot.Quantity;
-		}
-	}
-
-	GI->SetStashItems(StashItems);
-
-	FPDPlayerData Data = GI->GetPlayerData();
-	Data.Gold += Inventory->Gold;
-	GI->SetPlayerData(Data);
+	PDPlayerState->TransferInventoryToPersistentStash(Inventory);
 }

@@ -1,16 +1,24 @@
 #include "Weapons/Base/PDWeaponBase.h"
-#include "Kismet/GameplayStatics.h"
+#include "Characters/Base/PDCharacterBase.h"
 #include "Characters/PDPlayerCharacter.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "GameplayTag/PDGameplayTags.h"
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Component/PDWeaponComponent.h"
 
 #include "Items/PDInventoryComponent.h"
+#include "Net/UnrealNetwork.h"
 
 APDWeaponBase::APDWeaponBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	SetReplicates(true);
+	SetReplicateMovement(true);
+	bAlwaysRelevant = true;
+	NetDormancy = DORM_Never;
 
 	WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
 	SetRootComponent(WeaponMesh);
@@ -29,11 +37,33 @@ APDWeaponBase::APDWeaponBase()
 void APDWeaponBase::BeginPlay()
 {
 	Super::BeginPlay();
+	SetReplicates(true);
+	SetReplicateMovement(true);
+	bAlwaysRelevant = true;
+	SetNetDormancy(DORM_Never);
+
+	if (HasAuthority())
+	{
+		ForceNetUpdate();
+	}
+}
+
+void APDWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDWeaponBase, CurrentLevel);
+	DOREPLIFETIME(APDWeaponBase, bIsDropped);
+	DOREPLIFETIME(APDWeaponBase, WeaponOwner);
+	DOREPLIFETIME(APDWeaponBase, ItemID);
+	DOREPLIFETIME(APDWeaponBase, WeaponType);
 }
 
 void APDWeaponBase::Interact_Implementation(AActor* Interactor)
 {
-	if (WeaponOwner.IsValid()) return;
+	if (!HasAuthority()) return;
+
+	if (IsValid(WeaponOwner)) return;
 
 	APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(Interactor);
 	if (!Player) return;
@@ -44,14 +74,96 @@ void APDWeaponBase::Interact_Implementation(AActor* Interactor)
 		return;
 	}
 
-	UPDInventoryComponent* Inventory = Player->FindComponentByClass<UPDInventoryComponent>();
+	UPDInventoryComponent* Inventory = Player->GetInventoryComponent();
 	if (!Inventory || !Inventory->AddItemByID(ItemID))
 	{
 		OnPickupFailed();
 		return;
 	}
 
-	Destroy();
+	MulticastOnPickedUp();
+	ApplyPickedUpPresentation();
+	SetLifeSpan(0.2f);
+}
+
+void APDWeaponBase::OnRep_Dropped()
+{
+	if (!IsValid(WeaponOwner))
+	{
+		SetDropped(bIsDropped);
+	}
+}
+
+void APDWeaponBase::OnRep_WeaponOwner()
+{
+	ApplyReplicatedWeaponOwner();
+}
+
+void APDWeaponBase::OnRep_WeaponIdentity()
+{
+	ApplyReplicatedWeaponOwner();
+}
+
+void APDWeaponBase::MulticastOnPickedUp_Implementation()
+{
+	ApplyPickedUpPresentation();
+}
+
+void APDWeaponBase::ApplyPickedUpPresentation()
+{
+	SetActorHiddenInGame(true);
+	SetActorEnableCollision(false);
+
+	if (WeaponMesh)
+	{
+		WeaponMesh->SetVisibility(false, true);
+		WeaponMesh->SetSimulatePhysics(false);
+		WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	if (PickupCollision)
+	{
+		PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		PickupCollision->SetGenerateOverlapEvents(false);
+	}
+}
+
+void APDWeaponBase::ApplyReplicatedWeaponOwner()
+{
+	if (!IsValid(WeaponOwner))
+	{
+		return;
+	}
+
+	SetActorEnableCollision(false);
+	if (WeaponMesh)
+	{
+		WeaponMesh->SetVisibility(true, true);
+		WeaponMesh->SetSimulatePhysics(false);
+		WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	if (PickupCollision)
+	{
+		PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		PickupCollision->SetGenerateOverlapEvents(false);
+	}
+
+	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(WeaponOwner))
+	{
+		PlayerCharacter->AttachActorToWeaponSocket(this);
+		const bool bShouldBeVisible =
+			PlayerCharacter->GetReplicatedWeaponType() == WeaponType &&
+			PlayerCharacter->GetCurrentSlot() == PlayerCharacter->GetSlotForWeaponType(WeaponType);
+		SetActorHiddenInGame(!bShouldBeVisible);
+		return;
+	}
+
+	if (APDCharacterBase* Character = Cast<APDCharacterBase>(WeaponOwner))
+	{
+		Character->AttachActorToWeaponSocket(this);
+		SetActorHiddenInGame(false);
+	}
 }
 
 void APDWeaponBase::Fire_Implementation() {}
@@ -63,14 +175,27 @@ void APDWeaponBase::OnEquip_Implementation(AActor* NewOwner)
 	SetOwner(NewOwner);
 	WeaponMesh->SetSimulatePhysics(false);
 	PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	bIsDropped = false;
+	ApplyReplicatedWeaponOwner();
+	ForceNetUpdate();
 
-	if (EquipSound)
-		UGameplayStatics::SpawnSoundAttached(EquipSound, WeaponMesh);
+
+	if (UAbilitySystemComponent* ASCComp = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(NewOwner))
+	{
+		FGameplayCueParameters Params;
+		Params.Location = WeaponMesh->GetComponentLocation();
+		Params.TargetAttachComponent = WeaponMesh;
+		Params.SourceObject = this;
+		Params.EffectCauser = this;
+		Params.Instigator = NewOwner;
+		ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Weapon_Equip, Params);
+	}
 }
 
 void APDWeaponBase::OnUnequip_Implementation()
 {
 	WeaponOwner = nullptr;
+	ForceNetUpdate();
 }
 
 void APDWeaponBase::UpgradeLevel()
@@ -90,6 +215,13 @@ void APDWeaponBase::SetDropped(bool bDropped)
 
 	if (bDropped)
 	{
+		WeaponOwner = nullptr;
+		SetActorHiddenInGame(false);
+		SetActorEnableCollision(true);
+		if (WeaponMesh)
+		{
+			WeaponMesh->SetVisibility(true, true);
+		}
 		PickupCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 		WeaponMesh->SetSimulatePhysics(true);
 	}
@@ -97,6 +229,11 @@ void APDWeaponBase::SetDropped(bool bDropped)
 	{
 		PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		WeaponMesh->SetSimulatePhysics(false);
+	}
+
+	if (HasAuthority())
+	{
+		ForceNetUpdate();
 	}
 }
 
@@ -109,7 +246,7 @@ const FWeaponLevelStats& APDWeaponBase::GetCurrentStats() const
 
 FVector APDWeaponBase::GetAimDirectionFromOwner(const FVector& StartLocation) const
 {
-	if (!WeaponOwner.IsValid()) return FVector::ForwardVector;
+	if (!IsValid(WeaponOwner)) return FVector::ForwardVector;
 
 	if (UPDWeaponComponent* Comp = WeaponOwner->FindComponentByClass<UPDWeaponComponent>())
 		return Comp->GetAimDirection(StartLocation);

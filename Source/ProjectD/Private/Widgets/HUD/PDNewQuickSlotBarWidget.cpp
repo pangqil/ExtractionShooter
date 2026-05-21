@@ -3,6 +3,8 @@
 #include "Data/PDKeyIconDataAsset.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
+#include "Core/PDPlayerController.h"
+#include "GameFramework/Pawn.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "Items/PDQuickSlotComponent.h"
@@ -330,6 +332,14 @@ void UPDNewQuickSlotBarWidget::HandleControlMappingsRebuilt()
 
 UPDQuickSlotComponent* UPDNewQuickSlotBarWidget::FindQuickSlotComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDQuickSlotComponent* QuickSlotComponent = PDController->GetPlayerQuickSlotComponent())
+		{
+			return QuickSlotComponent;
+		}
+	}
+
 	if (APawn* Pawn = GetOwningPlayerPawn())
 	{
 		return Pawn->FindComponentByClass<UPDQuickSlotComponent>();

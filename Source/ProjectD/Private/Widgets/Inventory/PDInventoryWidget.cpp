@@ -630,6 +630,14 @@ void UPDInventoryWidget::RefreshInventoryWeightText()
 
 UPDInventoryComponent* UPDInventoryWidget::FindInventoryComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDInventoryComponent* InventoryComponent = PDController->GetPlayerInventoryComponent())
+		{
+			return InventoryComponent;
+		}
+	}
+
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();
@@ -650,6 +658,14 @@ void UPDInventoryWidget::SetActiveStashComponent(UPDStashComponent* InStashCompo
 
 UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDQuickSlotComponent* QuickSlotComponent = PDController->GetPlayerQuickSlotComponent())
+		{
+			return QuickSlotComponent;
+		}
+	}
+
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDQuickSlotComponent>();
@@ -660,6 +676,14 @@ UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 
 UPDEquipmentComponent* UPDInventoryWidget::FindEquipmentComponent() const
 {
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDEquipmentComponent* EquipmentComponent = PDController->GetPlayerEquipmentComponent())
+		{
+			return EquipmentComponent;
+		}
+	}
+
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDEquipmentComponent>();
@@ -1041,6 +1065,13 @@ void UPDInventoryWidget::ExecuteInventoryQuickAction(int32 SlotIndex, int32 Quan
 
 		if (InventoryComponent && StashComponent)
 		{
+			const AActor* StashOwner = StashComponent->GetOwner();
+			if (!StashOwner || !StashOwner->HasAuthority())
+			{
+				PlayerController->ServerStoreInventorySlotQuantityToStash(StashComponent, SlotIndex, INDEX_NONE, Quantity);
+				return;
+			}
+
 			StashComponent->StoreInventorySlotQuantity(InventoryComponent, SlotIndex, Quantity);
 		}
 
@@ -1075,6 +1106,16 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 	case EPDItemContainerType::Stash:
 		if (UPDStashComponent* StashComponent = FindStashComponent())
 		{
+			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+			{
+				const AActor* StashOwner = StashComponent->GetOwner();
+				if (!StashOwner || !StashOwner->HasAuthority())
+				{
+					PlayerController->ServerTakeStashSlotQuantityToInventorySlot(StashComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+					return;
+				}
+			}
+
 			StashComponent->TakeStashSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
 		}
 		break;

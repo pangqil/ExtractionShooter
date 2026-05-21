@@ -9,6 +9,7 @@
 APDMarketActor::APDMarketActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
 
 	InteractionCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionCollision"));
 	SetRootComponent(InteractionCollision);
@@ -37,6 +38,12 @@ void APDMarketActor::Interact_Implementation(AActor* Interactor)
 	APDPlayerController* PlayerController = Cast<APDPlayerController>(InteractingPawn->GetController());
 	if (!PlayerController)
 	{
+		return;
+	}
+
+	if (!PlayerController->IsLocalController())
+	{
+		PlayerController->ClientOpenMarketInterface(MarketComponent);
 		return;
 	}
 

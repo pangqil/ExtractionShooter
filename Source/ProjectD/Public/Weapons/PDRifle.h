@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+
 
 #pragma once
 
@@ -18,8 +18,13 @@ public:
     APDRifle();
 
 protected:
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+    UPROPERTY(ReplicatedUsing=OnRep_FireMode, EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
     EFireMode FireMode = EFireMode::Auto;
+
+    UFUNCTION()
+    void OnRep_FireMode();
 
 public:
     UPROPERTY(BlueprintAssignable, Category = "Weapon")
@@ -34,5 +39,5 @@ public:
     FORCEINLINE EFireMode GetFireMode() const { return FireMode; }
 
 private:
-    bool PerformLineTrace(FHitResult& OutHit);
+    bool PerformLineTrace(FHitResult& OutHit, FVector& OutTraceEnd);
 };

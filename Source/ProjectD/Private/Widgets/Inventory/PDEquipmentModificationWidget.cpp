@@ -6,6 +6,7 @@
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDEquipmentModificationComponent.h"
 #include "Items/PDInventoryComponent.h"
@@ -30,7 +31,15 @@ void UPDEquipmentModificationWidget::NativeDestruct()
 void UPDEquipmentModificationWidget::ResolveComponents()
 {
 	APawn* OwningPawn = GetOwningPlayerPawn();
-	InventoryComponent = OwningPawn ? OwningPawn->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+	InventoryComponent = nullptr;
+	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		InventoryComponent = PDController->GetPlayerInventoryComponent();
+	}
+	if (!InventoryComponent)
+	{
+		InventoryComponent = OwningPawn ? OwningPawn->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+	}
 	ModificationComponent = OwningPawn ? OwningPawn->FindComponentByClass<UPDEquipmentModificationComponent>() : nullptr;
 }
 
