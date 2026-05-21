@@ -229,11 +229,6 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 
 	if (!ApplyCharacterEquipSideEffects(InventorySlot))
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[Equip] ApplyCharacterEquipSideEffects failed for %s. Rolling back to %s."),
-			*InventorySlot.ItemData.ItemID.ToString(),
-			bHadPreviousItem ? *PreviousEquippedSlot.ItemData.ItemID.ToString() : TEXT("(none)"));
-
 		if (bHadPreviousItem)
 		{
 			// 롤백: 캡처한 상태를 함께 복원해 잔탄 손실 방지.

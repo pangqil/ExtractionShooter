@@ -46,7 +46,10 @@ void APDRangedWeaponBase::Fire_Implementation() {}
 
 void APDRangedWeaponBase::Reload_Implementation()
 {
-	if (!HasAuthority()) return;
+	if (!HasAuthority())
+	{
+		return;
+	}
 	if (!CanReload())
 	{
 		if (!bIsReloading && CurrentAmmo < GetCurrentStats().MaxAmmo && !HasAmmoToReload())
@@ -440,7 +443,10 @@ bool APDRangedWeaponBase::HasAmmoToReload() const
 
 int32 APDRangedWeaponBase::GetAvailableAmmoCount() const
 {
-	if (AmmoItemID.IsNone()) return ReserveAmmo;
+	if (AmmoItemID.IsNone())
+	{
+		return ReserveAmmo;
+	}
 
 	const UPDInventoryComponent* Inv = GetOwnerInventory();
 	if (!Inv) return ReserveAmmo;

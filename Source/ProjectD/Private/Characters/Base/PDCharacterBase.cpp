@@ -93,16 +93,6 @@ void APDCharacterBase::OnRep_Controller()
 
 void APDCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
 {
-	const UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
-	UE_LOG(LogTemp, Warning,
-		TEXT("[PD MoveSpeedRoot] OnMoveSpeedChanged. Character=%s Authority=%d Old=%.2f New=%.2f CurrentMaxWalk=%.2f LifeState=%d"),
-		*GetNameSafe(this),
-		HasAuthority() ? 1 : 0,
-		Data.OldValue,
-		Data.NewValue,
-		MovementComponent ? MovementComponent->MaxWalkSpeed : -1.f,
-		static_cast<int32>(LifeState));
-
 	if (LifeState == EPDLifeState::Downed)
 	{
 		GetCharacterMovement()->MaxWalkSpeed = DownedMoveSpeed;

@@ -1191,7 +1191,10 @@ void APDPlayerController::OnReload()
 {
 	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
 	{
-		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead())
+		{
+			return;
+		}
 	}
 
 	if (UAbilitySystemComponent* ASC =

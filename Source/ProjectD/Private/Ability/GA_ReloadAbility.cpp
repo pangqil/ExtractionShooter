@@ -27,6 +27,7 @@ void UGA_ReloadAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	if (!Weapon->CanReload())
 	{
+		Weapon->Reload();
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}

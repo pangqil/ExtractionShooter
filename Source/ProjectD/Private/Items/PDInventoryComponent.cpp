@@ -147,20 +147,8 @@ bool UPDInventoryComponent::AddItem(const FPDItemData& ItemData, int32 Quantity)
 bool UPDInventoryComponent::AddItemByID(FName ItemID, int32 Quantity)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
-	UE_LOG(LogTemp, Warning,
-		TEXT("[PD InventoryPickup] AddItemByID. Owner=%s ItemID=%s Quantity=%d DataTable=%s"),
-		*GetNameSafe(GetOwner()),
-		*ItemID.ToString(),
-		Quantity,
-		*GetNameSafe(ItemDataTable));
-
 	if (!ItemDataTable || ItemID.IsNone())
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[PD InventoryPickup] Failed: missing data table or ItemID. Owner=%s ItemID=%s DataTable=%s"),
-			*GetNameSafe(GetOwner()),
-			*ItemID.ToString(),
-			*GetNameSafe(ItemDataTable));
 		return false;
 	}
 
@@ -171,20 +159,10 @@ bool UPDInventoryComponent::AddItemByID(FName ItemID, int32 Quantity)
 	{
 		if (Row && Row->ItemID == ItemID)
 		{
-			const bool bAdded = AddItem(*Row, Quantity);
-			UE_LOG(LogTemp, Warning,
-				TEXT("[PD InventoryPickup] AddItemByID result. Owner=%s ItemID=%s Added=%d"),
-				*GetNameSafe(GetOwner()),
-				*ItemID.ToString(),
-				bAdded ? 1 : 0);
-			return bAdded;
+			return AddItem(*Row, Quantity);
 		}
 	}
 
-	UE_LOG(LogTemp, Warning,
-		TEXT("[PD InventoryPickup] Failed: ItemID not found in data table. Owner=%s ItemID=%s"),
-		*GetNameSafe(GetOwner()),
-		*ItemID.ToString());
 	return false;
 }
 
