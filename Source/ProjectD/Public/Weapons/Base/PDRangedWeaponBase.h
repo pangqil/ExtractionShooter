@@ -60,6 +60,8 @@ public:
 	// Player GA_FireAbility / AI Soldier 양쪽 모두 본 메서드 값으로 연사 루프 진입 여부 결정.
 	UFUNCTION(BlueprintPure, Category="Weapon") virtual bool IsFullAuto() const { return bFullAuto; }
 	UFUNCTION(BlueprintPure, Category="Weapon") int32 GetAvailableAmmoCount() const;
+	UFUNCTION(BlueprintPure,     Category="Weapon") bool HasInfiniteAmmo() const   { return bInfiniteAmmo; }
+	UFUNCTION(BlueprintCallable, Category="Weapon") void SetInfiniteAmmo(bool bEnabled) { bInfiniteAmmo = bEnabled; }
 	UFUNCTION(BlueprintPure, Category="Weapon") int32 GetReserveAmmo() const { return ReserveAmmo; }
 
 	UFUNCTION(BlueprintCallable, Category="Weapon")
@@ -131,6 +133,10 @@ protected:
 
 	UPROPERTY(ReplicatedUsing=OnRep_IsReloading, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
 	bool bIsReloading = false;
+
+	/** 무한 탄약. true면 장전 모션은 정상 재생되지만 FinishReload에서 인벤토리 무시하고 MaxAmmo로 풀충. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|State")
+	bool bInfiniteAmmo = false;
 
 
 	bool HasAmmoToReload() const;

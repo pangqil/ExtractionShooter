@@ -192,7 +192,12 @@ void APDRangedWeaponBase::FinishReload()
 		return;
 	}
 
-	if (!AmmoItemID.IsNone())
+	// 무한 탄약: 인벤토리 무시하고 무조건 풀충.
+	if (bInfiniteAmmo)
+	{
+		CurrentAmmo = MaxAmmo;
+	}
+	else if (!AmmoItemID.IsNone())
 	{
 		UPDInventoryComponent* Inv = GetOwnerInventory();
 		int32 InventoryAmmo = 0;
@@ -411,6 +416,7 @@ UAbilitySystemComponent* APDRangedWeaponBase::GetOwnerASC() const
 
 bool APDRangedWeaponBase::HasAmmoToReload() const
 {
+	if (bInfiniteAmmo) return true;
 	return GetAvailableAmmoCount() > 0;
 }
 
