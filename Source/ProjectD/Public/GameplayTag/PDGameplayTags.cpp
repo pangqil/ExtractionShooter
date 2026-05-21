@@ -87,6 +87,7 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_MeleeHit,"GameplayCue.Weapon.MeleeHit");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_CartridgeHit, "GameplayCue.Weapon.CartridgeHit");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_Reload, "GameplayCue.Weapon.Reload");
+	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_ReloadEmpty, "GameplayCue.Weapon.ReloadEmpty");
 
 
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Character_HitReact, "GameplayCue.Character.HitReact");

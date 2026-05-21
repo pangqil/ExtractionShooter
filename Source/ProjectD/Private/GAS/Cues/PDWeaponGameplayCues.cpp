@@ -234,6 +234,35 @@ bool UGCN_Weapon_Reload::OnExecute_Implementation(AActor* MyTarget, const FGamep
 	return true;
 }
 
+UGCN_Weapon_ReloadEmpty::UGCN_Weapon_ReloadEmpty()
+{
+	GameplayCueTag = FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Weapon.ReloadEmpty"));
+}
+
+bool UGCN_Weapon_ReloadEmpty::OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const
+{
+	APDRangedWeaponBase* Weapon = GetRangedWeapon(MyTarget, Parameters);
+	USoundBase* Sound = Weapon && Weapon->ReloadEmptySound ? Weapon->ReloadEmptySound.Get() : ReloadEmptySound.Get();
+	if (!Sound) return false;
+
+	USceneComponent* AttachComponent = Parameters.TargetAttachComponent.Get();
+	if (!AttachComponent && Weapon)
+	{
+		AttachComponent = Weapon->GetWeaponMesh();
+	}
+
+	if (AttachComponent)
+	{
+		UGameplayStatics::SpawnSoundAttached(Sound, AttachComponent);
+	}
+	else
+	{
+		UGameplayStatics::PlaySoundAtLocation(MyTarget, Sound, Parameters.Location);
+	}
+
+	return true;
+}
+
 UGCN_Item_Pickup::UGCN_Item_Pickup()
 {
 	GameplayCueTag = FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Item.Pickup"));

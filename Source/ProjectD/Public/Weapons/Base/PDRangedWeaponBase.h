@@ -12,6 +12,7 @@ class UParticleSystem;
 
 class UGCN_Weapon_Fire;
 class UGCN_Weapon_Impact;
+class UGCN_Weapon_ReloadEmpty;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponFired,         APDWeaponBase*, Weapon);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponReloadStarted, APDWeaponBase*, Weapon);
@@ -108,6 +109,9 @@ protected:
 	TObjectPtr<USoundBase> HitSurfaceSound;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|FX")
+	TObjectPtr<USoundBase> ReloadEmptySound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|FX")
 	FName CartridgeEjectSocketName = TEXT("AmmoEject");
 
 
@@ -156,6 +160,7 @@ protected:
 
 	void ExecuteImpactCue(const FHitResult& Hit);
 	void ExecuteReloadCue(float ReloadDuration);
+	void ExecuteReloadEmptyCue();
 	float GetReloadDuration() const;
 
 	APlayerController*             GetOwnerPlayerController() const;
@@ -183,4 +188,5 @@ private:
 
 	friend class UGCN_Weapon_Fire;
 	friend class UGCN_Weapon_Impact;
+	friend class UGCN_Weapon_ReloadEmpty;
 };

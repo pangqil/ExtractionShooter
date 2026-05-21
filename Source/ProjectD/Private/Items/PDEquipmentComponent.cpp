@@ -6,6 +6,23 @@
 #include "Items/PDInventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 
+namespace
+{
+	void InitializeNewWeaponAmmoState(FPDInventorySlot& Slot)
+	{
+		if (Slot.WeaponState.HasPersistedAmmo() || Slot.ItemData.WeaponType == EWeaponType::None || !Slot.ItemData.WeaponClass)
+		{
+			return;
+		}
+
+		const APDRangedWeaponBase* RangedCDO = Cast<APDRangedWeaponBase>(Slot.ItemData.WeaponClass->GetDefaultObject());
+		if (RangedCDO)
+		{
+			Slot.WeaponState.CurrentAmmo = FMath::Max(0, RangedCDO->GetMaxAmmo());
+		}
+	}
+}
+
 UPDEquipmentComponent::UPDEquipmentComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -271,6 +288,7 @@ bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData)
 	NewSlot.Quantity = 1;
 	NewSlot.bIsEmpty = false;
 	NewSlot.ModificationLevel = 0;
+	InitializeNewWeaponAmmoState(NewSlot);
 
 	if (!ApplyCharacterEquipSideEffects(NewSlot))
 	{
