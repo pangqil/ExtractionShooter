@@ -6,6 +6,7 @@
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDQuickSlotComponent.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Net/UnrealNetwork.h"
 
 namespace
@@ -58,6 +59,31 @@ namespace
 		}
 
 		return nullptr;
+	}
+
+	int32 ResolveDefaultWeaponAmmo(const FPDItemData& ItemData)
+	{
+		if (ItemData.WeaponType == EWeaponType::None || !ItemData.WeaponClass)
+		{
+			return INDEX_NONE;
+		}
+
+		const APDRangedWeaponBase* RangedCDO = Cast<APDRangedWeaponBase>(ItemData.WeaponClass->GetDefaultObject());
+		return RangedCDO ? FMath::Max(0, RangedCDO->GetMaxAmmo()) : INDEX_NONE;
+	}
+
+	void InitializeWeaponAmmoState(FPDInventorySlot& Slot)
+	{
+		if (Slot.WeaponState.HasPersistedAmmo())
+		{
+			return;
+		}
+
+		const int32 DefaultAmmo = ResolveDefaultWeaponAmmo(Slot.ItemData);
+		if (DefaultAmmo != INDEX_NONE)
+		{
+			Slot.WeaponState.CurrentAmmo = DefaultAmmo;
+		}
 	}
 }
 
@@ -121,7 +147,22 @@ bool UPDInventoryComponent::AddItem(const FPDItemData& ItemData, int32 Quantity)
 bool UPDInventoryComponent::AddItemByID(FName ItemID, int32 Quantity)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
-	if (!ItemDataTable || ItemID.IsNone()) return false;
+	UE_LOG(LogTemp, Warning,
+		TEXT("[PD InventoryPickup] AddItemByID. Owner=%s ItemID=%s Quantity=%d DataTable=%s"),
+		*GetNameSafe(GetOwner()),
+		*ItemID.ToString(),
+		Quantity,
+		*GetNameSafe(ItemDataTable));
+
+	if (!ItemDataTable || ItemID.IsNone())
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PD InventoryPickup] Failed: missing data table or ItemID. Owner=%s ItemID=%s DataTable=%s"),
+			*GetNameSafe(GetOwner()),
+			*ItemID.ToString(),
+			*GetNameSafe(ItemDataTable));
+		return false;
+	}
 
 	TArray<FPDItemData*> Rows;
 	ItemDataTable->GetAllRows<FPDItemData>(TEXT("AddItemByID"), Rows);
@@ -129,9 +170,21 @@ bool UPDInventoryComponent::AddItemByID(FName ItemID, int32 Quantity)
 	for (const FPDItemData* Row : Rows)
 	{
 		if (Row && Row->ItemID == ItemID)
-			return AddItem(*Row, Quantity);
+		{
+			const bool bAdded = AddItem(*Row, Quantity);
+			UE_LOG(LogTemp, Warning,
+				TEXT("[PD InventoryPickup] AddItemByID result. Owner=%s ItemID=%s Added=%d"),
+				*GetNameSafe(GetOwner()),
+				*ItemID.ToString(),
+				bAdded ? 1 : 0);
+			return bAdded;
+		}
 	}
 
+	UE_LOG(LogTemp, Warning,
+		TEXT("[PD InventoryPickup] Failed: ItemID not found in data table. Owner=%s ItemID=%s"),
+		*GetNameSafe(GetOwner()),
+		*ItemID.ToString());
 	return false;
 }
 
@@ -429,6 +482,7 @@ int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(Items[TargetSlotIndex], ItemData, Quantity);
 	if (AddedQuantity > 0)
 	{
+		InitializeWeaponAmmoState(Items[TargetSlotIndex]);
 		OnInventoryChanged.Broadcast();
 
 		if (UPDQuestComponent* QuestComponent = FindOwnerQuestComponent(this))
@@ -498,6 +552,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 					WeaponSlot.Quantity = 1;
 					WeaponSlot.bIsEmpty = false;
 					WeaponSlot.ModificationLevel = 0;
+					InitializeWeaponAmmoState(WeaponSlot);
 
 					bEquippedFromThisAdd = PlayerCharacter->TryAutoEquipWeaponSlot(WeaponSlot);
 				}
@@ -587,6 +642,9 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 		Items[EmptySlot].ItemData = ItemData;
 		Items[EmptySlot].Quantity = AddAmount;
 		Items[EmptySlot].bIsEmpty = false;
+		Items[EmptySlot].ModificationLevel = 0;
+		Items[EmptySlot].WeaponState.Reset();
+		InitializeWeaponAmmoState(Items[EmptySlot]);
 
 		RemainingQuantity -= AddAmount;
 		AddedQuantity += AddAmount;
@@ -632,6 +690,7 @@ int32 UPDInventoryComponent::AddSlotPartial(const FPDInventorySlot& SourceSlot)
 		Items[EmptySlot] = SourceSlot;
 		Items[EmptySlot].Quantity = FMath::Max(1, SourceSlot.Quantity);
 		Items[EmptySlot].bIsEmpty = false;
+		InitializeWeaponAmmoState(Items[EmptySlot]);
 		OnInventoryChanged.Broadcast();
 		return Items[EmptySlot].Quantity;
 	}

@@ -49,6 +49,10 @@ void APDRangedWeaponBase::Reload_Implementation()
 	if (!HasAuthority()) return;
 	if (!CanReload())
 	{
+		if (!bIsReloading && CurrentAmmo < GetCurrentStats().MaxAmmo && !HasAmmoToReload())
+		{
+			ExecuteReloadEmptyCue();
+		}
 		return;
 	}
 
@@ -355,6 +359,20 @@ void APDRangedWeaponBase::ExecuteReloadCue(float ReloadDuration)
 	Params.Instigator = GetWeaponOwner();
 	Params.RawMagnitude = ReloadDuration;
 	ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Weapon_Reload, Params);
+}
+
+void APDRangedWeaponBase::ExecuteReloadEmptyCue()
+{
+	UAbilitySystemComponent* ASCComp = GetOwnerASC();
+	if (!ASCComp) return;
+
+	FGameplayCueParameters Params;
+	Params.Location = WeaponMesh ? WeaponMesh->GetComponentLocation() : GetActorLocation();
+	Params.TargetAttachComponent = WeaponMesh;
+	Params.SourceObject = this;
+	Params.EffectCauser = this;
+	Params.Instigator = GetWeaponOwner();
+	ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Weapon_ReloadEmpty, Params);
 }
 
 float APDRangedWeaponBase::GetReloadDuration() const

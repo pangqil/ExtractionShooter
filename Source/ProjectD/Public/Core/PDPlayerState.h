@@ -10,6 +10,7 @@ class UPDEquipmentComponent;
 class UPDInventoryComponent;
 class UPDQuestComponent;
 class UPDQuickSlotComponent;
+class UDataTable;
 
 UCLASS(Blueprintable)
 class PROJECTD_API APDPlayerState : public APlayerState
@@ -78,7 +79,15 @@ public:
 	int32 RemovePersistentStashItems(FName ItemID, int32 Quantity, bool bRemoveAnyItem);
 	void TransferInventoryToPersistentStash(const UPDInventoryComponent* InventoryComponent);
 
+protected:
+	virtual void BeginPlay() override;
+
 private:
+	void ApplyComponentDataDefaults();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|PlayerState|Data", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UDataTable> ItemDataTable;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|PlayerState", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDInventoryComponent> InventoryComponent;
 

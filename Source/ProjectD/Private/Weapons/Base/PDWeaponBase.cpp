@@ -61,15 +61,39 @@ void APDWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 
 void APDWeaponBase::Interact_Implementation(AActor* Interactor)
 {
+	UE_LOG(LogTemp, Warning,
+		TEXT("[PD WeaponPickup] Interact. Weapon=%s Interactor=%s Authority=%d Owner=%s ItemID=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(Interactor),
+		HasAuthority() ? 1 : 0,
+		*GetNameSafe(WeaponOwner),
+		*ItemID.ToString());
+
 	if (!HasAuthority()) return;
 
-	if (IsValid(WeaponOwner)) return;
+	if (IsValid(WeaponOwner))
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PD WeaponPickup] Failed: already has WeaponOwner. Weapon=%s Owner=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(WeaponOwner));
+		return;
+	}
 
 	APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(Interactor);
-	if (!Player) return;
+	if (!Player)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PD WeaponPickup] Failed: interactor is not player character. Interactor=%s"),
+			*GetNameSafe(Interactor));
+		return;
+	}
 
 	if (ItemID.IsNone())
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PD WeaponPickup] Failed: ItemID is None. Weapon=%s"),
+			*GetNameSafe(this));
 		OnPickupFailed();
 		return;
 	}
@@ -77,9 +101,20 @@ void APDWeaponBase::Interact_Implementation(AActor* Interactor)
 	UPDInventoryComponent* Inventory = Player->GetInventoryComponent();
 	if (!Inventory || !Inventory->AddItemByID(ItemID))
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PD WeaponPickup] Failed: AddItemByID failed. Player=%s Inventory=%s ItemID=%s"),
+			*GetNameSafe(Player),
+			*GetNameSafe(Inventory),
+			*ItemID.ToString());
 		OnPickupFailed();
 		return;
 	}
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("[PD WeaponPickup] Succeeded. Weapon=%s Player=%s ItemID=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(Player),
+		*ItemID.ToString());
 
 	MulticastOnPickedUp();
 	ApplyPickedUpPresentation();

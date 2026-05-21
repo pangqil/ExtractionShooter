@@ -5,7 +5,9 @@
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDQuickSlotComponent.h"
 #include "Data/PDQuestComponent.h"
+#include "Engine/DataTable.h"
 #include "Net/UnrealNetwork.h"
+#include "UObject/ConstructorHelpers.h"
 
 APDPlayerState::APDPlayerState()
 {
@@ -15,6 +17,29 @@ APDPlayerState::APDPlayerState()
 	EquipmentComponent = CreateDefaultSubobject<UPDEquipmentComponent>(TEXT("EquipmentComponent"));
 	QuickSlotComponent = CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
 	QuestComponent = CreateDefaultSubobject<UPDQuestComponent>(TEXT("QuestComponent"));
+
+	static ConstructorHelpers::FObjectFinder<UDataTable> ItemDataTableAsset(TEXT("/Game/Main/Data/DT_ItemData.DT_ItemData"));
+	if (ItemDataTableAsset.Succeeded())
+	{
+		ItemDataTable = ItemDataTableAsset.Object;
+	}
+
+	ApplyComponentDataDefaults();
+}
+
+void APDPlayerState::BeginPlay()
+{
+	Super::BeginPlay();
+
+	ApplyComponentDataDefaults();
+}
+
+void APDPlayerState::ApplyComponentDataDefaults()
+{
+	if (InventoryComponent && !InventoryComponent->ItemDataTable)
+	{
+		InventoryComponent->ItemDataTable = ItemDataTable;
+	}
 }
 
 void APDPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

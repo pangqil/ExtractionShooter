@@ -112,6 +112,19 @@ protected:
 };
 
 UCLASS(Blueprintable)
+class PROJECTD_API UGCN_Weapon_ReloadEmpty : public UGameplayCueNotify_Static
+{
+	GENERATED_BODY()
+public:
+	UGCN_Weapon_ReloadEmpty();
+	virtual bool OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const override;
+
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|FX")
+	TObjectPtr<USoundBase> ReloadEmptySound;
+};
+
+UCLASS(Blueprintable)
 class PROJECTD_API UGCN_Item_Pickup : public UGameplayCueNotify_Static
 {
 	GENERATED_BODY()

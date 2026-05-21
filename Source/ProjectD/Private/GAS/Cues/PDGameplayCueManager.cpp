@@ -64,6 +64,7 @@ void UPDGameplayCueManager::RegisterNativeGameplayCues()
 	RegisterNativeGameplayCue(CueSet, PDGameplayTags::GameplayCue_Weapon_MeleeHit, UGCN_Weapon_MeleeHit::StaticClass());
 	RegisterNativeGameplayCue(CueSet, PDGameplayTags::GameplayCue_Weapon_CartridgeHit, UGCN_Weapon_CartridgeHit::StaticClass());
 	RegisterNativeGameplayCue(CueSet, PDGameplayTags::GameplayCue_Weapon_Reload, UGCN_Weapon_Reload::StaticClass());
+	RegisterNativeGameplayCue(CueSet, PDGameplayTags::GameplayCue_Weapon_ReloadEmpty, UGCN_Weapon_ReloadEmpty::StaticClass());
 
 	RegisterNativeGameplayCue(CueSet, PDGameplayTags::GameplayCue_Character_HitReact, UGCN_Character_HitReact::StaticClass());
 	RegisterNativeGameplayCue(CueSet, PDGameplayTags::GameplayCue_Character_Bleeding, UGCN_Character_Bleeding::StaticClass());
@@ -105,6 +106,7 @@ TSubclassOf<UGameplayCueNotify_Static> UPDGameplayCueManager::GetNativeGameplayC
 	if (CueTag == PDGameplayTags::GameplayCue_Weapon_MeleeHit) return UGCN_Weapon_MeleeHit::StaticClass();
 	if (CueTag == PDGameplayTags::GameplayCue_Weapon_CartridgeHit) return UGCN_Weapon_CartridgeHit::StaticClass();
 	if (CueTag == PDGameplayTags::GameplayCue_Weapon_Reload) return UGCN_Weapon_Reload::StaticClass();
+	if (CueTag == PDGameplayTags::GameplayCue_Weapon_ReloadEmpty) return UGCN_Weapon_ReloadEmpty::StaticClass();
 
 	if (CueTag == PDGameplayTags::GameplayCue_Character_HitReact) return UGCN_Character_HitReact::StaticClass();
 	if (CueTag == PDGameplayTags::GameplayCue_Character_Bleeding) return UGCN_Character_Bleeding::StaticClass();
