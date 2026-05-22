@@ -81,6 +81,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Combat|FriendlyFire")
 	bool IsFriendlyInLineOfFire(float ZOffset = 64.f) const;
 
+	/** AI 측 LineTrace(발사 사선 / LOS) 의 표준 시작점.
+	 *  Actor.Loc + RightVector × MuzzleRightOffset + (0,0,ZOffset). 총구가 폰 우측에 있는 사실을 반영. */
+	UFUNCTION(BlueprintPure, Category = "PD|Combat|FireOffset")
+	FVector GetFireTraceStart(float ZOffset = 64.f) const;
+
 	UPROPERTY(BlueprintAssignable, Category = "PD|Combat")
 	FPDOnTargetChanged OnTargetChanged;
 
@@ -102,6 +107,10 @@ protected:
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Combat|Squad", meta = (ClampMin = "0.0"))
 	float NotifyAlliesCooldown = 5.0f;
+
+	/** AI 의 LineTrace 시작점을 actor 중심에서 우측으로 옮기는 거리(cm). 총구가 actor 우측에 부착된 사실을 반영. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Combat|FireOffset", meta = (ClampMin = "0.0"))
+	float MuzzleRightOffset = 30.f;
 
 private:
 	// 마지막으로 통보한 타겟 + 시점 — 같은 타겟 반복 통보 throttle 용.

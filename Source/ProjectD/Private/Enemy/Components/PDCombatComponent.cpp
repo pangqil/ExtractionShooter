@@ -1,5 +1,6 @@
 #include "Enemy/Components/PDCombatComponent.h"
 
+#include "DrawDebugHelpers.h"
 #include "Engine/Engine.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
@@ -139,6 +140,16 @@ void UPDCombatComponent::ClearNoiseHint()
 	OnNoiseHintChanged.Broadcast(LastNoiseLocation, false);
 }
 
+FVector UPDCombatComponent::GetFireTraceStart(float ZOffset) const
+{
+	const AActor* Owner = GetOwner();
+	if (!Owner) return FVector::ZeroVector;
+
+	return Owner->GetActorLocation()
+		+ Owner->GetActorRightVector() * MuzzleRightOffset
+		+ FVector(0.f, 0.f, ZOffset);
+}
+
 bool UPDCombatComponent::IsFriendlyInLineOfFire(float ZOffset) const
 {
 	const AActor* Owner = GetOwner();
@@ -154,7 +165,8 @@ bool UPDCombatComponent::IsFriendlyInLineOfFire(float ZOffset) const
 	// 무팀(NoTeam) 은 우군 개념이 없으므로 검사 자체를 건너뜀.
 	if (OwnerTeam == FGenericTeamId::NoTeam) return false;
 
-	const FVector Start = Owner ->GetActorLocation() + FVector(0.f, 0.f, ZOffset);
+	// 시작점은 총구 우측 오프셋 반영. 끝점은 target 중심(가슴 Z 동일).
+	const FVector Start = GetFireTraceStart(ZOffset);
 	const FVector End   = Target->GetActorLocation() + FVector(0.f, 0.f, ZOffset);
 
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(PD_FriendlyLOF), /*bTraceComplex=*/false, Owner);
@@ -162,13 +174,37 @@ bool UPDCombatComponent::IsFriendlyInLineOfFire(float ZOffset) const
 
 	FHitResult Hit;
 	const bool bBlocked = World->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params);
-	if (!bBlocked) return false;
 
-	const AActor* HitActor = Hit.GetActor();
-	if (!HitActor || !HitActor->Implements<UPDCombatInterface>()) return false;
+	bool bFriendlyHit = false;
+	if (bBlocked)
+	{
+		const AActor* HitActor = Hit.GetActor();
+		if (HitActor && HitActor->Implements<UPDCombatInterface>())
+		{
+			const uint8 HitTeam = IPDCombatInterface::Execute_GetTeamID(HitActor);
+			bFriendlyHit = (HitTeam != FGenericTeamId::NoTeam) && (HitTeam == OwnerTeam);
+		}
+	}
 
-	const uint8 HitTeam = IPDCombatInterface::Execute_GetTeamID(HitActor);
-	return (HitTeam != FGenericTeamId::NoTeam) && (HitTeam == OwnerTeam);
+#if ENABLE_DRAW_DEBUG
+	if (const IConsoleVariable* CVar = GetPDAIDebugDrawCVar())
+	{
+		if (CVar->GetInt() != 0)
+		{
+			// 빨강 = 우군 차단(발사 보류), 주황 = 비-우군 차단, 초록 = 사선 클리어.
+			const FColor LineCol  = bFriendlyHit ? FColor::Red : (bBlocked ? FColor::Orange : FColor::Green);
+			DrawDebugLine  (World, Start, End,    LineCol,        false, 0.2f, 0, 1.5f);
+			DrawDebugSphere(World, Start, 8.f, 8, FColor::Cyan,   false, 0.2f, 0, 1.0f);
+			DrawDebugSphere(World, End,   8.f, 8, FColor::Yellow, false, 0.2f, 0, 1.0f);
+			if (bFriendlyHit)
+			{
+				DrawDebugSphere(World, Hit.ImpactPoint, 16.f, 12, FColor::Red, false, 0.3f, 0, 2.f);
+			}
+		}
+	}
+#endif
+
+	return bFriendlyHit;
 }
 
 void UPDCombatComponent::NotifyAlliesInRadius(float Radius, AActor* SharedTarget)

@@ -3,6 +3,7 @@
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "DrawDebugHelpers.h"
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
 #include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
 #include "Enemy/Components/PDCombatComponent.h"
@@ -106,8 +107,12 @@ void UPDBTService_UpdateCombatBB::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 				FHitResult Hit;
 				FCollisionQueryParams Params(SCENE_QUERY_STAT(PD_BT_LOS), true, Pawn);
 				Params.AddIgnoredActor(Target);
+
+				// 시작점은 총구 우측 offset 반영(IsFriendlyInLineOfFire 와 동일 정책).
+				const FVector TraceStart = Combat->GetFireTraceStart(0.f);
+				const FVector TraceEnd   = Target->GetActorLocation();
 				const bool bBlocked = World->LineTraceSingleByChannel(
-					Hit, Pawn->GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Params);
+					Hit, TraceStart, TraceEnd, ECC_Visibility, Params);
 
 				if (!bBlocked)
 				{
@@ -128,6 +133,22 @@ void UPDBTService_UpdateCombatBB::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 					bHasLOS = bBlockerIsFriendly;
 					Blocker = bBlockerIsFriendly ? nullptr : HitActor;
 				}
+
+#if ENABLE_DRAW_DEBUG
+				if (const IConsoleVariable* CVar = GetPDAIDebugCVar())
+				{
+					if (CVar->GetInt() != 0)
+					{
+						// 초록 = LOS 확보, 노랑 = 우군 차단(LOS 는 유효 처리), 빨강 = 비-우군 차단.
+						const FColor LineCol = bHasLOS
+							? (bBlocked ? FColor::Yellow : FColor::Green)
+							: FColor::Red;
+						DrawDebugLine  (World, TraceStart, TraceEnd, LineCol, false, 0.2f, 0, 1.5f);
+						DrawDebugSphere(World, TraceStart,    8.f, 8, FColor::Cyan,   false, 0.2f, 0, 1.0f);
+						DrawDebugSphere(World, TraceEnd,      8.f, 8, FColor::Magenta,false, 0.2f, 0, 1.0f);
+					}
+				}
+#endif
 			}
 		}
 	}

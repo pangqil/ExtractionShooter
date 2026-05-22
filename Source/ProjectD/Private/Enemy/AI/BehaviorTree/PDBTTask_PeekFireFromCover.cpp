@@ -2,13 +2,17 @@
 
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
 #include "Enemy/Characters/PDEliteSoldier.h"
+#include "Enemy/Components/PDCombatComponent.h"
 #include "EnvironmentQuery/EnvQuery.h"
 #include "EnvironmentQuery/EnvQueryManager.h"
 #include "GameFramework/Pawn.h"
+#include "HAL/IConsoleManager.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "NavigationSystem.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 
 UPDBTTask_PeekFireFromCover::UPDBTTask_PeekFireFromCover()
@@ -27,6 +31,15 @@ uint16 UPDBTTask_PeekFireFromCover::GetInstanceMemorySize() const
 
 namespace
 {
+#if ENABLE_DRAW_DEBUG
+	// pd.ai.debugdraw 와 동일 CVar 참조 — 정의는 PDEnemyAIControllerBase.cpp 에 있음.
+	IConsoleVariable* GetPDAIDebugCVar_Peek()
+	{
+		static IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("pd.ai.debugdraw"));
+		return CVar;
+	}
+#endif
+
 	bool HasArrived(AAIController* AI, const FVector& Target, float AcceptanceRadius)
 	{
 		if (!AI) return false;
@@ -37,20 +50,40 @@ namespace
 	}
 
 	// 폰 → 타겟 LineTrace (Visibility). 차단 없으면 LOS 확보로 간주.
+	// 시작점은 PDCombatComponent.GetFireTraceStart 사용 — 총구 우측 offset 반영. 컴포넌트 없으면 actor 중심 폴백.
 	bool HasLOSToTarget(const APawn* Pawn, const AActor* Target, float Height)
 	{
 		if (!Pawn || !Target) return false;
 		UWorld* World = Pawn->GetWorld();
 		if (!World) return false;
 
-		const FVector Start = Pawn->GetActorLocation()   + FVector(0.f, 0.f, Height);
-		const FVector End   = Target->GetActorLocation() + FVector(0.f, 0.f, Height);
+		FVector Start = Pawn->GetActorLocation() + FVector(0.f, 0.f, Height);
+		if (const UPDCombatComponent* Combat = Pawn->FindComponentByClass<UPDCombatComponent>())
+		{
+			Start = Combat->GetFireTraceStart(Height);
+		}
+		const FVector End = Target->GetActorLocation() + FVector(0.f, 0.f, Height);
 
 		FCollisionQueryParams Params(SCENE_QUERY_STAT(PD_PeekLOS), /*bTraceComplex=*/false, Pawn);
 		Params.AddIgnoredActor(Target);
 
 		FHitResult Hit;
 		const bool bBlocked = World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params);
+
+#if ENABLE_DRAW_DEBUG
+		if (const IConsoleVariable* CVar = GetPDAIDebugCVar_Peek())
+		{
+			if (CVar->GetInt() != 0)
+			{
+				// 초록 = LOS 확보(사격 가능), 빨강 = 차단(사격 불가). lifetime 짧게 — peek 중 매 tick 호출되므로.
+				const FColor LineCol = bBlocked ? FColor::Red : FColor::Green;
+				DrawDebugLine  (World, Start, End, LineCol,        false, 0.1f, 0, 1.5f);
+				DrawDebugSphere(World, Start, 8.f, 8, FColor::Cyan,   false, 0.1f, 0, 1.0f);
+				DrawDebugSphere(World, End,   8.f, 8, FColor::Magenta,false, 0.1f, 0, 1.0f);
+			}
+		}
+#endif
+
 		return !bBlocked;
 	}
 }
@@ -62,7 +95,11 @@ EBTNodeResult::Type UPDBTTask_PeekFireFromCover::ExecuteTask(UBehaviorTreeCompon
 	APawn* Pawn = AI ? AI->GetPawn() : nullptr;
 	AActor* Target = BB ? Cast<AActor>(BB->GetValueAsObject(BlackboardKey.SelectedKeyName)) : nullptr;
 
-	if (!Pawn || !Target) return EBTNodeResult::Failed;
+	if (!Pawn || !Target)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("[D] Fail"));
+		return EBTNodeResult::Failed;
+	}
 
 	FPDPeekFireTaskMemory* Mem = reinterpret_cast<FPDPeekFireTaskMemory*>(NodeMemory);
 	Mem->OriginalLoc      = Pawn->GetActorLocation();
@@ -92,6 +129,7 @@ void UPDBTTask_PeekFireFromCover::TickTask(UBehaviorTreeComponent& OwnerComp, ui
 
 	if (!AI || !Pawn || !Elite || !Target)
 	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("[D] Fail"));
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
 	}
@@ -99,10 +137,13 @@ void UPDBTTask_PeekFireFromCover::TickTask(UBehaviorTreeComponent& OwnerComp, ui
 	FPDPeekFireTaskMemory* Mem = reinterpret_cast<FPDPeekFireTaskMemory*>(NodeMemory);
 	Mem->TotalElapsed += DeltaSeconds;
 
-	// safety timeout — 이동 막힘/스택 방지.
+	// safety timeout — 이동 막힘/스택 방지. 결과는 Succeeded.
+	// Failed 로 반환하면 부모 Sequence(Combat) 가 즉시 중단되어 CoverLocation 정리/SetEliteInCover(false) 건너뜀 →
+	// 후속 사이클에서 cover 진입 분기 못 들어가고 결국 Patrol/Home 으로 추락. timeout 은 사이클 중단만이 의도이므로 Succeeded.
 	if (Mem->TotalElapsed >= MaxTotalDuration)
 	{
-		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("[C] Timeout → safe end"));
+		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 		return;
 	}
 
@@ -115,32 +156,61 @@ void UPDBTTask_PeekFireFromCover::TickTask(UBehaviorTreeComponent& OwnerComp, ui
 
 		// 좌/우 랜덤 결정. 좌측은 muzzle 보정으로 거리 더 길게.
 		Mem->bGoLeft = FMath::RandBool();
-		const float StrafeDist = Mem->bGoLeft ? PeekOffsetLeft : PeekOffsetRight;
 
 		const FVector ToTarget = (Target->GetActorLocation() - Mem->OriginalLoc) * FVector(1, 1, 0);
 		const FVector ToTargetDir = ToTarget.GetSafeNormal();
 		if (ToTargetDir.IsNearlyZero())
 		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("[B] Fail"));
 			FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 			return;
 		}
 
 		// UE 좌수 좌표계: ToTarget × Up = 폰 기준 왼쪽. 우측은 부호 반전.
-		const FVector LeftDir  =  FVector::CrossProduct(ToTargetDir, FVector::UpVector);
-		const FVector StrafeDir = Mem->bGoLeft ? LeftDir : -LeftDir;
+		const FVector LeftDir = FVector::CrossProduct(ToTargetDir, FVector::UpVector);
 
-		Mem->PeekSpot = Mem->OriginalLoc + StrafeDir * StrafeDist;
+		// 1차 시도(랜덤 선택) → 2차 fallback(반대측). 둘 다 nav projection 실패면 제자리에서 사격.
+		UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(Pawn->GetWorld());
+		const FVector NavExtent(200.f, 200.f, 400.f);
 
-		const EPathFollowingRequestResult::Type MoveResult =
-			AI->MoveToLocation(Mem->PeekSpot, MoveAcceptanceRadius, /*bStopOnOverlap=*/true,
-				/*bUsePathfinding=*/true, /*bProjectDestinationToNavigation=*/true,
-				/*bCanStrafe=*/true);
-
-		if (MoveResult == EPathFollowingRequestResult::Failed)
+		bool bResolved = false;
+		for (int32 Attempt = 0; Attempt < 2 && !bResolved; ++Attempt)
 		{
-			FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
-			return;
+			const float StrafeDist = Mem->bGoLeft ? PeekOffsetLeft : PeekOffsetRight;
+			const FVector StrafeDir = Mem->bGoLeft ? LeftDir : -LeftDir;
+			const FVector Candidate = Mem->OriginalLoc + StrafeDir * StrafeDist;
+
+			FNavLocation Projected;
+			if (NavSys && NavSys->ProjectPointToNavigation(Candidate, Projected, NavExtent))
+			{
+				Mem->PeekSpot = Projected.Location;
+				const EPathFollowingRequestResult::Type MoveResult =
+					AI->MoveToLocation(Mem->PeekSpot, MoveAcceptanceRadius, /*bStopOnOverlap=*/true,
+						/*bUsePathfinding=*/true, /*bProjectDestinationToNavigation=*/false,
+						/*bCanStrafe=*/true);
+
+				if (MoveResult != EPathFollowingRequestResult::Failed)
+				{
+					bResolved = true;
+					break;
+				}
+			}
+
+			// 1차 실패 → 반대측으로 flip.
+			Mem->bGoLeft = !Mem->bGoLeft;
 		}
+
+		if (!bResolved)
+		{
+			// 좌/우 모두 nav 후보 없음 — 제자리 사격으로 폴백.
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("[A] Nav fail → fire in place"));
+			Mem->PeekSpot = Mem->OriginalLoc;
+			Elite->SetPeeking(true);
+			Mem->State = EPDPeekFireState::Firing;
+			Mem->FireElapsed = 0.f;
+			break;
+		}
+
 		Mem->State = EPDPeekFireState::Strafing;
 		break;
 	}
@@ -261,6 +331,7 @@ void UPDBTTask_PeekFireFromCover::TickTask(UBehaviorTreeComponent& OwnerComp, ui
 	{
 		if (HasArrived(AI, Mem->OriginalLoc, MoveAcceptanceRadius))
 		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Success"));
 			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 		}
 		break;

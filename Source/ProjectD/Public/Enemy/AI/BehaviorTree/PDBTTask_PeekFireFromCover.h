@@ -66,9 +66,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "PD|PeekFire", meta = (ClampMin = "1.0"))
 	float MoveAcceptanceRadius = 30.f;
 
-	/** 전체 task safety timeout(초). 이동 막힘 등 대비. */
+	/** 전체 task safety timeout(초). Settling + Strafing + Firing + (Reposition) + Returning 전체 누적. */
 	UPROPERTY(EditAnywhere, Category = "PD|PeekFire", meta = (ClampMin = "1.0"))
-	float MaxTotalDuration = 12.f;
+	float MaxTotalDuration = 20.f;
 
 	/** true 면 Firing 중 weapon.IsReloading() 감지 시 즉시 Returning. */
 	UPROPERTY(EditAnywhere, Category = "PD|PeekFire")

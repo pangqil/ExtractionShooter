@@ -276,10 +276,16 @@ void APDSoldier::StartContinuousFire()
 {
 	UWorld* World = GetWorld();
 	if (!World) return;
-	if (World->GetTimerManager().IsTimerActive(FireTimerHandle)) return;
 
-	// 첫 발은 지연 없이 즉시 시도.
-	OnFireTick();
+	// 이미 timer 가 도는 중이어도 return 하지 않음 — 무기 swap 시 새 weapon FireRate 로 interval 갱신 필요.
+	// 첫 발 즉시 시도는 timer 가 정말 새로 시작될 때만.
+	const bool bAlreadyActive = World->GetTimerManager().IsTimerActive(FireTimerHandle);
+
+	if (!bAlreadyActive)
+	{
+		// 첫 발은 지연 없이 즉시 시도.
+		OnFireTick();
+	}
 
 	// 플레이어 GA_FireAbility 와 동일하게 무기 stat 의 FireRate 사용.
 	// 미설정/0 이면 FireInterval(BP 디폴트) 로 폴백.
@@ -291,6 +297,7 @@ void APDSoldier::StartContinuousFire()
 	}
 	Interval = FMath::Max(Interval, 0.0167f); // 1 프레임 클램프.
 
+	// 같은 handle 로 SetTimer 호출 → 기존 timer 대체. swap 케이스에서 안전한 interval 갱신.
 	World->GetTimerManager().SetTimer(FireTimerHandle, this, &APDSoldier::OnFireTick, Interval, /*bLoop=*/true);
 }
 
