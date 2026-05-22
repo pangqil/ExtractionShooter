@@ -108,6 +108,27 @@ void APDPlayerCharacter::BeginPlay()
 	}
 
 	GetOrCreateInteractionComponent();
+
+	if (HasAuthority())
+	{
+		UPDInventoryComponent* RuntimeInventoryComponent = GetInventoryComponent();
+		UPDInventoryComponent* EditorInventoryComponent = FindComponentByClass<UPDInventoryComponent>();
+
+		if (RuntimeInventoryComponent && EditorInventoryComponent && RuntimeInventoryComponent != EditorInventoryComponent)
+		{
+			RuntimeInventoryComponent->GridColumns = FMath::Max(1, EditorInventoryComponent->GridColumns);
+			RuntimeInventoryComponent->GridRows = FMath::Max(1, EditorInventoryComponent->GridRows);
+			RuntimeInventoryComponent->BaseCarryWeight = EditorInventoryComponent->BaseCarryWeight;
+
+			if (EditorInventoryComponent->ItemDataTable)
+			{
+				RuntimeInventoryComponent->ItemDataTable = EditorInventoryComponent->ItemDataTable;
+			}
+
+			RuntimeInventoryComponent->InitializeInventory();
+		}
+	}
+
 	 if (ASC)
         {
             ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDPlayerCharacter::OnWeaponTypeTagChanged);

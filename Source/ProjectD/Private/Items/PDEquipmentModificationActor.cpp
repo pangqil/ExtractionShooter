@@ -21,6 +21,7 @@ APDEquipmentModificationActor::APDEquipmentModificationActor()
 
 	OutlineComponent = CreateDefaultSubobject<UPDInteractionOutlineComponent>(TEXT("OutlineComponent"));
 	OutlineComponent->SetupTrigger(InteractionCollision);
+	OutlineComponent->SetOverlapTriggerEnabled(true);
 }
 
 void APDEquipmentModificationActor::BeginPlay()
@@ -31,6 +32,7 @@ void APDEquipmentModificationActor::BeginPlay()
 	if (OutlineComponent)
 	{
 		OutlineComponent->SetupTrigger(InteractionCollision);
+	OutlineComponent->SetOverlapTriggerEnabled(true);
 	}
 }
 

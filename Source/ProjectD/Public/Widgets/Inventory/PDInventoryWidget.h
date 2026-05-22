@@ -49,11 +49,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	TSubclassOf<UUserWidget> InventorySlotWidgetClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
-	int32 FallbackGridColumns = 5;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Grid", meta = (ClampMin = "1.0"))
+	float InventorySlotWidth = 52.f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
-	int32 FallbackGridRows = 4;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Grid", meta = (ClampMin = "1.0"))
+	float InventorySlotHeight = 52.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Grid")
+	bool bScaleInventorySlotWidgetToFit = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	FName InventoryGridWidgetName = TEXT("UniformGridPanel_InventoryGrid");

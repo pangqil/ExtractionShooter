@@ -86,11 +86,36 @@ APDPlayerState* APDPlayerController::GetPDPlayerState() const
 
 UPDInventoryComponent* APDPlayerController::GetPlayerInventoryComponent() const
 {
+	UPDInventoryComponent* EditorInventoryComponent = GetPawn() ? GetPawn()->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+
 	if (APDPlayerState* PDPlayerState = GetPDPlayerState())
 	{
-		return PDPlayerState->GetInventoryComponent();
+		UPDInventoryComponent* RuntimeInventoryComponent = PDPlayerState->GetInventoryComponent();
+		if (RuntimeInventoryComponent && EditorInventoryComponent && RuntimeInventoryComponent != EditorInventoryComponent)
+		{
+			const int32 EditorGridColumns = FMath::Max(1, EditorInventoryComponent->GridColumns);
+			const int32 EditorGridRows = FMath::Max(1, EditorInventoryComponent->GridRows);
+			const bool bGridChanged = RuntimeInventoryComponent->GridColumns != EditorGridColumns || RuntimeInventoryComponent->GridRows != EditorGridRows;
+
+			RuntimeInventoryComponent->GridColumns = EditorGridColumns;
+			RuntimeInventoryComponent->GridRows = EditorGridRows;
+			RuntimeInventoryComponent->BaseCarryWeight = EditorInventoryComponent->BaseCarryWeight;
+
+			if (EditorInventoryComponent->ItemDataTable)
+			{
+				RuntimeInventoryComponent->ItemDataTable = EditorInventoryComponent->ItemDataTable;
+			}
+
+			if (bGridChanged && RuntimeInventoryComponent->GetOwner() && RuntimeInventoryComponent->GetOwner()->HasAuthority())
+			{
+				RuntimeInventoryComponent->InitializeInventory();
+			}
+		}
+
+		return RuntimeInventoryComponent;
 	}
-	return GetPawn() ? GetPawn()->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+
+	return EditorInventoryComponent;
 }
 
 UPDEquipmentComponent* APDPlayerController::GetPlayerEquipmentComponent() const
@@ -559,14 +584,9 @@ void APDPlayerController::ClientOpenMarketInterface_Implementation(UPDMarketComp
 
 void APDPlayerController::CloseMarketInterface()
 {
-	UPDMarketComponent* ClosingMarketComponent = GetActiveMarketComponent();
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->CloseMarket();
-	}
-	if (ClosingMarketComponent)
-	{
-		OnMarketInterfaceClosed.Broadcast(ClosingMarketComponent);
 	}
 }
 
@@ -606,14 +626,9 @@ void APDPlayerController::ClientOpenStashInterface_Implementation(UPDStashCompon
 
 void APDPlayerController::CloseStashInterface()
 {
-	UPDStashComponent* ClosingStashComponent = GetActiveStashComponent();
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->CloseStash();
-	}
-	if (ClosingStashComponent)
-	{
-		OnStashInterfaceClosed.Broadcast(ClosingStashComponent);
 	}
 }
 
@@ -860,14 +875,9 @@ void APDPlayerController::OpenEquipmentModificationInterface()
 
 void APDPlayerController::CloseEquipmentModificationInterface()
 {
-	const bool bWasOpen = IsEquipmentModificationInterfaceOpen();
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->CloseEquipmentModification();
-	}
-	if (bWasOpen)
-	{
-		OnEquipmentModificationInterfaceClosed.Broadcast();
 	}
 }
 

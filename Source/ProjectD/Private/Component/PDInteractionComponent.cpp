@@ -46,6 +46,8 @@ void UPDInteractionComponent::BeginPlay()
 
 void UPDInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	CachedTarget.Reset();
+
 	if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
 	{
 		OwnerPawn->ReceiveControllerChangedDelegate.RemoveDynamic(this, &UPDInteractionComponent::HandleOwnerControllerChanged);
@@ -90,12 +92,7 @@ void UPDInteractionComponent::EvaluatePollingState()
 	{
 		World->GetTimerManager().ClearTimer(PollTimerHandle);
 
-		// 로컬 제어를 잃은 경우 HUD 프롬프트가 잔존하지 않도록 타겟 클리어.
-		if (CachedTarget.IsValid())
-		{
-			CachedTarget.Reset();
-			OnInteractTargetChanged.Broadcast(nullptr);
-		}
+		ApplyInteractTargetChange(nullptr);
 	}
 }
 
@@ -211,7 +208,11 @@ AActor* UPDInteractionComponent::FindInteractTarget() const
 
 void UPDInteractionComponent::PollTarget()
 {
-	AActor* NewTarget = FindInteractTarget();
+	ApplyInteractTargetChange(FindInteractTarget());
+}
+
+void UPDInteractionComponent::ApplyInteractTargetChange(AActor* NewTarget)
+{
 	AActor* OldTarget = CachedTarget.Get();
 
 	if (NewTarget == OldTarget)
@@ -220,5 +221,6 @@ void UPDInteractionComponent::PollTarget()
 	}
 
 	CachedTarget = NewTarget;
+
 	OnInteractTargetChanged.Broadcast(NewTarget);
 }

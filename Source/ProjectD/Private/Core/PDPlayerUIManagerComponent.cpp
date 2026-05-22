@@ -219,6 +219,8 @@ void UPDPlayerUIManagerComponent::OpenMarket(UPDMarketComponent* MarketComponent
 
 void UPDPlayerUIManagerComponent::CloseMarket()
 {
+	UPDMarketComponent* ClosedMarketComponent = ActiveMarketComponent.Get();
+
 	if (MarketWidgetInstance)
 	{
 		MarketWidgetInstance->RemoveFromParent();
@@ -235,6 +237,14 @@ void UPDPlayerUIManagerComponent::CloseMarket()
 	if (!IsStashOpen() && !IsQuestOpen() && !IsEquipmentModificationOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
+	}
+
+	if (ClosedMarketComponent)
+	{
+		if (APDPlayerController* PC = GetPDController())
+		{
+			PC->OnMarketInterfaceClosed.Broadcast(ClosedMarketComponent);
+		}
 	}
 }
 
@@ -287,6 +297,8 @@ void UPDPlayerUIManagerComponent::OpenStash(UPDStashComponent* StashSource)
 
 void UPDPlayerUIManagerComponent::CloseStash()
 {
+	UPDStashComponent* ClosedStashComponent = ActiveStashComponent.Get();
+
 	if (StashWidgetInstance)
 	{
 		StashWidgetInstance->RemoveFromParent();
@@ -304,6 +316,14 @@ void UPDPlayerUIManagerComponent::CloseStash()
 	if (!IsMarketOpen() && !IsQuestOpen() && !IsEquipmentModificationOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
+	}
+
+	if (ClosedStashComponent)
+	{
+		if (APDPlayerController* PC = GetPDController())
+		{
+			PC->OnStashInterfaceClosed.Broadcast(ClosedStashComponent);
+		}
 	}
 }
 
@@ -341,6 +361,8 @@ void UPDPlayerUIManagerComponent::OpenEquipmentModification()
 
 void UPDPlayerUIManagerComponent::CloseEquipmentModification()
 {
+	const bool bWasOpen = IsEquipmentModificationOpen();
+
 	if (EquipmentModificationWidgetInstance)
 	{
 		EquipmentModificationWidgetInstance->RemoveFromParent();
@@ -356,6 +378,14 @@ void UPDPlayerUIManagerComponent::CloseEquipmentModification()
 	if (!IsStashOpen() && !IsMarketOpen() && !IsQuestOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
+	}
+
+	if (bWasOpen)
+	{
+		if (APDPlayerController* PC = GetPDController())
+		{
+			PC->OnEquipmentModificationInterfaceClosed.Broadcast();
+		}
 	}
 }
 

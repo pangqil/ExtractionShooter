@@ -19,6 +19,7 @@ APDMarketActor::APDMarketActor()
 
 	OutlineComponent = CreateDefaultSubobject<UPDInteractionOutlineComponent>(TEXT("OutlineComponent"));
 	OutlineComponent->SetupTrigger(InteractionCollision);
+	OutlineComponent->SetOverlapTriggerEnabled(true);
 }
 
 void APDMarketActor::BeginPlay()
@@ -29,6 +30,7 @@ void APDMarketActor::BeginPlay()
 	if (OutlineComponent)
 	{
 		OutlineComponent->SetupTrigger(InteractionCollision);
+	OutlineComponent->SetOverlapTriggerEnabled(true);
 	}
 }
 

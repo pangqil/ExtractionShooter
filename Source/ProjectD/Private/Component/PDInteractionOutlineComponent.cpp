@@ -15,8 +15,8 @@ void UPDInteractionOutlineComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	ApplyOverlayMaterial();
 	BindTrigger();
+	RefreshOverlapState();
 }
 
 void UPDInteractionOutlineComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -44,9 +44,29 @@ void UPDInteractionOutlineComponent::SetupTrigger(UPrimitiveComponent* InTrigger
 	}
 }
 
+void UPDInteractionOutlineComponent::SetOverlapTriggerEnabled(bool bEnabled)
+{
+	if (bEnableOverlapTrigger == bEnabled)
+	{
+		return;
+	}
+
+	bEnableOverlapTrigger = bEnabled;
+
+	if (!bEnableOverlapTrigger)
+	{
+		UnbindTrigger();
+		ResetOverlapState();
+		return;
+	}
+
+	BindTrigger();
+	RefreshOverlapState();
+}
+
 void UPDInteractionOutlineComponent::BindTrigger()
 {
-	if (bTriggerBound || !TriggerComponent)
+	if (!bEnableOverlapTrigger || bTriggerBound || !TriggerComponent)
 	{
 		return;
 	}
@@ -89,11 +109,8 @@ void UPDInteractionOutlineComponent::HandleTriggerEndOverlap(UPrimitiveComponent
 	}
 
 	OverlappingPawns.Remove(Pawn);
-
-	if (OverlappingPawns.Num() == 0)
-	{
-		SetOutlineEnabled(false);
-	}
+	PruneInvalidOverlaps();
+	SetOutlineEnabled(OverlappingPawns.Num() > 0);
 }
 
 bool UPDInteractionOutlineComponent::IsValidInteractor(AActor* Actor) const
@@ -120,6 +137,16 @@ void UPDInteractionOutlineComponent::SetOutlineEnabled(bool bEnabled)
 	}
 
 	bOutlineEnabled = bEnabled;
+
+	if (bOutlineEnabled)
+	{
+		ApplyOverlayMaterial();
+	}
+	else
+	{
+		RemoveOverlayMaterial();
+	}
+
 	UpdateOutlineParameters();
 }
 
@@ -140,19 +167,74 @@ void UPDInteractionOutlineComponent::ApplyOverlayMaterial()
 		return;
 	}
 
-	UpdateOutlineParameters();
-
 	TArray<UMeshComponent*> MeshComponents;
 	CacheMeshComponents(MeshComponents);
 
 	for (UMeshComponent* MeshComponent : MeshComponents)
 	{
-		if (!MeshComponent)
+		if (!IsValid(MeshComponent))
 		{
 			continue;
 		}
 
+		if (!PreviousOverlayMaterials.Contains(MeshComponent))
+		{
+			PreviousOverlayMaterials.Add(MeshComponent, MeshComponent->GetOverlayMaterial());
+		}
+
 		MeshComponent->SetOverlayMaterial(OutlineMID);
+	}
+}
+
+void UPDInteractionOutlineComponent::RemoveOverlayMaterial()
+{
+	for (auto It = PreviousOverlayMaterials.CreateIterator(); It; ++It)
+	{
+		UMeshComponent* MeshComponent = It.Key().Get();
+		if (!IsValid(MeshComponent))
+		{
+			It.RemoveCurrent();
+			continue;
+		}
+
+		MeshComponent->SetOverlayMaterial(It.Value().Get());
+		It.RemoveCurrent();
+	}
+}
+
+void UPDInteractionOutlineComponent::RefreshOverlapState()
+{
+	OverlappingPawns.Reset();
+
+	if (!bEnableOverlapTrigger || !TriggerComponent)
+	{
+		SetOutlineEnabled(false);
+		return;
+	}
+
+	TArray<AActor*> OverlappingActors;
+	TriggerComponent->GetOverlappingActors(OverlappingActors, APawn::StaticClass());
+
+	for (AActor* OverlappingActor : OverlappingActors)
+	{
+		if (IsValidInteractor(OverlappingActor))
+		{
+			OverlappingPawns.Add(CastChecked<APawn>(OverlappingActor));
+		}
+	}
+
+	SetOutlineEnabled(OverlappingPawns.Num() > 0);
+}
+
+void UPDInteractionOutlineComponent::PruneInvalidOverlaps()
+{
+	for (auto It = OverlappingPawns.CreateIterator(); It; ++It)
+	{
+		APawn* Pawn = It->Get();
+		if (!IsValid(Pawn) || !IsValidInteractor(Pawn))
+		{
+			It.RemoveCurrent();
+		}
 	}
 }
 

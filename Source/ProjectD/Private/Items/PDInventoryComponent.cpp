@@ -107,6 +107,8 @@ void UPDInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(UPDInventoryComponent, Items);
+	DOREPLIFETIME(UPDInventoryComponent, GridColumns);
+	DOREPLIFETIME(UPDInventoryComponent, GridRows);
 	DOREPLIFETIME(UPDInventoryComponent, Gold);
 }
 
@@ -116,6 +118,11 @@ void UPDInventoryComponent::OnRep_Items()
 }
 
 void UPDInventoryComponent::OnRep_Gold()
+{
+	OnInventoryChanged.Broadcast();
+}
+
+void UPDInventoryComponent::OnRep_GridConfig()
 {
 	OnInventoryChanged.Broadcast();
 }
