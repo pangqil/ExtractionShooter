@@ -9,6 +9,22 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnMarketChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnTraderReputationChanged, int32, NewLevel, int32, NewExp);
 
+/** Source legacy: row used when populating goods from a single data table. */
+USTRUCT(BlueprintType)
+struct FPDMarketGoodsRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
+	FName ItemRowName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
+	int32 Stock = -1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market")
+	int32 OverridePrice = -1;
+};
+
 USTRUCT(BlueprintType)
 struct FPDMarketEntry
 {
@@ -58,6 +74,13 @@ public:
 	UPROPERTY(ReplicatedUsing=OnRep_MarketData, EditAnywhere, BlueprintReadWrite, Category="PD|Market")
 	TArray<FPDMarketEntry> Goods;
 
+	/** Source legacy: optional data table whose rows are FPDMarketGoodsRow used to populate Goods at BeginPlay. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="PD|Market")
+	TObjectPtr<UDataTable> MarketGoodsDataTable = nullptr;
+
+	/** Source legacy: data table used by FindItemData / ReloadGoodsFromDataTable to resolve PDItemData rows by name. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="PD|Market")
+	TObjectPtr<UDataTable> ItemDataTable = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Market|Level")
 	TObjectPtr<UDataTable> MarketLevelDataTable = nullptr;
@@ -92,6 +115,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|Market")
 	bool ResolveEntryItemData(const FPDMarketEntry& Entry, FPDItemData& OutItemData) const;
+
+	/** Source legacy: search the local ItemDataTable for an item by row name. */
+	const FPDItemData* FindItemData(FName ItemRowName) const;
+
+	/** Source legacy: reload Goods from MarketGoodsDataTable when the component is configured with one. */
+	UFUNCTION(BlueprintCallable, Category="PD|Market")
+	void ReloadGoodsFromDataTable();
 
 	UFUNCTION(BlueprintPure, Category="PD|Market")
 	int32 GetEntryUnitPrice(const FPDMarketEntry& Entry) const;

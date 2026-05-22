@@ -17,6 +17,7 @@ class UPDInteractionComponent;
 class UPDInventoryComponent;
 class UPDQuickSlotComponent;
 class UPDEquipmentComponent;
+class UPDSecureContainerComponent;
 class UPDEquipmentModificationComponent;
 class UPDQuestComponent;
 class UCameraComponent;
@@ -61,6 +62,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDEquipmentModificationComponent> EquipmentModificationComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDSecureContainerComponent> SecureContainerComponent;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Stamina")
@@ -171,6 +175,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|Equipment")
 	UPDEquipmentModificationComponent* GetEquipmentModificationComponent() const { return EquipmentModificationComponent; }
+
+	UFUNCTION(BlueprintPure, Category="PD|SecureContainer")
+	UPDSecureContainerComponent* GetSecureContainerComponent() const { return SecureContainerComponent; }
 
 	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
 	void TryInteract();

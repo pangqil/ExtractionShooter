@@ -559,15 +559,25 @@ void APDPlayerController::ClientOpenMarketInterface_Implementation(UPDMarketComp
 
 void APDPlayerController::CloseMarketInterface()
 {
+	UPDMarketComponent* ClosingMarketComponent = GetActiveMarketComponent();
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->CloseMarket();
+	}
+	if (ClosingMarketComponent)
+	{
+		OnMarketInterfaceClosed.Broadcast(ClosingMarketComponent);
 	}
 }
 
 bool APDPlayerController::IsMarketInterfaceOpen() const
 {
 	return UIManagerComponent && UIManagerComponent->IsMarketOpen();
+}
+
+UPDMarketComponent* APDPlayerController::GetActiveMarketComponent() const
+{
+	return UIManagerComponent ? UIManagerComponent->GetActiveMarketComponent() : nullptr;
 }
 
 void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
@@ -596,9 +606,14 @@ void APDPlayerController::ClientOpenStashInterface_Implementation(UPDStashCompon
 
 void APDPlayerController::CloseStashInterface()
 {
+	UPDStashComponent* ClosingStashComponent = GetActiveStashComponent();
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->CloseStash();
+	}
+	if (ClosingStashComponent)
+	{
+		OnStashInterfaceClosed.Broadcast(ClosingStashComponent);
 	}
 }
 
@@ -845,9 +860,14 @@ void APDPlayerController::OpenEquipmentModificationInterface()
 
 void APDPlayerController::CloseEquipmentModificationInterface()
 {
+	const bool bWasOpen = IsEquipmentModificationInterfaceOpen();
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->CloseEquipmentModification();
+	}
+	if (bWasOpen)
+	{
+		OnEquipmentModificationInterfaceClosed.Broadcast();
 	}
 }
 

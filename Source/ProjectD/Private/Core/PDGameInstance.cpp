@@ -81,6 +81,16 @@ int32 UPDGameInstance::GetStashUpgradeLevel() const
 	return FMath::Max(0, PlayerData.StashUpgradeLevel);
 }
 
+void UPDGameInstance::SetSecureContainerItems(const TArray<FPDInventorySlot>& InSecureContainerItems)
+{
+	SecureContainerItems = InSecureContainerItems;
+}
+
+const TArray<FPDInventorySlot>& UPDGameInstance::GetSecureContainerItems() const
+{
+	return SecureContainerItems;
+}
+
 void UPDGameInstance::SetTraderReputation(int32 InLevel, int32 InExp)
 {
 	PlayerData.TraderReputationLevel = FMath::Max(1, InLevel);
@@ -153,6 +163,8 @@ void UPDGameInstance::LoadFromDisk()
 	UPDSaveGame* SaveObject=Cast<UPDSaveGame>(UGameplayStatics::LoadGameFromSlot(UPDSaveGame::SlotName, UPDSaveGame::UserIndex));
 	if (!SaveObject) return;
 	PlayerData=SaveObject->PlayerData;
+	// SecureContainer는 세이브파일이 아닌 세션 휴대에만 존재—디스크 로드의는 리셋해서 아이템이 남아있지 않도록 함.
+	SecureContainerItems.Reset();
 }
 
 void UPDGameInstance::TravelToLevel(TSoftObjectPtr<UWorld> Level, bool bMarkBaseResetPending)

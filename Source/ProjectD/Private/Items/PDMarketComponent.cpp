@@ -56,7 +56,76 @@ void UPDMarketComponent::OnRep_MarketData()
 void UPDMarketComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	if (MarketGoodsDataTable)
+	{
+		ReloadGoodsFromDataTable();
+	}
 	SyncTraderReputationFromSave();
+}
+
+void UPDMarketComponent::ReloadGoodsFromDataTable()
+{
+	if (!MarketGoodsDataTable)
+	{
+		return;
+	}
+
+	Goods.Reset();
+
+	TArray<FName> RowNames = MarketGoodsDataTable->GetRowNames();
+	Goods.Reserve(RowNames.Num());
+
+	for (const FName& RowName : RowNames)
+	{
+		const FPDMarketGoodsRow* Row = MarketGoodsDataTable->FindRow<FPDMarketGoodsRow>(RowName, TEXT("ReloadGoodsFromDataTable"), false);
+		if (!Row)
+		{
+			continue;
+		}
+
+		FPDMarketEntry Entry;
+		Entry.ItemDataTable = ItemDataTable;
+		Entry.ItemRowName = Row->ItemRowName.IsNone() ? RowName : Row->ItemRowName;
+		Entry.Stock = Row->Stock;
+		Entry.OverridePrice = Row->OverridePrice;
+
+		FPDItemData ItemData;
+		if (!ResolveEntryItemData(Entry, ItemData))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("PDMarketComponent: Invalid market goods row '%s'. ItemRowName='%s'"),
+				*RowName.ToString(), *Entry.ItemRowName.ToString());
+			continue;
+		}
+
+		Goods.Add(Entry);
+	}
+
+	OnMarketChanged.Broadcast();
+}
+
+const FPDItemData* UPDMarketComponent::FindItemData(FName ItemRowName) const
+{
+	if (!ItemDataTable || ItemRowName.IsNone())
+	{
+		return nullptr;
+	}
+
+	if (const FPDItemData* DirectRow = ItemDataTable->FindRow<FPDItemData>(ItemRowName, TEXT("FindItemData"), false))
+	{
+		return DirectRow;
+	}
+
+	TArray<FPDItemData*> Rows;
+	ItemDataTable->GetAllRows<FPDItemData>(TEXT("FindItemData"), Rows);
+	for (const FPDItemData* Row : Rows)
+	{
+		if (Row && Row->ItemID == ItemRowName)
+		{
+			return Row;
+		}
+	}
+
+	return nullptr;
 }
 
 bool UPDMarketComponent::BuyEntry(UPDInventoryComponent* BuyerInventory, int32 EntryIndex, int32 Quantity)

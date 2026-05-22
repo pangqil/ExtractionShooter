@@ -1,6 +1,7 @@
 #include "Core/PDGameMode.h"
 #include "Core/PDGameState.h"
 #include "Core/PDGameInstance.h"
+#include "Items/PDSecureContainerComponent.h"
 #include "Core/PDPlayerState.h"
 #include "Items/PDInventoryComponent.h"
 #include "GameFramework/Pawn.h"
@@ -71,6 +72,18 @@ void APDGameMode::EndRaid(bool bSuccess)
 			APlayerController* PC = It->Get();
 			TransferPlayerInventoryToStash(PC);
 			SavePlayerStateToDisk(PC);
+
+			// SecureContainer는 생존 시 내용물을 유지(GI 메모리에 저장해 다음 레이드로 이월)
+			if (PC)
+			{
+				if (APawn* Pawn = PC->GetPawn())
+				{
+					if (UPDSecureContainerComponent* SecureContainer = Pawn->FindComponentByClass<UPDSecureContainerComponent>())
+					{
+						SecureContainer->SaveSecureContainer();
+					}
+				}
+			}
 		}
 	}
 	else if (GI)
@@ -79,6 +92,8 @@ void APDGameMode::EndRaid(bool bSuccess)
 		{
 			SavePlayerStateToDisk(It->Get());
 		}
+		// 사망 시 SecureContainer도 날린다(탈해 실패 규칙).
+		GI->SetSecureContainerItems({});
 	}
 
 

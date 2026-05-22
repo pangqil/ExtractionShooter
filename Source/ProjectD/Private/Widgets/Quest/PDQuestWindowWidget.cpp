@@ -138,9 +138,27 @@ void UPDQuestWindowWidget::RefreshQuestDetail()
 			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("마켓 경험치 +%d"), QuestData.Reward.RewardTraderReputationExp)));
 		}
 
-		for (const FPDItemData& ItemData : QuestData.Reward.RewardItems)
+		for (const FPDQuestRewardItem& RewardItem : QuestData.Reward.RewardItems)
 		{
-			AddDetailLine(VB_Rewards, !ItemData.DisplayName.IsEmpty() ? ItemData.DisplayName : FText::FromName(ItemData.ItemID));
+			if (RewardItem.ItemID.IsNone())
+			{
+				continue;
+			}
+
+			FText RewardText = FText::FromName(RewardItem.ItemID);
+			if (InventoryComponent)
+			{
+				FPDItemData ItemData;
+				if (InventoryComponent->FindItemDataByID(RewardItem.ItemID, ItemData) && !ItemData.DisplayName.IsEmpty())
+				{
+					RewardText = ItemData.DisplayName;
+				}
+			}
+
+			const int32 Quantity = FMath::Max(1, RewardItem.Quantity);
+			AddDetailLine(VB_Rewards, Quantity > 1
+				? FText::FromString(FString::Printf(TEXT("%s x%d"), *RewardText.ToString(), Quantity))
+				: RewardText);
 		}
 	}
 

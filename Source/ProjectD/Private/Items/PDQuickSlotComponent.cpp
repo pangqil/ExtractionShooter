@@ -6,7 +6,9 @@
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDStashComponent.h"
+#include "Items/PDItemSoundLibrary.h"
 #include "Weapons/Base/PDWeaponBase.h"
+#include "Components/AudioComponent.h"
 
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
@@ -884,6 +886,7 @@ bool UPDQuickSlotComponent::BeginConsumableUse(int32 SlotIndex, const FPDInvento
 	ConsumableUseStartTime = World->GetTimeSeconds();
 	ConsumableUseEndTime = ConsumableUseStartTime + Duration;
 
+	StartConsumableUseSound(Slot.ItemData);
 	ApplyConsumableMoveSpeed();
 	World->GetTimerManager().SetTimer(ConsumableUseTimerHandle, this, &UPDQuickSlotComponent::FinishConsumableUse, Duration, false);
 	if (QuickSlotItems.IsValidIndex(SlotIndex))
@@ -910,6 +913,7 @@ void UPDQuickSlotComponent::FinishConsumableUse()
 	ConsumableUseEndTime = 0.f;
 	PendingConsumableSlot.Clear();
 	RestoreConsumableMoveSpeed();
+	StopConsumableUseSound();
 
 	if (ConsumeItem(CompletedSlot))
 	{
@@ -1034,6 +1038,23 @@ float UPDQuickSlotComponent::GetWeaponQuickSlotCooldownRemainingTime() const
 
 	const UWorld* World = GetWorld();
 	return World ? FMath::Max(0.f, WeaponCooldownEndTime - World->GetTimeSeconds()) : 0.f;
+}
+
+void UPDQuickSlotComponent::StartConsumableUseSound(const FPDItemData& ItemData)
+{
+	StopConsumableUseSound();
+	ConsumableUseAudioComponent = UPDItemSoundLibrary::SpawnConsumableUseSound(this, ItemData);
+}
+
+void UPDQuickSlotComponent::StopConsumableUseSound()
+{
+	if (!ConsumableUseAudioComponent)
+	{
+		return;
+	}
+
+	ConsumableUseAudioComponent->Stop();
+	ConsumableUseAudioComponent = nullptr;
 }
 
 void UPDQuickSlotComponent::ApplyConsumableMoveSpeed()
