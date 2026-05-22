@@ -685,6 +685,11 @@ void UPDInventoryWidget::ResolveInventoryGridPanel()
 
 void UPDInventoryWidget::RefreshGoldText()
 {
+	if (!GoldTextWidget)
+	{
+		GoldTextWidget = Text_Gold;
+	}
+
 	if (!GoldTextWidget && WidgetTree && !GoldTextWidgetName.IsNone())
 	{
 		GoldTextWidget = Cast<UTextBlock>(WidgetTree->FindWidget(GoldTextWidgetName));
@@ -696,7 +701,7 @@ void UPDInventoryWidget::RefreshGoldText()
 	}
 
 	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
-	GoldTextWidget->SetText(FText::FromString(FString::Printf(TEXT("Gold : %d"), InventoryComponent ? InventoryComponent->GetGold() : 0)));
+	GoldTextWidget->SetText(FText::AsNumber(FMath::Max(0, InventoryComponent ? InventoryComponent->GetGold() : 0)));
 }
 
 void UPDInventoryWidget::ResolveInventoryWeightBarWidget()

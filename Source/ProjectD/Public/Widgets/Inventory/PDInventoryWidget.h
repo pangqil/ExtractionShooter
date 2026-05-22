@@ -15,6 +15,7 @@ class UPDInventorySlotWidget;
 class UUserWidget;
 class UWidgetTree;
 class UTextBlock;
+class UImage;
 class UPDQuantityPopupWidget;
 class UPDInventoryItemContextMenuWidget;
 class UPanelWidget;
@@ -111,6 +112,12 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Sort")
 	TObjectPtr<UWidget> Panel_SortTabs;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Gold")
+	TObjectPtr<UImage> Image_Gold;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Gold")
+	TObjectPtr<UTextBlock> Text_Gold;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Equipment")
 	FName EquipmentSlotWeaponWidgetName = TEXT("EquipmentSlot_Weapon");
