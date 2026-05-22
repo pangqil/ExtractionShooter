@@ -2,10 +2,8 @@
 
 #include "Core/PDPlayerState.h"
 #include "Data/PDQuestComponent.h"
-#include "Characters/PDPlayerCharacter.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDEquipmentComponent.h"
-#include "Items/PDQuickSlotComponent.h"
 #include "Items/PDItemSoundLibrary.h"
 #include "Items/PDSecureContainerComponent.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
@@ -41,26 +39,6 @@ namespace
 		}
 
 		return Component->GetOwner()->FindComponentByClass<UPDEquipmentComponent>();
-	}
-
-	APDPlayerCharacter* FindOwnerPlayerCharacter(const UActorComponent* Component)
-	{
-		if (!Component || !Component->GetOwner())
-		{
-			return nullptr;
-		}
-
-		if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(Component->GetOwner()))
-		{
-			return PlayerCharacter;
-		}
-
-		if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(Component->GetOwner()))
-		{
-			return PDPlayerState->GetPDPlayerCharacter();
-		}
-
-		return nullptr;
 	}
 
 	int32 ResolveDefaultWeaponAmmo(const FPDItemData& ItemData)
@@ -584,40 +562,23 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 		return 0;
 	}
 
+	if (Items.Num() != GetMaxSlotCount())
+	{
+		InitializeInventory();
+	}
+
 	int32 RemainingQuantity = Quantity;
 	int32 AddedQuantity = 0;
-	bool bEquippedFromThisAdd = false;
 
 	auto HandleAddedItem = [&](int32 InAddedQuantity)
 	{
+		if (InAddedQuantity <= 0)
+		{
+			return;
+		}
+
 		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		OnInventoryChanged.Broadcast();
-
-		if (ItemData.WeaponType != EWeaponType::None)
-		{
-			if (APDPlayerCharacter* PlayerCharacter = FindOwnerPlayerCharacter(this))
-			{
-				if (!bEquippedFromThisAdd)
-				{
-					FPDInventorySlot WeaponSlot;
-					WeaponSlot.ItemData = ItemData;
-					WeaponSlot.Quantity = 1;
-					WeaponSlot.bIsEmpty = false;
-					WeaponSlot.ModificationLevel = 0;
-					InitializeWeaponAmmoState(WeaponSlot);
-
-					bEquippedFromThisAdd = PlayerCharacter->TryAutoEquipWeaponSlot(WeaponSlot);
-				}
-
-				if (bEquippedFromThisAdd)
-				{
-					if (UPDQuickSlotComponent* QuickSlotComponent = PlayerCharacter->GetQuickSlotComponent())
-					{
-						QuickSlotComponent->AddItemPartial(ItemData, 1);
-					}
-				}
-			}
-		}
 
 		if (UPDQuestComponent* QuestComponent = FindOwnerQuestComponent(this))
 		{
@@ -637,7 +598,6 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 			{
 				RemainingQuantity -= 1;
 				AddedQuantity += 1;
-				bEquippedFromThisAdd = true;
 			}
 		}
 	}
@@ -651,6 +611,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 	if (!CanAddWeight(ItemData, RemainingQuantity))
 	{
 		BroadcastWeightLimitExceeded();
+		HandleAddedItem(AddedQuantity);
 		return AddedQuantity;
 	}
 
