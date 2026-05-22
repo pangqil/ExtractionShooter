@@ -212,7 +212,7 @@ void UPDBTTask_PeekFireFromCover::TickTask(UBehaviorTreeComponent& OwnerComp, ui
 		{
 			FEnvQueryRequest Request(RepositionQuery, Pawn);
 			TSharedPtr<FEnvQueryResult> Result =
-				UEnvQueryManager::GetCurrent(Pawn->GetWorld())->RunInstantQuery(Request, EEnvQueryRunMode::SingleBest);
+				UEnvQueryManager::GetCurrent(Pawn->GetWorld())->RunInstantQuery(Request, EEnvQueryRunMode::SingleResult);
 
 			if (Result.IsValid() && Result->IsSuccessful())
 			{
