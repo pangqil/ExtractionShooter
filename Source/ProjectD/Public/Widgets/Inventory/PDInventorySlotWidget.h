@@ -50,6 +50,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory|Tooltip")
 	UUserWidget* CreateItemTooltipWidget();
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory|Tooltip")
+	void SetTooltipPreviewMode(bool bInPreviewMode);
+
 	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory|Event")
 	FPDOnInventorySlotClicked OnSlotLeftClicked;
 
@@ -96,6 +99,9 @@ protected:
 	bool bLastClickWithControl = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Inventory")
+	bool bTooltipPreviewMode = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "PD|Inventory")
 	FText EmptySlotLabel;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Debug")
@@ -120,10 +126,19 @@ protected:
 	FName TooltipItemNameWidgetName = TEXT("Text_ItemName");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
-	FName TooltipDescriptionWidgetName = TEXT("Text_Description");
+	FName TooltipDescriptionWidgetName = TEXT("Text_ItemDesc");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
-	FName TooltipWeightWidgetName = TEXT("Text_Weight");
+	FName TooltipWeightWidgetName = TEXT("Text_ItemWeight");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
+	FName TooltipSellPriceWidgetName = TEXT("Text_SellPrice");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
+	FName TooltipItemGradeWidgetName = TEXT("Text_ItemGrade");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
+	FName TooltipPreviewSlotWidgetName = TEXT("WBP_InventorySlot");
 
 private:
 	void ClearDropOverlays();

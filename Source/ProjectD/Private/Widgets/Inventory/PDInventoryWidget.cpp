@@ -9,6 +9,10 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
+#include "Components/ScaleBox.h"
+#include "Components/ScaleBoxSlot.h"
+#include "Components/SizeBox.h"
+#include "Components/SizeBoxSlot.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/PanelWidget.h"
@@ -26,6 +30,20 @@
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDInventoryWeightBarWidget.h"
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
+
+void UPDInventoryWidget::InitializeForOwner(APlayerController* /*OwnerPC*/)
+{
+}
+
+void UPDInventoryWidget::OnTabShown()
+{
+}
+
+void UPDInventoryWidget::OnTabHidden()
+{
+	CloseContextMenu();
+	CloseItemHoverTooltip();
+}
 
 void UPDInventoryWidget::NativeOnInitialized()
 {
@@ -84,9 +102,19 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 
 	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
 
-	const int32 Columns = InventoryComponent ? FMath::Max(1, InventoryComponent->GridColumns) : FMath::Max(1, FallbackGridColumns);
-	const int32 Rows = InventoryComponent ? FMath::Max(1, InventoryComponent->GridRows) : FMath::Max(1, FallbackGridRows);
-	const int32 SlotCount = InventoryComponent ? InventoryComponent->GetMaxSlotCount() : Columns * Rows;
+	if (!InventoryComponent)
+	{
+		return;
+	}
+
+	const int32 Columns = FMath::Max(1, InventoryComponent->GridColumns);
+	const int32 Rows = FMath::Max(1, InventoryComponent->GridRows);
+	const int32 SlotCount = Columns * Rows;
+	const float SlotWidth = FMath::Max(1.f, InventorySlotWidth);
+	const float SlotHeight = FMath::Max(1.f, InventorySlotHeight);
+
+	InventoryGridPanel->SetMinDesiredSlotWidth(SlotWidth);
+	InventoryGridPanel->SetMinDesiredSlotHeight(SlotHeight);
 
 	TArray<int32> DisplaySlotIndices;
 	if (InventoryComponent)
@@ -147,7 +175,44 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 			}
 		}
 
-		UUniformGridSlot* GridSlot = InventoryGridPanel->AddChildToUniformGrid(CreatedSlotWidget, DisplayIndex / Columns, DisplayIndex % Columns);
+		UWidget* GridChildWidget = CreatedSlotWidget;
+		USizeBox* SlotSizeBox = WidgetTree ? WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass()) : nullptr;
+		if (SlotSizeBox)
+		{
+			SlotSizeBox->SetWidthOverride(SlotWidth);
+			SlotSizeBox->SetHeightOverride(SlotHeight);
+			SlotSizeBox->SetMinDesiredWidth(SlotWidth);
+			SlotSizeBox->SetMinDesiredHeight(SlotHeight);
+
+			UWidget* SlotContentWidget = CreatedSlotWidget;
+			if (bScaleInventorySlotWidgetToFit)
+			{
+				UScaleBox* SlotScaleBox = WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass());
+				if (SlotScaleBox)
+				{
+					SlotScaleBox->SetStretch(EStretch::ScaleToFit);
+					SlotScaleBox->SetStretchDirection(EStretchDirection::Both);
+
+					if (UScaleBoxSlot* ScaleBoxSlot = Cast<UScaleBoxSlot>(SlotScaleBox->AddChild(CreatedSlotWidget)))
+					{
+						ScaleBoxSlot->SetHorizontalAlignment(HAlign_Fill);
+						ScaleBoxSlot->SetVerticalAlignment(VAlign_Fill);
+					}
+
+					SlotContentWidget = SlotScaleBox;
+				}
+			}
+
+			if (USizeBoxSlot* SizeBoxSlot = Cast<USizeBoxSlot>(SlotSizeBox->AddChild(SlotContentWidget)))
+			{
+				SizeBoxSlot->SetHorizontalAlignment(HAlign_Fill);
+				SizeBoxSlot->SetVerticalAlignment(VAlign_Fill);
+			}
+
+			GridChildWidget = SlotSizeBox;
+		}
+
+		UUniformGridSlot* GridSlot = InventoryGridPanel->AddChildToUniformGrid(GridChildWidget, DisplayIndex / Columns, DisplayIndex % Columns);
 		if (GridSlot)
 		{
 			GridSlot->SetHorizontalAlignment(HAlign_Center);
@@ -289,9 +354,7 @@ int32 UPDInventoryWidget::GetInventoryDisplaySlotCount() const
 		return FMath::Max(1, InventoryComponent->GetMaxSlotCount());
 	}
 
-	const int32 Columns = FMath::Max(1, FallbackGridColumns);
-	const int32 Rows = FMath::Max(1, FallbackGridRows);
-	return Columns * Rows;
+	return 16;
 }
 
 void UPDInventoryWidget::SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const
@@ -636,6 +699,11 @@ void UPDInventoryWidget::ResolveInventoryGridPanel()
 
 void UPDInventoryWidget::RefreshGoldText()
 {
+	if (!GoldTextWidget)
+	{
+		GoldTextWidget = Text_Gold;
+	}
+
 	if (!GoldTextWidget && WidgetTree && !GoldTextWidgetName.IsNone())
 	{
 		GoldTextWidget = Cast<UTextBlock>(WidgetTree->FindWidget(GoldTextWidgetName));
@@ -647,7 +715,7 @@ void UPDInventoryWidget::RefreshGoldText()
 	}
 
 	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
-	GoldTextWidget->SetText(FText::FromString(FString::Printf(TEXT("Gold : %d"), InventoryComponent ? InventoryComponent->GetGold() : 0)));
+	GoldTextWidget->SetText(FText::AsNumber(FMath::Max(0, InventoryComponent ? InventoryComponent->GetGold() : 0)));
 }
 
 void UPDInventoryWidget::ResolveInventoryWeightBarWidget()
@@ -1260,7 +1328,14 @@ void UPDInventoryWidget::OpenQuantityPopup(int32 SlotIndex, int32 MaxQuantity, c
 	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->AddToViewport(100);
-	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	if (const FPDInventorySlot* PreviewSlot = FindInventorySlot(SlotIndex))
+	{
+		ActiveQuantityPopup->InitializeQuantityPopupWithSlot(MaxQuantity, Title, *PreviewSlot);
+	}
+	else
+	{
+		ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	}
 }
 
 void UPDInventoryWidget::OpenTransferQuantityPopup(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 MaxQuantity, const FText& Title)
@@ -1293,7 +1368,14 @@ void UPDInventoryWidget::OpenTransferQuantityPopup(EPDItemContainerType SourceCo
 	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->AddToViewport(100);
-	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	if (const FPDInventorySlot* PreviewSlot = FindSourceSlot(SourceContainerType, SourceSlotIndex))
+	{
+		ActiveQuantityPopup->InitializeQuantityPopupWithSlot(MaxQuantity, Title, *PreviewSlot);
+	}
+	else
+	{
+		ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	}
 }
 
 void UPDInventoryWidget::HandleQuantityConfirmed(int32 Quantity)

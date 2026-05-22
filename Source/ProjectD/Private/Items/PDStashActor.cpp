@@ -23,6 +23,7 @@ APDStashActor::APDStashActor()
 
 	OutlineComponent = CreateDefaultSubobject<UPDInteractionOutlineComponent>(TEXT("OutlineComponent"));
 	OutlineComponent->SetupTrigger(InteractionCollision);
+	OutlineComponent->SetOverlapTriggerEnabled(true);
 
 	CurrentDoorAngle = ClosedDoorAngle;
 	TargetDoorAngle = ClosedDoorAngle;
@@ -36,6 +37,7 @@ void APDStashActor::BeginPlay()
 	if (OutlineComponent)
 	{
 		OutlineComponent->SetupTrigger(InteractionCollision);
+		OutlineComponent->SetOverlapTriggerEnabled(true);
 	}
 	SetDoorOpen(false, true);
 }

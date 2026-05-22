@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "Widgets/PDActivatableBase.h"
 #include "Widgets/Inventory/PDInventoryDragDropOperation.h"
+#include "Widgets/Screen/PDTabbedContent.h"
 #include "PDInventoryWidget.generated.h"
 
 class UUniformGridPanel;
@@ -15,6 +16,7 @@ class UPDInventorySlotWidget;
 class UUserWidget;
 class UWidgetTree;
 class UTextBlock;
+class UImage;
 class UPDQuantityPopupWidget;
 class UPDInventoryItemContextMenuWidget;
 class UPanelWidget;
@@ -24,11 +26,16 @@ class UWidget;
 class UPDInventoryWeightBarWidget;
 
 UCLASS(BlueprintType, Blueprintable)
-class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase
+class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase, public IPDTabbedContent
 {
 	GENERATED_BODY()
 
 public:
+	// IPDTabbedContent
+	virtual void InitializeForOwner(APlayerController* OwnerPC) override;
+	virtual void OnTabShown() override;
+	virtual void OnTabHidden() override;
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void RefreshInventoryGrid();
 
@@ -49,11 +56,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	TSubclassOf<UUserWidget> InventorySlotWidgetClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
-	int32 FallbackGridColumns = 5;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Grid", meta = (ClampMin = "1.0"))
+	float InventorySlotWidth = 52.f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
-	int32 FallbackGridRows = 4;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Grid", meta = (ClampMin = "1.0"))
+	float InventorySlotHeight = 52.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Grid")
+	bool bScaleInventorySlotWidgetToFit = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	FName InventoryGridWidgetName = TEXT("UniformGridPanel_InventoryGrid");
@@ -108,6 +118,12 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Sort")
 	TObjectPtr<UWidget> Panel_SortTabs;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Gold")
+	TObjectPtr<UImage> Image_Gold;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "PD|Inventory|Gold")
+	TObjectPtr<UTextBlock> Text_Gold;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Equipment")
 	FName EquipmentSlotWeaponWidgetName = TEXT("EquipmentSlot_Weapon");

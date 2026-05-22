@@ -690,7 +690,10 @@ bool UPDStashComponent::TakeStashSlotQuantity(UPDInventoryComponent* TargetInven
 	}
 
 	const int32 MoveQuantity = FMath::Min(Quantity, SourceSlot.Quantity);
-	const int32 AddedQuantity = TargetInventory->AddItemPartial(SourceSlot.ItemData, MoveQuantity);
+	FPDInventorySlot TransferSlot = SourceSlot;
+	TransferSlot.Quantity = MoveQuantity;
+
+	const int32 AddedQuantity = TargetInventory->AddSlotPartial(TransferSlot);
 
 	if (AddedQuantity <= 0)
 	{

@@ -740,7 +740,14 @@ void UPDStashWidget::OpenQuantityPopup(int32 SlotIndex, int32 MaxQuantity, const
 	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->AddToViewport(100);
-	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	if (const FPDInventorySlot* PreviewSlot = FindStashSlot(SlotIndex))
+	{
+		ActiveQuantityPopup->InitializeQuantityPopupWithSlot(MaxQuantity, Title, *PreviewSlot);
+	}
+	else
+	{
+		ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	}
 }
 
 void UPDStashWidget::OpenTransferQuantityPopup(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 MaxQuantity, const FText& Title)
@@ -773,7 +780,14 @@ void UPDStashWidget::OpenTransferQuantityPopup(EPDItemContainerType SourceContai
 	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->AddToViewport(100);
-	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	if (const FPDInventorySlot* PreviewSlot = FindSourceSlot(SourceContainerType, SourceSlotIndex))
+	{
+		ActiveQuantityPopup->InitializeQuantityPopupWithSlot(MaxQuantity, Title, *PreviewSlot);
+	}
+	else
+	{
+		ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	}
 }
 
 void UPDStashWidget::HandleQuantityConfirmed(int32 Quantity)
