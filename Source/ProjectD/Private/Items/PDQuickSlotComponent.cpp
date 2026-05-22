@@ -51,6 +51,7 @@ void UPDQuickSlotComponent::OnRep_ConsumableUseState()
 	if (!bIsUsingConsumable)
 	{
 		RestoreConsumableMoveSpeed();
+		StopConsumableUseSound();
 	}
 }
 
@@ -947,6 +948,7 @@ bool UPDQuickSlotComponent::CancelConsumableUse()
 {
 	if (GetOwner() && !GetOwner()->HasAuthority())
 	{
+		StopConsumableUseSound();
 		ServerCancelConsumableUse();
 		return true;
 	}
@@ -970,6 +972,7 @@ bool UPDQuickSlotComponent::CancelConsumableUse()
 	ConsumableUseStartTime = 0.f;
 	ConsumableUseEndTime = 0.f;
 	RestoreConsumableMoveSpeed();
+	StopConsumableUseSound();
 	OnConsumableUseCanceled.Broadcast(CanceledSlotIndex, CanceledItemData);
 	return true;
 }
@@ -1027,8 +1030,9 @@ void UPDQuickSlotComponent::StartConsumableUseSound(const FPDItemData& ItemData)
 
 void UPDQuickSlotComponent::StopConsumableUseSound()
 {
-	if (!ConsumableUseAudioComponent)
+	if (!IsValid(ConsumableUseAudioComponent))
 	{
+		ConsumableUseAudioComponent = nullptr;
 		return;
 	}
 
