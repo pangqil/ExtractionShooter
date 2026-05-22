@@ -171,23 +171,43 @@ void APDEnemyAIControllerBase::HandleTargetSpotted(AActor* Target)
 
 void APDEnemyAIControllerBase::HandleTargetLost(AActor* Target, FVector LastKnownLocation)
 {
-	// 순서 주의: BB 먼저, Combat 나중.
-	// Combat->ClearCurrentTarget 이 OnTargetChanged.Broadcast(nullptr) 를 통해 HandleCombatTargetChanged 를 즉시 호출하고
-	// 그 안에서 BB.TargetActor 가 null 처리됨. 그 뒤에 본 함수의 BB 검사를 하면 `== Target` 비교가 false 가 되어
-	// LastSeenLocation 갱신이 영구 SKIP 되는 순서 버그 회피.
-	if (UBlackboardComponent* BB = GetBlackboardComponent())
+	UBlackboardComponent* BB = GetBlackboardComponent();
+	if (!BB)
 	{
-		if (BB->GetValueAsObject(PDBTKeys::TargetActor) == Target)
-		{
-			BB->ClearValue(PDBTKeys::TargetActor);
-			BB->SetValueAsVector(PDBTKeys::LastSeenLocation, LastKnownLocation);
-		}
+		OnTargetLost(Target, LastKnownLocation);
+		return;
 	}
+
+	// 본 콜백이 받는 target 이 현재 BB.TargetActor 와 다르면 무관 — 무시.
+	if (BB->GetValueAsObject(PDBTKeys::TargetActor) != Target)
+	{
+		OnTargetLost(Target, LastKnownLocation);
+		return;
+	}
+
+	// LastSeenLocation 은 항상 갱신 — perception 이 마지막 본 위치는 BT 가 Investigate 등에 사용.
+	BB->SetValueAsVector(PDBTKeys::LastSeenLocation, LastKnownLocation);
+
+	// 교전 중(Chase/Combat) 에는 perception 의 lost 가 단순 정보 — TargetActor 유지.
+	// 거리 기반 lose 판정은 PDBTService_TrackPlayer(LoseRange) 가 담당.
+	// 이유: 사격 후 cover 복귀로 LoseSightRadius 일시 초과 → perception 이 클리어 → Combat abort → Investigate
+	//       로 떨어지는 race 차단. Elite 는 사실상 거의 매 사이클 이 race 에 노출됨.
+	const uint8 RawState = BB->GetValueAsEnum(PDBTKeys::EnemyState);
+	const EPDEnemyState State = static_cast<EPDEnemyState>(RawState);
+	const bool bEngaged = (State == EPDEnemyState::Chase) || (State == EPDEnemyState::Combat);
+
+	if (bEngaged)
+	{
+		OnTargetLost(Target, LastKnownLocation);
+		return;
+	}
+
+	// 비-교전 상태(Idle/Alert/Dead) — perception 이 유일한 target 결정자이므로 정상 클리어.
+	BB->ClearValue(PDBTKeys::TargetActor);
 
 	APawn* OwnerPawn = GetPawn();
 	if (UPDCombatComponent* Combat = OwnerPawn ? OwnerPawn->FindComponentByClass<UPDCombatComponent>() : nullptr)
 	{
-		// 두 자극원 추적 중 한쪽만 Lost 됐을 때 다른 타겟이 날아가지 않도록 가드.
 		if (Combat->GetCurrentTarget() == Target)
 		{
 			Combat->ClearCurrentTarget();

@@ -42,6 +42,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Soldier|Weapon")
 	void SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevious = true);
 
+	/** 진행 중인 풀오토 발사 timer 정지. BT task(FireAtTarget) 종료 시 명시적 정지용. */
+	UFUNCTION(BlueprintCallable, Category = "PD|Soldier|Weapon")
+	void StopContinuousFire();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnEnterState_Dead() override;
@@ -75,8 +79,13 @@ protected:
 	TSubclassOf<UAnimInstance> DefaultAnimLayerClass;
 
 	// 자식 클래스(예: APDEliteSoldier) 가 BT/상태머신 측에서 직접 발사 루프 on/off 하기 위함.
+	// StopContinuousFire 는 위로 옮겨 public BlueprintCallable 화 — BT task 종료 hook 에서 호출.
 	void StartContinuousFire();
-	void StopContinuousFire();
+
+	// 자식 클래스가 timer 기반 연속 발사를 풀오토 외 무기에서도 강제하려면 override.
+	// 디폴트 false — 비-auto 무기로 swap 되면 timer 가 자기 종료 후 단발 경로(HandleAttackRequested)로 위임.
+	// EliteSoldier 처럼 SetPeeking 으로 timer 직접 구동하는 경우 true 반환 (peek 중 timer 보존).
+	virtual bool ShouldForceContinuousFire() const { return false; }
 
 private:
 	UFUNCTION()

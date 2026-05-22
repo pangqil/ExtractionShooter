@@ -79,6 +79,14 @@ void APDPlayerController::ServerRequestExtraction_Implementation()
 	RequestExtraction();
 }
 
+void APDPlayerController::Server_RequestBaseTravel_Implementation()
+{
+	if (APDGameMode* GM = GetWorld()->GetAuthGameMode<APDGameMode>())
+	{
+		GM->NotifyPlayerReadyForTravel(this);
+	}
+}
+
 APDPlayerState* APDPlayerController::GetPDPlayerState() const
 {
 	return GetPlayerState<APDPlayerState>();

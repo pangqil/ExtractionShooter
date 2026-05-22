@@ -61,6 +61,10 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerRequestExtraction();
 
+	// 결산 위젯의 Anim_BlackFade 종료 시점에 호출. 서버에서 GameMode의 게이트에 ACK 등록.
+	UFUNCTION(Server, Reliable)
+	void Server_RequestBaseTravel();
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void OpenStashInterface(UPDStashComponent* StashSource);
 

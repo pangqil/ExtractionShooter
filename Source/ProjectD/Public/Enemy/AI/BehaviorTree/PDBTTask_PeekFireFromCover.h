@@ -4,26 +4,34 @@
 #include "BehaviorTree/Tasks/BTTask_BlackboardBase.h"
 #include "PDBTTask_PeekFireFromCover.generated.h"
 
+class UEnvQuery;
+
 /**
- * 엄폐물에서 우측 피크 → 사격 → 원위치 복귀의 단일 latent Task.
+ * 엄폐물에서 settle → 랜덤 방향 strafe → LOS 확보 시 사격 → 원위치 복귀의 단일 latent Task.
  *
  * 흐름:
- *  1) ExecuteTask: 현재 폰 위치(=cover 위치)를 OriginalLoc 으로 기록.
- *     적(BlackboardKey=Target) 방향 기준 우측(Cross(ToTarget, Up))으로 PeekOffset 만큼 이동한 PeekSpot 계산.
- *     SetFocus(Target). AIController.MoveToLocation(PeekSpot). 상태=Peeking.
+ *  1) ExecuteTask: 현재 폰 위치(=cover)를 OriginalLoc 으로 기록. SetFocus(Target). 상태=Settling.
  *  2) TickTask:
- *     - Peeking 중 도착 → SetPeeking(true), 상태=Firing, FireTimer 시작.
- *     - Firing 중 FireDuration 경과 → SetPeeking(false), MoveToLocation(OriginalLoc), 상태=Returning.
- *     - Returning 중 도착 → FinishLatentTask(Succeeded).
- *  3) AbortTask/OnTaskFinished: SetPeeking(false), ClearFocus 정리.
+ *     - Settling: SettleDuration 대기 후 좌/우 랜덤 결정. ToTarget 기준 좌(또는 우) 방향으로
+ *       PeekOffsetLeft(좌) / PeekOffsetRight(우) 만큼 떨어진 PeekSpot 계산 + MoveTo. 상태=Strafing.
+ *       (좌측은 총구가 폰의 오른쪽에 있어 LOS 확보까지 더 노출 필요 → 거리 더 크게.)
+ *     - Strafing: 매 tick HasLOS 검사. LOS 확보 즉시 StopMovement + SetPeeking(true) + 상태=Firing.
+ *       LOS 미확보 상태로 PeekSpot 도착 시 그래도 발사 시도(fallback).
+ *     - Firing: FireDuration 경과 OR Weapon->IsReloading() → SetPeeking(false) + MoveTo(OriginalLoc) + 상태=Returning.
+ *     - Returning: OriginalLoc 도착 시 FinishLatentTask(Succeeded).
+ *  3) AbortTask/OnTaskFinished: SetPeeking(false), ClearFocus, StopMovement.
  *
  * 사용자 사양:
- *  - 오른손잡이 → 항상 우측 피크. 우측 방향은 Soldier 자기 forward 기준이 아니라
- *    적과의 대치선(ToTarget) 기준 우측 — 자연스러운 피크 동작.
- *  - 우측 lean 애니메이션이 없으므로 위치 이동으로 표현.
- *  - 사격은 부모(APDSoldier::SetPeeking) 가 들고 있는 풀오토 루프에 위임.
+ *  - 항상 우측 peek → 랜덤 좌/우 strafe 로 변경 (예측 가능성 제거).
+ *  - "정면에 플레이어 보이면 사격" → LOS 확보를 게이트로 사용.
+ *  - 좌측 노출 거리 ↑ — 총구가 우측에 있어 좌 strafe 시 더 많은 노출 필요.
+ *  - 장전 시작 시 즉시 복귀.
+ *
+ * 부모 의존:
+ *  - 사격은 APDEliteSoldier::SetPeeking(true/false) 가 들고 있는 풀오토 루프에 위임.
+ *  - 장전 감지는 APDRangedWeaponBase::IsReloading() 폴링 (DYNAMIC_MULTICAST 델리게이트 lambda 바인딩 불가).
  */
-UCLASS(meta = (DisplayName = "PD Peek Fire From Cover (Right)"))
+UCLASS(meta = (DisplayName = "PD Peek Fire From Cover (LOS)"))
 class PROJECTD_API UPDBTTask_PeekFireFromCover : public UBTTask_BlackboardBase
 {
 	GENERATED_BODY()
@@ -38,35 +46,65 @@ public:
 	virtual uint16 GetInstanceMemorySize() const override;
 
 protected:
-	/** 적 방향 기준 우측으로 빠져나갈 거리(cm). 캐릭터 캡슐 + 무기 길이 대비 적절히. */
+	/** 우측 strafe 시 OriginalLoc 에서 PeekSpot 까지 거리(cm). 총구가 우측에 있어 짧아도 LOS 확보. */
 	UPROPERTY(EditAnywhere, Category = "PD|PeekFire", meta = (ClampMin = "10.0"))
-	float PeekOffset = 120.f;
+	float PeekOffsetRight = 100.f;
 
-	/** 피크 위치에서 사격을 유지할 시간(초). */
+	/** 좌측 strafe 시 거리(cm). 총구가 우측에 있으므로 폰 중심이 cover 모서리 더 밖으로 나가야 함 → 길게. */
+	UPROPERTY(EditAnywhere, Category = "PD|PeekFire", meta = (ClampMin = "10.0"))
+	float PeekOffsetLeft = 180.f;
+
+	/** 피크 전 cover 에서 대기할 시간(초). */
+	UPROPERTY(EditAnywhere, Category = "PD|PeekFire", meta = (ClampMin = "0.0"))
+	float SettleDuration = 1.5f;
+
+	/** LOS 확보 후 사격 유지 시간(초). */
 	UPROPERTY(EditAnywhere, Category = "PD|PeekFire", meta = (ClampMin = "0.1"))
-	float FireDuration = 1.5f;
+	float FireDuration = 5.0f;
 
-	/** Peek/Return 이동 시 MoveTo 의 AcceptanceRadius(cm). 너무 작으면 도착 판정 지연. */
+	/** Move 도착 판정 AcceptanceRadius(cm). */
 	UPROPERTY(EditAnywhere, Category = "PD|PeekFire", meta = (ClampMin = "1.0"))
 	float MoveAcceptanceRadius = 30.f;
 
-	/** 전체 Task 가 이 시간을 넘으면 강제 종료(Failed). 이동 막힘 등 대비 safety. */
+	/** 전체 task safety timeout(초). 이동 막힘 등 대비. */
 	UPROPERTY(EditAnywhere, Category = "PD|PeekFire", meta = (ClampMin = "1.0"))
-	float MaxTotalDuration = 6.f;
+	float MaxTotalDuration = 12.f;
+
+	/** true 면 Firing 중 weapon.IsReloading() 감지 시 즉시 Returning. */
+	UPROPERTY(EditAnywhere, Category = "PD|PeekFire")
+	bool bAbortOnReload = true;
+
+	/** LOS line trace 시 폰/타겟 모두에 더할 Z offset(cm). 캐릭터 가슴 높이 근사. */
+	UPROPERTY(EditAnywhere, Category = "PD|PeekFire", meta = (ClampMin = "0.0"))
+	float LOSCheckHeight = 80.f;
+
+	/** Firing 중 LOS 잃은 후 reposition 트리거까지의 grace 시간(초). 짧으면 잦은 reposition, 길면 무용한 사격 누적. */
+	UPROPERTY(EditAnywhere, Category = "PD|PeekFire|Reposition", meta = (ClampMin = "0.0"))
+	float LosLostTolerance = 0.4f;
+
+	/** 사격 중 LOS 잃었을 때 가시 위치 산출용 EQS. nullptr 이면 reposition 안 함(cover 복귀). */
+	UPROPERTY(EditAnywhere, Category = "PD|PeekFire|Reposition")
+	TObjectPtr<UEnvQuery> RepositionQuery;
 };
 
 enum class EPDPeekFireState : uint8
 {
-	Peeking,    // PeekSpot 으로 이동 중
-	Firing,     // 피크 위치 도착, 사격 중
-	Returning,  // 원위치로 복귀 중
+	Settling,       // cover 도착 직후 SettleDuration 만큼 대기
+	Strafing,       // PeekSpot 으로 측면 이동하며 매 tick LOS 검사
+	Firing,         // LOS 확보, 사격 중
+	Repositioning,  // 사격 중 LOS 잃어 EQS 결과로 가시 위치 이동 중
+	Returning,      // 원위치로 복귀 중
 };
 
 struct FPDPeekFireTaskMemory
 {
-	FVector OriginalLoc = FVector::ZeroVector;
-	FVector PeekSpot    = FVector::ZeroVector;
-	float TotalElapsed  = 0.f;
-	float FireElapsed   = 0.f;
-	EPDPeekFireState State = EPDPeekFireState::Peeking;
+	FVector OriginalLoc       = FVector::ZeroVector;
+	FVector PeekSpot          = FVector::ZeroVector;
+	FVector RepositionTarget  = FVector::ZeroVector;
+	float TotalElapsed   = 0.f;
+	float SettleElapsed  = 0.f;
+	float FireElapsed    = 0.f;
+	float LosLostElapsed = 0.f;
+	bool bGoLeft         = false;
+	EPDPeekFireState State = EPDPeekFireState::Settling;
 };
