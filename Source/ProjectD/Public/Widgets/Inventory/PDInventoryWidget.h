@@ -83,9 +83,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	bool bEnableContextMenu = true;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
-	FName ContextMenuContainerWidgetName = TEXT("Panel_ContextMenu");
-
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "PD|Inventory")
 	TObjectPtr<UUniformGridPanel> InventoryGridPanel;
 
@@ -221,7 +218,6 @@ private:
 	void ExecuteInventorySlotTransfer(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 	void OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex);
 	void CloseContextMenu();
-	UPanelWidget* FindContextMenuContainer() const;
 	void OpenItemHoverTooltip(UPDInventorySlotWidget* SlotWidget);
 	void CloseItemHoverTooltip();
 	FVector2D GetSlotTooltipPosition(UPDInventorySlotWidget* SlotWidget) const;

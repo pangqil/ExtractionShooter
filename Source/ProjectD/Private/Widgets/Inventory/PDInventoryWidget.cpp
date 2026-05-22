@@ -989,6 +989,7 @@ void UPDInventoryWidget::HandleInventorySlotRightClicked(UPDInventorySlotWidget*
 void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex)
 {
 	CloseContextMenu();
+	CloseItemHoverTooltip();
 
 	if (!SlotWidget || !ContextMenuWidgetClass)
 	{
@@ -997,14 +998,6 @@ void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int
 
 	const FPDInventorySlot& SlotData = SlotWidget->GetSlotData();
 	if (SlotData.IsEmpty())
-	{
-		return;
-	}
-
-	OpenItemHoverTooltip(SlotWidget);
-
-	UPanelWidget* ContextMenuContainer = FindContextMenuContainer();
-	if (!ContextMenuContainer)
 	{
 		return;
 	}
@@ -1019,53 +1012,31 @@ void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int
 	ActiveContextMenu->OnDropClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleContextMenuDropClicked);
 	ActiveContextMenu->OnEquipClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleContextMenuEquipClicked);
 	ActiveContextMenu->InitializeContextMenu(SlotIndex, SlotData);
-	ContextMenuContainer->ClearChildren();
-	ContextMenuContainer->AddChild(ActiveContextMenu);
-	ContextMenuContainer->SetVisibility(ESlateVisibility::Visible);
-	ActiveContextMenu->ForceLayoutPrepass();
+	ActiveContextMenu->SetVisibility(ESlateVisibility::Visible);
+	ActiveContextMenu->AddToViewport(300);
+
+	FVector2D MousePosition = FVector2D::ZeroVector;
+	if (APlayerController* PlayerController = GetOwningPlayer())
+	{
+		UWidgetLayoutLibrary::GetMousePositionScaledByDPI(PlayerController, MousePosition.X, MousePosition.Y);
+	}
+
+	ActiveContextMenu->SetPositionInViewport(MousePosition, false);
 }
 
 void UPDInventoryWidget::CloseContextMenu()
 {
-	if (ActiveContextMenu)
+	if (!ActiveContextMenu)
 	{
-		ActiveContextMenu->OnUseClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuUseClicked);
-		ActiveContextMenu->OnDropClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuDropClicked);
-		ActiveContextMenu->OnEquipClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuEquipClicked);
-		ActiveContextMenu->RemoveFromParent();
-		ActiveContextMenu = nullptr;
+		return;
 	}
 
-	if (UPanelWidget* ContextMenuContainer = FindContextMenuContainer())
-	{
-		ContextMenuContainer->ClearChildren();
-		ContextMenuContainer->SetVisibility(ESlateVisibility::Collapsed);
-	}
+	ActiveContextMenu->OnUseClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuUseClicked);
+	ActiveContextMenu->OnDropClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuDropClicked);
+	ActiveContextMenu->OnEquipClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuEquipClicked);
+	ActiveContextMenu->RemoveFromParent();
+	ActiveContextMenu = nullptr;
 }
-
-UPanelWidget* UPDInventoryWidget::FindContextMenuContainer() const
-{
-	if (!ActiveItemTooltip || !ActiveItemTooltip->WidgetTree)
-	{
-		return nullptr;
-	}
-
-	if (!ContextMenuContainerWidgetName.IsNone())
-	{
-		if (UPanelWidget* FoundPanel = Cast<UPanelWidget>(ActiveItemTooltip->WidgetTree->FindWidget(ContextMenuContainerWidgetName)))
-		{
-			return FoundPanel;
-		}
-	}
-
-	if (UPanelWidget* FoundPanel = Cast<UPanelWidget>(ActiveItemTooltip->WidgetTree->FindWidget(TEXT("ContextMenuContainer"))))
-	{
-		return FoundPanel;
-	}
-
-	return nullptr;
-}
-
 
 void UPDInventoryWidget::OpenItemHoverTooltip(UPDInventorySlotWidget* SlotWidget)
 {
