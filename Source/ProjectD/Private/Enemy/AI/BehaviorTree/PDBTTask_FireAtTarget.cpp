@@ -2,6 +2,7 @@
 
 #include "AIController.h"
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
+#include "Enemy/Characters/PDSoldier.h"
 #include "Enemy/Components/PDCombatComponent.h"
 
 UPDBTTask_FireAtTarget::UPDBTTask_FireAtTarget()
@@ -101,6 +102,13 @@ void UPDBTTask_FireAtTarget::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, u
 	if (AAIController* AIController = OwnerComp.GetAIOwner())
 	{
 		AIController->ClearFocus(EAIFocusPriority::Gameplay);
+
+		// 풀오토 timer 가 진행 중이면 명시적 정지 — task abort/완료 후 자동 발사 잔존 방지.
+		// (사용자 정책: BT task 안에서만 발사. Task 종료 시 fire 도 함께 끝.)
+		if (APDSoldier* Soldier = Cast<APDSoldier>(AIController->GetPawn()))
+		{
+			Soldier->StopContinuousFire();
+		}
 	}
 	Super::OnTaskFinished(OwnerComp, NodeMemory, TaskResult);
 }

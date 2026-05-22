@@ -15,6 +15,7 @@ namespace PDBTKeys
 	static const FName HasNoiseHint      = TEXT("HasNoiseHint");       // Bool
 	static const FName LastNoiseLocation = TEXT("LastNoiseLocation");  // Vector
 	static const FName LastSeenLocation  = TEXT("LastSeenLocation");   // Vector  (Chase 용)
+	static const FName LastSeenDirection = TEXT("LastSeenDirection");  // Vector  (Investigate 시 둘러볼 방향)
 
 	// ─── State / Movement ───
 	static const FName EnemyState        = TEXT("EnemyState");         // Enum    EPDEnemyState
@@ -29,7 +30,6 @@ namespace PDBTKeys
 
 	// ─── Elite: Cover ───
 	static const FName CoverLocation     = TEXT("CoverLocation");      // Vector  (Actor.SnapLocation 또는 EQS Points 결과)
-	static const FName bHasCoverTarget   = TEXT("bHasCoverTarget");    // Bool
 
 	// ─── Elite: LOS Occlusion ───
 	static const FName TimeSinceLastLOS  = TEXT("TimeSinceLastLOS");   // Float   (Service 누적)

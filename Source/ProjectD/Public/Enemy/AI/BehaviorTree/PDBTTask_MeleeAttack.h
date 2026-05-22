@@ -11,13 +11,6 @@
  *  - Tick: AttackDuration 만큼 점유 → 동일 task 가 휘두름 도중 재진입하지 않음.
  *  - 거리/쿨다운 게이트는 BT 데코레이터(IsTargetInRange) 와 CombatComponent 가 이중으로 담당.
  *
- * 디자이너 사용 흐름:
- *  [Combat 분기] Selector
- *   ├─ Decorator: IsTargetInRange == true (Lower Priority Abort)
- *   ├─ Decorator: HasLOSToTarget   == true
- *   └─ Sequence
- *       ├─ SetEnemyState(Combat)
- *       └─ PDBTTask_MeleeAttack
  */
 UCLASS(meta = (DisplayName = "PD Melee Attack"))
 class PROJECTD_API UPDBTTask_MeleeAttack : public UBTTaskNode
