@@ -1,11 +1,19 @@
 #include "Core/PDGameMode.h"
 #include "Core/PDGameState.h"
 #include "Core/PDGameInstance.h"
+#include "Core/PDPlayerController.h"
 #include "Items/PDSecureContainerComponent.h"
 #include "Core/PDPlayerState.h"
 #include "Items/PDInventoryComponent.h"
+#include "Characters/Base/PDCharacterBase.h"
+#include "Game/PDRaidStats.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
 #include "Type/Types.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogPDRaid, Log, All);
 
 APDGameMode::APDGameMode()
 {
@@ -17,28 +25,47 @@ void APDGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 	InitializePlayerStateFromSave(NewPlayer);
+
+	UE_LOG(LogPDRaid, Log, TEXT("PostLogin: PC=%s NumPlayers=%d"),
+		*GetNameSafe(NewPlayer),
+		GetWorld() ? GetWorld()->GetNumPlayerControllers() : -1);
 }
 
 void APDGameMode::StartRaid()
 {
+	const AGameStateBase* GS = GetGameState<AGameStateBase>();
+	RaidStartServerTime = GS ? GS->GetServerWorldTimeSeconds() : (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f);
+
+	int32 PlayerCount = 0;
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		APlayerController* PC = It->Get();
 		InitializePlayerInventoryFromLoadout(PC);
+
+		if (APDPlayerState* PS = PC ? PC->GetPlayerState<APDPlayerState>() : nullptr)
+		{
+			PS->ResetRaidParticipationState();
+		}
+
+		// Step 2-C: 초기 골드/아이템 수량 스냅샷 (사망/추출 시점에 Delta 계산용).
+		CaptureInitialRaidSnapshotFor(PC);
+		++PlayerCount;
 	}
 
 	SetRaidState(ERaidState::InProgress);
+	UE_LOG(LogPDRaid, Log, TEXT("StartRaid: Participants=%d StartTime=%.2f"), PlayerCount, RaidStartServerTime);
 }
 
 void APDGameMode::TravelToRaidLevel(FName RaidMapName)
 {
 	if (RaidMapName.IsNone())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("APDGameMode::TravelToRaidLevel: RaidMapName is not set."));
+		UE_LOG(LogPDRaid, Warning, TEXT("TravelToRaidLevel: RaidMapName is not set."));
 		return;
 	}
 
 	StartRaid();
+	UE_LOG(LogPDRaid, Log, TEXT("TravelToRaidLevel: ServerTravel to %s"), *RaidMapName.ToString());
 	GetWorld()->ServerTravel(RaidMapName.ToString());
 }
 
@@ -46,61 +73,202 @@ void APDGameMode::TravelToBaseLevel(bool bMarkResetPending)
 {
 	if (UPDGameInstance* GI = GetGameInstance<UPDGameInstance>())
 	{
+		UE_LOG(LogPDRaid, Log, TEXT("TravelToBaseLevel: bMarkResetPending=%d"), bMarkResetPending ? 1 : 0);
 		GI->TravelToLevel(GI->GetBaseLevel(), bMarkResetPending);
 	}
 }
 
 void APDGameMode::RequestExtraction(APlayerController* PC)
 {
-	if (!PC||CurrentRaidState!=ERaidState::InProgress) return;
-	SetRaidState(ERaidState::Extracting);
-	EndRaid(true);
-	ScheduleReturnToBaseTravel(ExtractionToTravelDelay);
+	if (!PC)
+	{
+		UE_LOG(LogPDRaid, Warning, TEXT("RequestExtraction: null PC, ignored"));
+		return;
+	}
+
+	if (CurrentRaidState != ERaidState::InProgress)
+	{
+		UE_LOG(LogPDRaid, Warning, TEXT("RequestExtraction: ignored, state=%d PC=%s"),
+			static_cast<int32>(CurrentRaidState), *PC->GetName());
+		return;
+	}
+
+	APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
+	if (!PS)
+	{
+		UE_LOG(LogPDRaid, Warning, TEXT("RequestExtraction: PC=%s has no PDPlayerState"), *PC->GetName());
+		return;
+	}
+
+	if (PS->IsExtracted() || PS->IsRaidDead())
+	{
+		UE_LOG(LogPDRaid, Warning, TEXT("RequestExtraction: PC=%s already finalized (extracted=%d dead=%d)"),
+			*PC->GetName(), PS->IsExtracted() ? 1 : 0, PS->IsRaidDead() ? 1 : 0);
+		return;
+	}
+
+	UE_LOG(LogPDRaid, Log, TEXT("RequestExtraction: PC=%s -> mark extracted"), *PC->GetName());
+	PS->SetExtracted(true);
+
+	// Step 2-C: 인벤토리가 stash 로 옮겨지기 전에 Delta 확정.
+	FinalizeRaidStatsOnExtraction(PC);
+
+	ProcessExtractionForPlayer(PC);
+
+	// Step 2-B: 추출자를 관전하던 다른 PC 가 있으면 다음 생존자로 순환.
+	NotifyOthersWatchingFinalized(PC);
+
+	EvaluateRaidEnd();
+}
+
+void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
+{
+	if (!PC)
+	{
+		UE_LOG(LogPDRaid, Warning, TEXT("OnPlayerDied: null PC, ignored"));
+		return;
+	}
+	if (CurrentRaidState == ERaidState::Ended)
+	{
+		UE_LOG(LogPDRaid, Verbose, TEXT("OnPlayerDied: PC=%s ignored, raid already Ended"), *PC->GetName());
+		return;
+	}
+
+	APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
+	if (PS)
+	{
+		if (PS->IsRaidDead())
+		{
+			UE_LOG(LogPDRaid, Verbose, TEXT("OnPlayerDied: PC=%s already marked dead"), *PC->GetName());
+			return;
+		}
+		PS->SetRaidDead(true);
+	}
+
+	UE_LOG(LogPDRaid, Log, TEXT("OnPlayerDied: PC=%s Killer=%s Alive=%d Dead=%d Extracted=%d"),
+		*PC->GetName(),
+		*GetNameSafe(Killer),
+		CountAlivePlayers(), CountDeadPlayers(), CountExtractedPlayers());
+
+	ProcessDeathForPlayer(PC);
+
+	// Step 2-C: 사망자 결산 스탯 확정 + 킬러에게 Kill 크레딧.
+	FinalizeRaidStatsOnDeath(PC);
+	CreditKillToShooter(Killer, PC);
+
+	// Step 2-B: 사망자는 첫 생존자 시점으로 관전 전환,
+	// 죽은 PC를 보고 있던 다른 관전자들은 다음 생존자로 자동 순환.
+	HandleSpectatorTransitionForDeath(PC);
+	NotifyOthersWatchingFinalized(PC);
+
+	EvaluateRaidEnd();
+}
+
+void APDGameMode::EvaluateRaidEnd()
+{
+	if (CurrentRaidState != ERaidState::InProgress)
+	{
+		UE_LOG(LogPDRaid, Verbose, TEXT("EvaluateRaidEnd: skipped, state=%d"),
+			static_cast<int32>(CurrentRaidState));
+		return;
+	}
+
+	const AGameStateBase* GS = GetGameState<AGameStateBase>();
+	if (!GS || GS->PlayerArray.Num() == 0)
+	{
+		UE_LOG(LogPDRaid, Warning, TEXT("EvaluateRaidEnd: empty PlayerArray, holding off"));
+		return;
+	}
+
+	int32 Alive = 0;
+	int32 Extracted = 0;
+	int32 Dead = 0;
+	for (APlayerState* PSBase : GS->PlayerArray)
+	{
+		APDPlayerState* PS = Cast<APDPlayerState>(PSBase);
+		if (!PS) continue;
+
+		if (PS->IsExtracted())     ++Extracted;
+		else if (PS->IsRaidDead()) ++Dead;
+		else                       ++Alive;
+	}
+
+	UE_LOG(LogPDRaid, Log, TEXT("EvaluateRaidEnd: Alive=%d Dead=%d Extracted=%d (Total=%d)"),
+		Alive, Dead, Extracted, GS->PlayerArray.Num());
+
+	if (Alive > 0)
+	{
+		UE_LOG(LogPDRaid, Log, TEXT("EvaluateRaidEnd: %d player(s) still alive, raid continues"), Alive);
+		return;
+	}
+
+	const bool bAnyExtracted = Extracted > 0;
+	UE_LOG(LogPDRaid, Log, TEXT("EvaluateRaidEnd: all participants finalized -> EndRaid(bSuccess=%d)"),
+		bAnyExtracted ? 1 : 0);
+	EndRaid(bAnyExtracted);
 }
 
 void APDGameMode::EndRaid(bool bSuccess)
 {
-	if (CurrentRaidState == ERaidState::Ended) return;
+	if (CurrentRaidState == ERaidState::Ended)
+	{
+		UE_LOG(LogPDRaid, Verbose, TEXT("EndRaid: already Ended, ignored"));
+		return;
+	}
 	SetRaidState(ERaidState::Ended);
+
+	UE_LOG(LogPDRaid, Log, TEXT("EndRaid: bSuccess=%d Alive=%d Dead=%d Extracted=%d"),
+		bSuccess ? 1 : 0,
+		CountAlivePlayers(), CountDeadPlayers(), CountExtractedPlayers());
 
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
 
-	if (bSuccess)
+	// 정산 마감: 추출자는 RequestExtraction 단계에서 이미 처리됨. 여기서는 사망자만 마저 처리.
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-		{
-			APlayerController* PC = It->Get();
-			TransferPlayerInventoryToStash(PC);
-			SavePlayerStateToDisk(PC);
+		APlayerController* PC = It->Get();
+		if (!PC) continue;
 
-			// SecureContainer는 생존 시 내용물을 유지(GI 메모리에 저장해 다음 레이드로 이월)
-			if (PC)
-			{
-				if (APawn* Pawn = PC->GetPawn())
-				{
-					if (UPDSecureContainerComponent* SecureContainer = Pawn->FindComponentByClass<UPDSecureContainerComponent>())
-					{
-						SecureContainer->SaveSecureContainer();
-					}
-				}
-			}
-		}
-	}
-	else if (GI)
-	{
-		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
+		if (!PS) continue;
+
+		if (PS->IsExtracted())
 		{
-			SavePlayerStateToDisk(It->Get());
+			UE_LOG(LogPDRaid, Log, TEXT("EndRaid: PC=%s already extracted (kept items/gold)"), *PC->GetName());
+			continue;
 		}
-		// 사망 시 SecureContainer도 날린다(탈해 실패 규칙).
+
+		// 사망자: 인벤토리/RaidGold 손실. 영구 데이터(스태시/평판 등)만 저장.
+		UE_LOG(LogPDRaid, Log, TEXT("EndRaid: PC=%s dead -> drop raid inventory, save persistent only"),
+			*PC->GetName());
+		SavePlayerStateToDisk(PC);
+	}
+
+	// SecureContainer 전역 규칙: 어느 누구도 추출 못 했으면 메모리 캐시 비움(다음 레이드 빈손).
+	if (!bSuccess && GI)
+	{
+		UE_LOG(LogPDRaid, Log, TEXT("EndRaid: no survivors, clearing GI SecureContainer cache"));
 		GI->SetSecureContainerItems({});
 	}
 
-
-	// BP 연출 훅 — BP에서 결과 UI 표시. 트래블은 ACK 게이트로 위임.
+	// BP 연출 훅 — 사운드/이펙트 등 서버 사이드 연출용. 결산 위젯 푸시는 아래 ClientRPC 로 일원화.
 	OnRaidEnded(bSuccess);
 
-	// 모든 PC가 ACK하거나 타임아웃 시 ServerTravel. 둘 중 빠른 쪽이 발동.
+	// 옵션 B: 모든 PC 에 결산 위젯 push ClientRPC.
+	TArray<FPDPlayerRaidEntryData> Entries;
+	BuildRaidEndEntries(Entries);
+	const float Duration = GetCurrentRaidElapsedSeconds();
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APDPlayerController* PDPC = Cast<APDPlayerController>(It->Get());
+		if (!PDPC) continue;
+		PDPC->Client_ShowRaidEndTransition(bSuccess, Entries, Duration);
+	}
+
+	// 모든 PC가 ACK하거나 TravelGateTimeoutSeconds 경과 시 ServerTravel. 둘 중 빠른 쪽이 발동.
+	UE_LOG(LogPDRaid, Log, TEXT("EndRaid: travel gate armed (timeout=%.1fs) Entries=%d Duration=%.1fs"),
+		TravelGateTimeoutSeconds, Entries.Num(), Duration);
 	GetWorldTimerManager().SetTimer(
 		TravelTimeoutTimerHandle,
 		this,
@@ -109,33 +277,215 @@ void APDGameMode::EndRaid(bool bSuccess)
 		false);
 }
 
-void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
+void APDGameMode::ProcessExtractionForPlayer(APlayerController* PC)
 {
 	if (!PC) return;
-	if (CurrentRaidState == ERaidState::Ended) return;
-	EndRaid(false);
-	ScheduleReturnToBaseTravel(DeathToTravelDelay);
+
+	APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
+	if (!PS) return;
+
+	UE_LOG(LogPDRaid, Log, TEXT("ProcessExtraction: PC=%s -> transfer inventory to stash"),
+		*PC->GetName());
+
+	TransferPlayerInventoryToStash(PC);
+	SavePlayerStateToDisk(PC);
+
+	// SecureContainer 는 생존(추출) 시 다음 레이드로 이월.
+	if (APawn* Pawn = PC->GetPawn())
+	{
+		if (UPDSecureContainerComponent* SecureContainer = Pawn->FindComponentByClass<UPDSecureContainerComponent>())
+		{
+			SecureContainer->SaveSecureContainer();
+			UE_LOG(LogPDRaid, Verbose, TEXT("ProcessExtraction: PC=%s saved SecureContainer"), *PC->GetName());
+		}
+	}
 }
 
-void APDGameMode::HandleReturnToBaseTravel()
+void APDGameMode::ProcessDeathForPlayer(APlayerController* PC)
 {
-	TravelToBaseLevel(true);
+	if (!PC) return;
+
+	// 사망자는 이체하지 않음(인벤/RaidGold 손실). 다른 영구 데이터는 EndRaid 에서 일괄 저장.
+	UE_LOG(LogPDRaid, Verbose, TEXT("ProcessDeath: PC=%s -> raid inventory will be dropped on EndRaid"),
+		*PC->GetName());
 }
 
-void APDGameMode::ScheduleReturnToBaseTravel(float Delay)
+void APDGameMode::HandleSpectatorTransitionForDeath(APlayerController* DeadPC)
 {
-	GetWorldTimerManager().ClearTimer(ReturnToBaseTravelTimerHandle);
-	GetWorldTimerManager().SetTimer(
-		ReturnToBaseTravelTimerHandle,
-		this,
-		&APDGameMode::HandleReturnToBaseTravel,
-		FMath::Max(0.f, Delay),
-		false);
+	APDPlayerController* DeadPDPC = Cast<APDPlayerController>(DeadPC);
+	if (!DeadPDPC) return;
+
+	APlayerController* InitialTarget = FindFirstAliveSpectateTarget(DeadPC);
+	if (!InitialTarget)
+	{
+		UE_LOG(LogPDRaid, Verbose, TEXT("HandleSpectatorTransitionForDeath: PC=%s no alive target, skip"),
+			*DeadPC->GetName());
+		return;
+	}
+
+	DeadPDPC->StartSpectatingDeath(InitialTarget);
+}
+
+void APDGameMode::NotifyOthersWatchingFinalized(APlayerController* AffectedPC)
+{
+	if (!AffectedPC) return;
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APDPlayerController* Other = Cast<APDPlayerController>(It->Get());
+		if (!Other || Other == AffectedPC) continue;
+		Other->CycleSpectateIfTargetIs(AffectedPC);
+	}
+}
+
+APlayerController* APDGameMode::FindFirstAliveSpectateTarget(APlayerController* ExcludePC) const
+{
+	UWorld* World = GetWorld();
+	if (!World) return nullptr;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+		if (!PC || PC == ExcludePC) continue;
+
+		APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
+		if (!PS) continue;
+		if (PS->IsRaidDead() || PS->IsExtracted()) continue;
+		if (!PC->GetPawn()) continue;
+
+		return PC;
+	}
+	return nullptr;
+}
+
+float APDGameMode::GetCurrentRaidElapsedSeconds() const
+{
+	const AGameStateBase* GS = GetGameState<AGameStateBase>();
+	const float Now = GS ? GS->GetServerWorldTimeSeconds() : (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f);
+	return FMath::Max(0.f, Now - RaidStartServerTime);
+}
+
+int32 APDGameMode::CountInventoryItemQuantity(UPDInventoryComponent* Inventory) const
+{
+	if (!Inventory) return 0;
+	int32 Total = 0;
+	for (const FPDInventorySlot& Slot : Inventory->Items)
+	{
+		if (!Slot.IsEmpty())
+		{
+			Total += FMath::Max(0, Slot.Quantity);
+		}
+	}
+	return Total;
+}
+
+void APDGameMode::CaptureInitialRaidSnapshotFor(APlayerController* PC)
+{
+	if (!PC) return;
+	APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
+	if (!PS) return;
+
+	UPDInventoryComponent* Inventory = PS->GetInventoryComponent();
+	const int32 InitialGold = Inventory ? Inventory->Gold : 0;
+	const int32 InitialItemQty = CountInventoryItemQuantity(Inventory);
+	PS->CaptureInitialRaidSnapshot(InitialGold, InitialItemQty);
+
+	UE_LOG(LogPDRaid, Verbose, TEXT("CaptureInitialRaidSnapshot: PC=%s Gold=%d ItemQty=%d"),
+		*PC->GetName(), InitialGold, InitialItemQty);
+}
+
+void APDGameMode::FinalizeRaidStatsOnDeath(APlayerController* DeadPC)
+{
+	if (!DeadPC) return;
+	APDPlayerState* PS = DeadPC->GetPlayerState<APDPlayerState>();
+	if (!PS) return;
+
+	// 사망자: 인벤/골드 모두 소실 → Delta 는 시작 스냅샷 음수.
+	PS->SetSurvivalSeconds(GetCurrentRaidElapsedSeconds());
+	PS->SetGoldDelta(-PS->GetInitialRaidGold());
+	PS->SetItemDelta(-PS->GetInitialRaidItemQuantity());
+
+	UE_LOG(LogPDRaid, Log, TEXT("FinalizeRaidStatsOnDeath: PC=%s Survive=%.1fs GoldDelta=%d ItemDelta=%d"),
+		*DeadPC->GetName(),
+		PS->GetRaidStats().SurvivalSeconds,
+		PS->GetRaidStats().GoldDelta,
+		PS->GetRaidStats().ItemDelta);
+}
+
+void APDGameMode::FinalizeRaidStatsOnExtraction(APlayerController* ExtractedPC)
+{
+	if (!ExtractedPC) return;
+	APDPlayerState* PS = ExtractedPC->GetPlayerState<APDPlayerState>();
+	if (!PS) return;
+
+	UPDInventoryComponent* Inventory = PS->GetInventoryComponent();
+	const int32 FinalGold = Inventory ? Inventory->Gold : 0;
+	const int32 FinalItemQty = CountInventoryItemQuantity(Inventory);
+
+	PS->SetSurvivalSeconds(GetCurrentRaidElapsedSeconds());
+	PS->SetGoldDelta(FinalGold - PS->GetInitialRaidGold());
+	PS->SetItemDelta(FinalItemQty - PS->GetInitialRaidItemQuantity());
+
+	UE_LOG(LogPDRaid, Log, TEXT("FinalizeRaidStatsOnExtraction: PC=%s Survive=%.1fs GoldDelta=%d ItemDelta=%d"),
+		*ExtractedPC->GetName(),
+		PS->GetRaidStats().SurvivalSeconds,
+		PS->GetRaidStats().GoldDelta,
+		PS->GetRaidStats().ItemDelta);
+}
+
+void APDGameMode::CreditKillToShooter(AActor* Killer, APlayerController* Victim)
+{
+	if (!Killer || !Victim) return;
+
+	// Killer 는 보통 공격자의 Pawn. PlayerController 로 환원.
+	APawn* KillerPawn = Cast<APawn>(Killer);
+	APlayerController* KillerPC = KillerPawn ? Cast<APlayerController>(KillerPawn->GetController()) : Cast<APlayerController>(Killer);
+	if (!KillerPC || KillerPC == Victim) return;
+
+	APDPlayerState* KillerPS = KillerPC->GetPlayerState<APDPlayerState>();
+	if (!KillerPS) return;
+
+	KillerPS->AddKill();
+	UE_LOG(LogPDRaid, Log, TEXT("CreditKillToShooter: Killer=%s Victim=%s Kills=%d"),
+		*KillerPC->GetName(), *Victim->GetName(), KillerPS->GetRaidStats().Kills);
+}
+
+void APDGameMode::BuildRaidEndEntries(TArray<FPDPlayerRaidEntryData>& OutEntries) const
+{
+	const AGameStateBase* GS = GetGameState<AGameStateBase>();
+	if (!GS) return;
+
+	OutEntries.Reserve(GS->PlayerArray.Num());
+	for (APlayerState* PS : GS->PlayerArray)
+	{
+		if (!PS) continue;
+
+		FPDPlayerRaidEntryData Data;
+		Data.PlayerName = PS->GetPlayerName();
+
+		if (const APDPlayerState* PDPS = Cast<APDPlayerState>(PS))
+		{
+			Data.bSurvived = PDPS->IsExtracted();
+			Data.Stats     = PDPS->GetRaidStats();
+		}
+		else
+		{
+			Data.bSurvived = false;
+			Data.Stats     = FPDRaidStats{};
+		}
+		OutEntries.Add(MoveTemp(Data));
+	}
 }
 
 void APDGameMode::SetRaidState(ERaidState NewState)
 {
 	if (CurrentRaidState==NewState) return;
+
+	UE_LOG(LogPDRaid, Log, TEXT("SetRaidState: %d -> %d"),
+		static_cast<int32>(CurrentRaidState), static_cast<int32>(NewState));
+
 	CurrentRaidState=NewState;
 	if (APDGameState* GS=GetGameState<APDGameState>()) GS->SetRaidState(NewState);
 	OnRaidStateChanged(NewState);
@@ -213,10 +563,24 @@ void APDGameMode::NotifyPlayerReadyForTravel(APlayerController* PC)
 {
 	if (!PC || bTravelStarted) return;
 
-	ReadyPlayersForTravel.AddUnique(PC);
+	// 결산 위젯이 뜨기 전에 클릭으로 들어오는 ACK 차단. EndRaid 가 호출되어 Ended 상태일 때만 받음.
+	if (CurrentRaidState != ERaidState::Ended)
+	{
+		UE_LOG(LogPDRaid, Verbose, TEXT("NotifyPlayerReadyForTravel: ignored, raid not Ended (state=%d) PC=%s"),
+			static_cast<int32>(CurrentRaidState), *PC->GetName());
+		return;
+	}
+
+	const bool bWasAdded = ReadyPlayersForTravel.AddUnique(PC) != INDEX_NONE;
+	const int32 ReadyCount = ReadyPlayersForTravel.Num();
+	const int32 TotalPlayers = GetGameState<AGameStateBase>() ? GetGameState<AGameStateBase>()->PlayerArray.Num() : 0;
+
+	UE_LOG(LogPDRaid, Log, TEXT("NotifyPlayerReadyForTravel: PC=%s ack=%d/%d (newAck=%d)"),
+		*PC->GetName(), ReadyCount, TotalPlayers, bWasAdded ? 1 : 0);
 
 	if (AreAllPlayersReadyForTravel())
 	{
+		UE_LOG(LogPDRaid, Log, TEXT("NotifyPlayerReadyForTravel: all players ACK'd -> RequestBaseTravel"));
 		RequestBaseTravel();
 	}
 }
@@ -240,19 +604,68 @@ bool APDGameMode::AreAllPlayersReadyForTravel() const
 void APDGameMode::OnTravelTimeoutExpired()
 {
 	if (bTravelStarted) return;
-	UE_LOG(LogTemp, Warning, TEXT("APDGameMode: Travel gate timeout — forcing ServerTravel"));
+	UE_LOG(LogPDRaid, Warning, TEXT("OnTravelTimeoutExpired: %.1fs gate expired, forcing ServerTravel"),
+		TravelGateTimeoutSeconds);
 	RequestBaseTravel();
 }
 
 void APDGameMode::RequestBaseTravel()
 {
-	if (bTravelStarted) return;
+	if (bTravelStarted)
+	{
+		UE_LOG(LogPDRaid, Verbose, TEXT("RequestBaseTravel: already started, ignored"));
+		return;
+	}
 	bTravelStarted = true;
 
 	GetWorldTimerManager().ClearTimer(TravelTimeoutTimerHandle);
+
+	UE_LOG(LogPDRaid, Log, TEXT("RequestBaseTravel: invoking seamless ServerTravel to BaseLevel"));
 
 	if (UPDGameInstance* GI = GetGameInstance<UPDGameInstance>())
 	{
 		GI->TravelToLevel(GI->GetBaseLevel(), /*bMarkBaseResetPending=*/false);
 	}
+}
+
+int32 APDGameMode::CountAlivePlayers() const
+{
+	const AGameStateBase* GS = GetGameState<AGameStateBase>();
+	if (!GS) return 0;
+
+	int32 Count = 0;
+	for (APlayerState* PSBase : GS->PlayerArray)
+	{
+		const APDPlayerState* PS = Cast<APDPlayerState>(PSBase);
+		if (PS && !PS->IsRaidDead() && !PS->IsExtracted()) ++Count;
+	}
+	return Count;
+}
+
+int32 APDGameMode::CountExtractedPlayers() const
+{
+	const AGameStateBase* GS = GetGameState<AGameStateBase>();
+	if (!GS) return 0;
+
+	int32 Count = 0;
+	for (APlayerState* PSBase : GS->PlayerArray)
+	{
+		const APDPlayerState* PS = Cast<APDPlayerState>(PSBase);
+		if (PS && PS->IsExtracted()) ++Count;
+	}
+	return Count;
+}
+
+int32 APDGameMode::CountDeadPlayers() const
+{
+	const AGameStateBase* GS = GetGameState<AGameStateBase>();
+	if (!GS) return 0;
+
+	int32 Count = 0;
+	for (APlayerState* PSBase : GS->PlayerArray)
+	{
+		const APDPlayerState* PS = Cast<APDPlayerState>(PSBase);
+		if (PS && PS->IsRaidDead()) ++Count;
+	}
+	return Count;
 }

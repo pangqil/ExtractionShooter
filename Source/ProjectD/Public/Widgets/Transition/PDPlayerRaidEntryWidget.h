@@ -12,7 +12,7 @@ class UWidgetAnimation;
 
 /**
  * 결산 화면의 per-player 한 줄. WBP_PDPlayerRaidEntry 부모.
- * UPDRaidEndTransitionWidget::K2_PopulateEntries 가 인스턴스 생성 후 Configure 호출.
+ * UPDRaidEndTransitionWidget::Configure 가 C++ CreateWidget 으로 인스턴스 생성 후 Configure 호출 (Step 4).
  */
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
 class PROJECTD_API UPDPlayerRaidEntryWidget : public UUserWidget
