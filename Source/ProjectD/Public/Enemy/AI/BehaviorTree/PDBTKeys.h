@@ -43,4 +43,8 @@ namespace PDBTKeys
 	// ─── Player Tracking (Service_TrackPlayer) ───
 	static const FName TrackedPlayerLocation = TEXT("TrackedPlayerLocation"); // Vector  (최근접 플레이어 폰 위치)
 	static const FName bHasTrackedPlayer     = TEXT("bHasTrackedPlayer");     // Bool    (추적 범위 내 플레이어 존재 여부)
+
+	// ─── Boss (Juggernaut) ───
+	static const FName BossPhase           = TEXT("BossPhase");           // Enum  EPDJuggernautPhase (Dormant/Active/Deactivating/Returning)
+	static const FName bIsExecutingPattern = TEXT("bIsExecutingPattern"); // Bool  (패턴 실행 중 — 일반공격/Strafe 억제용 BT 게이트)
 }
