@@ -69,7 +69,7 @@ protected:
 	EWeaponType WeaponType = EWeaponType::None;
 
 
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, Category="Weapon|State")
 	int32 CurrentLevel = 1;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Dropped, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
