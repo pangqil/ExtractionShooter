@@ -19,16 +19,19 @@
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDMarketWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
+#include "Widgets/PDActivatableBase.h"
 #include "Widgets/PDNotificationWidget.h"
 #include "Widgets/PDRootLayout.h"
 #include "Widgets/Quest/PDQuestWindowWidget.h"
+#include "Widgets/Screen/PDTabbedScreenBase.h"
 
 namespace
 {
 	bool ShouldShowCrosshairForController(const APDPlayerController* PC)
 	{
-		const APDPlayerCharacter* PlayerCharacter = PC ? Cast<APDPlayerCharacter>(PC->GetPawn()) : nullptr;
-		return PlayerCharacter && PlayerCharacter->GetCurrentWeapon();
+		// 무기 유무와 관계없이 PD 캐릭터를 빙의하고 있으면 크로스헤어 표시.
+		// 무기 없을 때는 HUD가 EWeaponType::None 디자인(중앙 점 등)을 띄움.
+		return PC && Cast<APDPlayerCharacter>(PC->GetPawn()) != nullptr;
 	}
 }
 
@@ -170,10 +173,49 @@ void UPDPlayerUIManagerComponent::RebindHUDToASC(UAbilitySystemComponent* ASC)
 
 void UPDPlayerUIManagerComponent::ApplyEffectiveUIState(EWidgetInputMode Mode)
 {
+	APDPlayerController* PC = GetPDController();
+	if (!PC)
+	{
+		return;
+	}
+
+	// Stack의 effective top 모드에 따라 PC InputMode + 커서를 일괄 적용.
+	// stack이 비면 Subsystem이 Game을 broadcast → 여기서 GameOnly로 복원 → WASD/Tab 등 PC 입력 정상화.
+	switch (Mode)
+	{
+	case EWidgetInputMode::Game:
+		{
+			FInputModeGameOnly InputMode;
+			PC->SetInputMode(InputMode);
+			PC->SetShowMouseCursor(false);
+			break;
+		}
+	case EWidgetInputMode::GameAndMenu:
+		{
+			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			InputMode.SetHideCursorDuringCapture(false);
+			PC->SetInputMode(InputMode);
+			PC->SetShowMouseCursor(true);
+			break;
+		}
+	case EWidgetInputMode::Menu:
+		{
+			FInputModeUIOnly InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			PC->SetInputMode(InputMode);
+			PC->SetShowMouseCursor(true);
+			break;
+		}
+	case EWidgetInputMode::Passive:
+		// 모드/커서 건드리지 않음 (top 위젯이 명시적으로 비관여 선언).
+		break;
+	}
+
 	if (HUDInstance)
 	{
 		HUDInstance->SetCrosshairVisible(
-			Mode == EWidgetInputMode::Game && ShouldShowCrosshairForController(GetPDController()));
+			Mode == EWidgetInputMode::Game && ShouldShowCrosshairForController(PC));
 	}
 }
 
@@ -449,50 +491,65 @@ bool UPDPlayerUIManagerComponent::IsQuestOpen() const
 	return QuestWindowWidgetInstance && QuestWindowWidgetInstance->IsInViewport();
 }
 
-void UPDPlayerUIManagerComponent::ToggleQuest()
-{
-	if (IsQuestOpen())
-	{
-		CloseQuest();
-		return;
-	}
-	OpenQuest();
-}
-
-void UPDPlayerUIManagerComponent::ToggleInventory()
+bool UPDPlayerUIManagerComponent::IsHubOpen() const
 {
 	APDPlayerController* PC = GetPDController();
-	if (!PC || !PC->IsLocalController()) return;
+	if (!PC || !HubScreenClass)
+	{
+		return false;
+	}
 
-	if (IsQuestOpen()) { CloseQuest(); return; }
+	UPDFrontendUISubsystem* Subsystem = UPDFrontendUISubsystem::Get(PC);
+	if (!Subsystem)
+	{
+		return false;
+	}
+
+	UPDActivatableBase* Top = Subsystem->GetTopOfLayer(EUILayer::GameMenu);
+	return Top && Top->IsA(HubScreenClass);
+}
+
+void UPDPlayerUIManagerComponent::ToggleHub()
+{
+	APDPlayerController* PC = GetPDController();
+	if (!PC || !PC->IsLocalController())
+	{
+		return;
+	}
+
+	// 페어링 컨텍스트(Stash/Market/Equip)가 열려있으면 그것부터 닫는다(2단계 close UX).
 	if (IsStashOpen()) { CloseStash(); return; }
 	if (IsMarketOpen()) { CloseMarket(); return; }
 	if (IsEquipmentModificationOpen()) { CloseEquipmentModification(); return; }
 
-	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
+	if (!HubScreenClass)
 	{
-		InventoryWidgetInstance->RemoveFromParent();
-		InventoryWidgetInstance = nullptr;
-		SetGameplayInputBlockedByModalUI(false);
+		UE_LOG(LogPDCharacter, Warning, TEXT("HubScreenClass is not set."));
 		return;
 	}
 
-	if (!InventoryWidgetClass)
+	UPDFrontendUISubsystem* Subsystem = UPDFrontendUISubsystem::Get(PC);
+	if (!Subsystem)
 	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
 		return;
 	}
 
-	InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(PC, InventoryWidgetClass);
-	if (!InventoryWidgetInstance)
+	if (IsHubOpen())
 	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("Failed to create inventory widget."));
+		// 닫기 직전 활성 탭 캡처 → 다음 열 때 그 탭으로 복귀.
+		if (UPDActivatableBase* Top = Subsystem->GetTopOfLayer(EUILayer::GameMenu))
+		{
+			if (const UPDTabbedScreenBase* Hub = Cast<UPDTabbedScreenBase>(Top))
+			{
+				LastHubTabId = Hub->GetActiveTabId();
+			}
+		}
+		Subsystem->PopFromLayer(EUILayer::GameMenu);
 		return;
 	}
 
-	AddWidgetToViewportIfNeeded(InventoryWidgetInstance);
-	SetGameplayInputBlockedByModalUI(true, InventoryWidgetInstance);
-	PC->SetIgnoreMoveInput(false);
+	// 마지막 탭이 없으면 빈 태그 전달 → base가 DA의 DefaultTabId로 fallback.
+	UPDTabbedScreenBase::OpenAtTab(PC, HubScreenClass, LastHubTabId, EUILayer::GameMenu);
 }
 
 void UPDPlayerUIManagerComponent::ShowNotification(const FText& Message, float Duration)
@@ -628,7 +685,10 @@ void UPDPlayerUIManagerComponent::SetCrosshairType(APDWeaponBase* NewWeapon)
 	if (!NewWeapon)
 	{
 		HUDInstance->SetCrosshairType(EWeaponType::None);
-		HUDInstance->SetCrosshairVisible(false);
+		if (!bIsGameplayInputBlockedByModalUI)
+		{
+			HUDInstance->SetCrosshairVisible(true);
+		}
 		return;
 	}
 
