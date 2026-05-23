@@ -3,7 +3,9 @@
 
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
+#include "Net/UnrealNetwork.h"
 
 #include "GameplayTag/PDGameplayTags.h"
 #include "InputActionValue.h"
@@ -37,6 +39,8 @@
 #include "Widgets/PDActivatableBase.h"
 #include "Widgets/PDRootLayout.h"
 #include "Widgets/PDNotificationWidget.h"
+#include "Widgets/Transition/PDRaidEndTransitionWidget.h"
+#include "Game/PDRaidStats.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
 #include "Subsystems/PDQuipSubsystem.h"
 #include "Data/PDQuipDataAsset.h"
@@ -85,6 +89,161 @@ void APDPlayerController::Server_RequestBaseTravel_Implementation()
 	{
 		GM->NotifyPlayerReadyForTravel(this);
 	}
+}
+
+void APDPlayerController::Client_ShowRaidEndTransition_Implementation(bool bSuccess,
+                                                                       const TArray<FPDPlayerRaidEntryData>& Entries,
+                                                                       float RaidDurationSeconds)
+{
+	if (!RaidEndTransitionClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidEndTransition: RaidEndTransitionClass 미할당 (PC=%s)"), *GetName());
+		return;
+	}
+
+	UPDFrontendUISubsystem* Subsystem = UPDFrontendUISubsystem::Get(this);
+	if (!Subsystem)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidEndTransition: FrontendUISubsystem null (PC=%s)"), *GetName());
+		return;
+	}
+
+	UPDActivatableBase* Pushed = Subsystem->PushToLayer(EUILayer::Modal, RaidEndTransitionClass);
+	UPDRaidEndTransitionWidget* Transition = Cast<UPDRaidEndTransitionWidget>(Pushed);
+	if (!Transition)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidEndTransition: PushToLayer 실패 또는 캐스트 실패 (PC=%s)"), *GetName());
+		return;
+	}
+
+	Transition->Configure(bSuccess, Entries, RaidDurationSeconds);
+}
+
+void APDPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME_CONDITION(APDPlayerController, bIsSpectating, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(APDPlayerController, SpectateTargetPC, COND_OwnerOnly);
+}
+
+void APDPlayerController::StartSpectatingDeath(APlayerController* InitialTarget)
+{
+	if (!HasAuthority()) return;
+	if (!InitialTarget || !InitialTarget->GetPawn()) return;
+	if (InitialTarget == this) return;
+
+	bIsSpectating = true;
+	SpectateTargetPC = InitialTarget;
+	SetViewTargetWithBlend(InitialTarget->GetPawn(), 0.5f);
+
+	// Listen-server host(서버=로컬)에서는 OnRep 이 자동 발화하지 않으므로 수동 브로드캐스트.
+	if (IsLocalController())
+	{
+		OnRep_SpectateState();
+	}
+
+	UE_LOG(LogPDCharacter, Log, TEXT("StartSpectatingDeath: %s -> %s"),
+		*GetName(), *InitialTarget->GetName());
+}
+
+void APDPlayerController::CycleSpectateIfTargetIs(APlayerController* AffectedPC)
+{
+	if (!HasAuthority()) return;
+	if (!bIsSpectating) return;
+	if (SpectateTargetPC != AffectedPC) return;
+	CycleSpectateTargetServer(+1);
+}
+
+void APDPlayerController::CycleSpectateTargetServer(int32 Direction)
+{
+	if (!HasAuthority()) return;
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	TArray<APlayerController*> Candidates;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+		if (!PC || PC == this) continue;
+
+		APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
+		if (!PS) continue;
+		if (PS->IsRaidDead() || PS->IsExtracted()) continue;
+		if (!PC->GetPawn()) continue;
+
+		Candidates.Add(PC);
+	}
+
+	if (Candidates.Num() == 0)
+	{
+		// 더 이상 살아있는 관전 대상이 없음. 자기 자신 시점으로 스냅하면 죽은 자기 몸으로 컷이 튀어
+		// 부자연스러우므로 마지막으로 보던 폰(방금 죽거나 추출한 대상)의 시점을 그대로 유지.
+		// EndRaid 가 곧 결산 위젯을 띄우므로 카메라 상태는 거기서 덮임.
+		UE_LOG(LogPDCharacter, Log, TEXT("CycleSpectate: %s -> no candidates, keep current view target"), *GetName());
+		return;
+	}
+
+	const int32 CurrentIdx = Candidates.IndexOfByKey(SpectateTargetPC.Get());
+	int32 NextIdx;
+	if (CurrentIdx == INDEX_NONE)
+	{
+		NextIdx = (Direction > 0) ? 0 : (Candidates.Num() - 1);
+	}
+	else
+	{
+		NextIdx = (CurrentIdx + Direction + Candidates.Num()) % Candidates.Num();
+	}
+
+	SpectateTargetPC = Candidates[NextIdx];
+	SetViewTargetWithBlend(SpectateTargetPC->GetPawn(), 0.3f);
+	if (IsLocalController())
+	{
+		OnRep_SpectateState();
+	}
+
+	UE_LOG(LogPDCharacter, Log, TEXT("CycleSpectate: %s -> %s (idx=%d/%d, dir=%d)"),
+		*GetName(), *SpectateTargetPC->GetName(), NextIdx, Candidates.Num(), Direction);
+}
+
+void APDPlayerController::Server_SpectateNext_Implementation()
+{
+	if (!bIsSpectating) return;
+	CycleSpectateTargetServer(+1);
+}
+
+void APDPlayerController::Server_SpectatePrev_Implementation()
+{
+	if (!bIsSpectating) return;
+	CycleSpectateTargetServer(-1);
+}
+
+void APDPlayerController::OnSpectateNextInput()
+{
+	if (!bIsSpectating) return;
+	Server_SpectateNext();
+}
+
+void APDPlayerController::OnSpectatePrevInput()
+{
+	if (!bIsSpectating) return;
+	Server_SpectatePrev();
+}
+
+void APDPlayerController::OnRep_SpectateState()
+{
+	OnSpectateChanged.Broadcast();
+}
+
+FString APDPlayerController::GetSpectateTargetName() const
+{
+	if (SpectateTargetPC)
+	{
+		if (APlayerState* PS = SpectateTargetPC->PlayerState)
+		{
+			return PS->GetPlayerName();
+		}
+	}
+	return FString();
 }
 
 APDPlayerState* APDPlayerController::GetPDPlayerState() const
@@ -177,8 +336,7 @@ void APDPlayerController::SetupInputComponent()
 
 	if (!InputConfig)
 	{
-		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APDPlayerController::ToggleInventory);
-		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
+		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APDPlayerController::ToggleHub);
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
 		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnQuickslot1);
 		InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnQuickslot2);
@@ -197,21 +355,11 @@ void APDPlayerController::SetupInputComponent()
 	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Inventory))
 	{
 		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Inventory,
-			ETriggerEvent::Started, this, &APDPlayerController::ToggleInventory);
+			ETriggerEvent::Started, this, &APDPlayerController::ToggleHub);
 	}
 	else
 	{
-		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APDPlayerController::ToggleInventory);
-	}
-
-	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Quest))
-	{
-		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quest,
-			ETriggerEvent::Started, this, &APDPlayerController::ToggleQuest);
-	}
-	else
-	{
-		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
+		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APDPlayerController::ToggleHub);
 	}
 
 	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Interact))
@@ -285,6 +433,27 @@ void APDPlayerController::SetupInputComponent()
 
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Map,
 		ETriggerEvent::Started, this, &APDPlayerController::OnToggleWorldMap);
+
+	// Step 2-B: 관전 다음/이전 (사망 후에만 활성화 — 핸들러에서 bIsSpectating 체크).
+	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_SpectateNext))
+	{
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SpectateNext,
+			ETriggerEvent::Started, this, &APDPlayerController::OnSpectateNextInput);
+	}
+	else
+	{
+		InputComponent->BindKey(EKeys::F, IE_Pressed, this, &APDPlayerController::OnSpectateNextInput);
+	}
+
+	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_SpectatePrev))
+	{
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SpectatePrev,
+			ETriggerEvent::Started, this, &APDPlayerController::OnSpectatePrevInput);
+	}
+	else
+	{
+		InputComponent->BindKey(EKeys::G, IE_Pressed, this, &APDPlayerController::OnSpectatePrevInput);
+	}
 }
 
 void APDPlayerController::BeginPlay()
@@ -358,6 +527,17 @@ void APDPlayerController::OnPossess(APawn* InPawn)
 {
 	UnbindInventoryNotifications();
 	Super::OnPossess(InPawn);
+
+	// Step 2-B 후속: 새 폰 빙의 → 관전 상태 carry-over 차단. HUD "Spectating: ..." 잔존 방지.
+	if (HasAuthority() && (bIsSpectating || SpectateTargetPC))
+	{
+		bIsSpectating = false;
+		SpectateTargetPC = nullptr;
+		if (IsLocalController())
+		{
+			OnRep_SpectateState();
+		}
+	}
 
 	if (UIManagerComponent)
 	{
@@ -951,20 +1131,36 @@ bool APDPlayerController::IsQuestInterfaceOpen() const
 	return UIManagerComponent && UIManagerComponent->IsQuestOpen();
 }
 
-void APDPlayerController::ToggleQuest()
+void APDPlayerController::ToggleHub()
 {
 	if (UIManagerComponent)
 	{
-		UIManagerComponent->ToggleQuest();
+		UIManagerComponent->ToggleHub();
 	}
 }
 
-void APDPlayerController::ToggleInventory()
+TArray<FKey> APDPlayerController::GetMappedKeysForInputTag(const FGameplayTag& InputTag) const
 {
-	if (UIManagerComponent)
+	TArray<FKey> Keys;
+	if (!InputConfig || !DefaultMappingContext)
 	{
-		UIManagerComponent->ToggleInventory();
+		return Keys;
 	}
+
+	const UInputAction* Action = InputConfig->FindNativeInputActionForTag(InputTag);
+	if (!Action)
+	{
+		return Keys;
+	}
+
+	for (const FEnhancedActionKeyMapping& Mapping : DefaultMappingContext->GetMappings())
+	{
+		if (Mapping.Action == Action)
+		{
+			Keys.AddUnique(Mapping.Key);
+		}
+	}
+	return Keys;
 }
 
 void APDPlayerController::TryInteract()

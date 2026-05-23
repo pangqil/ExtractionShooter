@@ -38,6 +38,8 @@ class UPDRootLayout;
 class UPDPingInputComponent;
 class UPDWorldMapWidget;
 class UPDQuipDataAsset;
+class UPDRaidEndTransitionWidget;
+struct FPDPlayerRaidEntryData;
 enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
@@ -46,6 +48,8 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FPDLootInterfaceClosedSignature, UPDLootComp
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDStashInterfaceClosedSignature, UPDStashComponent*);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDMarketInterfaceClosedSignature, UPDMarketComponent*);
 DECLARE_MULTICAST_DELEGATE(FPDEquipmentModificationInterfaceClosedSignature);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDSpectateChangedDelegate);
 
 UCLASS(abstract)
 class PROJECTD_API APDPlayerController : public APlayerController
@@ -64,6 +68,12 @@ public:
 	// 결산 위젯의 Anim_BlackFade 종료 시점에 호출. 서버에서 GameMode의 게이트에 ACK 등록.
 	UFUNCTION(Server, Reliable)
 	void Server_RequestBaseTravel();
+
+	// 서버 EndRaid 가 모든 PC 에 발사. Modal 레이어에 결산 위젯 push + Configure.
+	UFUNCTION(Client, Reliable)
+	void Client_ShowRaidEndTransition(bool bSuccess,
+	                                  const TArray<FPDPlayerRaidEntryData>& Entries,
+	                                  float RaidDurationSeconds);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void OpenStashInterface(UPDStashComponent* StashSource);
@@ -196,7 +206,30 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Quest")
 	bool IsQuestInterfaceOpen() const;
 
+	// 주어진 GameplayTag에 매핑된 InputAction의 키 매핑을 IMC에서 조회.
+	// UIOnly 모드에서 위젯이 PC InputComponent 대신 직접 키 입력을 처리할 때 사용.
+	TArray<FKey> GetMappedKeysForInputTag(const FGameplayTag& InputTag) const;
+
 	virtual void PlayerTick(float DeltaTime) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	// ─── Spectator (Step 2-B: 사망 후 ViewTarget 순환 관전) ─────────────────
+	// 서버에서 GameMode::OnPlayerDied 가 호출. 첫 생존자 대상으로 관전 시작.
+	void StartSpectatingDeath(APlayerController* InitialTarget);
+	// 서버에서 호출. 자신의 관전 대상이 DeadPC 면 다음 생존자로 이동.
+	void CycleSpectateIfTargetIs(APlayerController* AffectedPC);
+
+	UFUNCTION(BlueprintPure, Category = "PD|Spectator")
+	bool IsSpectating() const { return bIsSpectating; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Spectator")
+	APlayerController* GetSpectateTargetController() const { return SpectateTargetPC; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Spectator")
+	FString GetSpectateTargetName() const;
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Spectator")
+	FPDSpectateChangedDelegate OnSpectateChanged;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
@@ -246,6 +279,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
+
+	// 결산 위젯 클래스. BP_PDPlayerController 에서 WBP_PDRaidEndTransition 할당.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI|Transition")
+	TSubclassOf<UPDRaidEndTransitionWidget> RaidEndTransitionClass;
 
 	/** Quip(캐릭터 멘트) 데이터. UPDQuipSubsystem에 주입되어 태그→Line 라우팅에 사용. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
@@ -316,8 +353,9 @@ private:
 	void CancelAbilityByInputTag(FGameplayTag InputTag);
 	void UpdateAimRotation();
 
-	void ToggleInventory();
-	void ToggleQuest();
+	// Hub 통합 화면 토글. Input_Inventory 태그에 매핑된 키 입력 시 호출.
+	void ToggleHub();
+
 	void TryInteract();
 	void StopInteract();
 
@@ -373,4 +411,26 @@ private:
 
 	UFUNCTION()
 	void HandleInventoryMessage(const FText& Message);
+
+	// ─── Spectator internals ──────────────────────────────────────────────
+	UFUNCTION(Server, Reliable)
+	void Server_SpectateNext();
+
+	UFUNCTION(Server, Reliable)
+	void Server_SpectatePrev();
+
+	void OnSpectateNextInput();
+	void OnSpectatePrevInput();
+
+	// 서버 권한 가정. Direction = +1(next) / -1(prev). 후보가 없으면 관전 종료.
+	void CycleSpectateTargetServer(int32 Direction);
+
+	UFUNCTION()
+	void OnRep_SpectateState();
+
+	UPROPERTY(ReplicatedUsing = OnRep_SpectateState, Transient)
+	bool bIsSpectating = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_SpectateState, Transient)
+	TObjectPtr<APlayerController> SpectateTargetPC;
 };
