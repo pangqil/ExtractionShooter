@@ -58,16 +58,17 @@ UWidget* UPDLobbyScreenWidget::GetDesiredFocusTarget_Implementation() const
 
 void UPDLobbyScreenWidget::HandleNewGameClicked()
 {
-	if (MainLevel.IsNull())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UPDLobbyScreenWidget::HandleNewGameClicked: MainLevel is not set."));
-		return;
-	}
-
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
 	if (!GI) return;
 
-	GI->TravelToLevel(MainLevel, /*bMarkBaseResetPending=*/false);
+	const TSoftObjectPtr<UWorld> BaseLevel = GI->GetBaseLevel();
+	if (BaseLevel.IsNull())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UPDLobbyScreenWidget::HandleNewGameClicked: BaseLevel is not set on GameInstance."));
+		return;
+	}
+
+	GI->TravelToLevel(BaseLevel, /*bMarkBaseResetPending=*/false);
 }
 
 void UPDLobbyScreenWidget::HandleContinueClicked()

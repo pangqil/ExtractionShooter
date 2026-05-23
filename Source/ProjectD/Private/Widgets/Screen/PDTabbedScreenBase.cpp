@@ -1,5 +1,8 @@
 #include "Widgets/Screen/PDTabbedScreenBase.h"
 
+#include "Core/PDPlayerController.h"
+#include "Core/PDPlayerUIManagerComponent.h"
+#include "GameplayTag/PDGameplayTags.h"
 #include "Widgets/Screen/PDTabButtonWidget.h"
 #include "Widgets/Screen/PDTabbedContent.h"
 #include "Data/PDTabbedScreenDataAsset.h"
@@ -79,24 +82,28 @@ void UPDTabbedScreenBase::SwitchToTab(FGameplayTag TabId)
 	ActiveTabId = TabId;
 	LastTabId = TabId;
 
-	if (TObjectPtr<UUserWidget>* NewContent = SpawnedContents.Find(TabId))
+	TObjectPtr<UUserWidget>* NewContentPtr = SpawnedContents.Find(TabId);
+	UUserWidget* NewContent = (NewContentPtr && *NewContentPtr) ? NewContentPtr->Get() : nullptr;
+	if (NewContent)
 	{
-		if (*NewContent)
-		{
-			Switcher_Content->SetActiveWidget(*NewContent);
+		Switcher_Content->SetActiveWidget(NewContent);
 
-			if ((*NewContent)->GetClass()->ImplementsInterface(UPDTabbedContent::StaticClass()))
+		if (NewContent->GetClass()->ImplementsInterface(UPDTabbedContent::StaticClass()))
+		{
+			if (IPDTabbedContent* NewIface = Cast<IPDTabbedContent>(NewContent))
 			{
-				if (IPDTabbedContent* NewIface = Cast<IPDTabbedContent>(*NewContent))
+				NewIface->OnTabShown();
+				if (UWidget* Focus = NewIface->GetTabDesiredFocusTarget())
 				{
-					NewIface->OnTabShown();
-					if (UWidget* Focus = NewIface->GetTabDesiredFocusTarget())
-					{
-						Focus->SetUserFocus(GetOwningPlayer());
-					}
+					Focus->SetUserFocus(GetOwningPlayer());
 				}
 			}
 		}
+	}
+	else
+	{
+		// Fail-safe: ContentClass 미등록 탭으로 전환 시 직전 탭 잔상 방지.
+		Switcher_Content->SetActiveWidgetIndex(-1);
 	}
 
 	ApplyActiveTabVisualState();
@@ -129,6 +136,14 @@ void UPDTabbedScreenBase::CycleTab(int32 Direction)
 	}
 }
 
+void UPDTabbedScreenBase::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+
+	// 키 입력을 직접 받아 Hub 토글을 처리하려면 위젯이 focusable이어야 함. WBP의 Class Defaults가 false여도 강제.
+	SetIsFocusable(true);
+}
+
 void UPDTabbedScreenBase::NativeOnActivated()
 {
 	Super::NativeOnActivated();
@@ -142,6 +157,62 @@ void UPDTabbedScreenBase::NativeOnActivated()
 	}
 
 	PendingInitialTab = FGameplayTag();
+
+	// UIOnly 모드에서 PC InputComponent가 차단되므로, Hub 자신이 키보드 포커스를 받아야 토글 키를 직접 처리할 수 있다.
+	if (APlayerController* PC = GetOwningPlayer())
+	{
+		SetUserFocus(PC);
+	}
+
+	UE_LOG(LogTemp, Verbose, TEXT("[Hub] NativeOnActivated: IsFocusable=%d HasKeyboardFocus=%d"),
+		IsFocusable() ? 1 : 0, HasKeyboardFocus() ? 1 : 0);
+}
+
+bool UPDTabbedScreenBase::TryHandleHubToggleKey(const FKeyEvent& InKeyEvent)
+{
+	APDPlayerController* PDPC = Cast<APDPlayerController>(GetOwningPlayer());
+	if (!PDPC)
+	{
+		return false;
+	}
+
+	const TArray<FKey> ToggleKeys = PDPC->GetMappedKeysForInputTag(PDGameplayTags::Input_Inventory);
+	const FKey PressedKey = InKeyEvent.GetKey();
+	const bool bMatched = ToggleKeys.Num() > 0
+		? ToggleKeys.Contains(PressedKey)
+		: (PressedKey == EKeys::Tab);
+
+	if (!bMatched)
+	{
+		return false;
+	}
+
+	if (UPDPlayerUIManagerComponent* UI = PDPC->GetUIManagerComponent())
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("[Hub] Toggle key handled: %s"), *PressedKey.ToString());
+		UI->ToggleHub();
+		return true;
+	}
+	return false;
+}
+
+FReply UPDTabbedScreenBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (TryHandleHubToggleKey(InKeyEvent))
+	{
+		return FReply::Handled();
+	}
+	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+}
+
+FReply UPDTabbedScreenBase::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	// PreviewKeyDown은 capture phase — 자식 위젯(TabButton 등)이 Tab을 Navigation으로 가로채기 전에 먼저 받음.
+	if (TryHandleHubToggleKey(InKeyEvent))
+	{
+		return FReply::Handled();
+	}
+	return Super::NativeOnPreviewKeyDown(InGeometry, InKeyEvent);
 }
 
 void UPDTabbedScreenBase::NativeOnDeactivated()

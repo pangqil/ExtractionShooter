@@ -46,8 +46,11 @@ public:
 	FGameplayTag GetActiveTabId() const { return ActiveTabId; }
 
 protected:
+	virtual void NativeOnInitialized() override;
 	virtual void NativeOnActivated() override;
 	virtual void NativeOnDeactivated() override;
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FReply NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Tabbed")
 	TObjectPtr<UPDTabbedScreenDataAsset> TabSet;
@@ -72,6 +75,9 @@ private:
 	int32 FindTabIndexInDataAsset(FGameplayTag TabId) const;
 	void ApplyActiveTabVisualState();
 	FGameplayTag ResolveInitialTabId() const;
+
+	// Tab(또는 IMC 매핑 키) 입력을 KeyDown/PreviewKeyDown에서 공유 처리. Handled 시 true.
+	bool TryHandleHubToggleKey(const FKeyEvent& InKeyEvent);
 
 	UPROPERTY(Transient)
 	TMap<FGameplayTag, TObjectPtr<UUserWidget>> SpawnedContents;

@@ -25,6 +25,7 @@
 #include "Items/PDQuickSlotComponent.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/TextBlock.h"
 #include "GameFramework/PlayerController.h"
 #include "TimerManager.h"
 
@@ -47,10 +48,14 @@ void UPDHUDWidget::NativeOnActivated()
 
 	RefreshNewQuickSlots();
 	RefreshInteractPromptBinding(FindOwningInteractionComponent());
+
+	BindSpectatorDelegate(Cast<APDPlayerController>(GetOwningPlayer()));
+	RefreshSpectateDisplay();
 }
 
 void UPDHUDWidget::NativeOnDeactivated()
 {
+	UnbindSpectatorDelegate();
 	RefreshInteractPromptBinding(nullptr);
 	RefreshUseProgressBinding(nullptr);
 	RebindToASC(nullptr);
@@ -493,5 +498,52 @@ void UPDHUDWidget::UpdateInteractPromptPosition()
 	{
 		WBP_InteractPrompt->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
+}
+
+void UPDHUDWidget::BindSpectatorDelegate(APDPlayerController* PC)
+{
+	if (CachedSpectatorPC.Get() == PC) return;
+
+	UnbindSpectatorDelegate();
+	if (!PC) return;
+
+	PC->OnSpectateChanged.AddDynamic(this, &UPDHUDWidget::HandleSpectateChanged);
+	CachedSpectatorPC = PC;
+}
+
+void UPDHUDWidget::UnbindSpectatorDelegate()
+{
+	if (APDPlayerController* PC = CachedSpectatorPC.Get())
+	{
+		PC->OnSpectateChanged.RemoveDynamic(this, &UPDHUDWidget::HandleSpectateChanged);
+	}
+	CachedSpectatorPC.Reset();
+}
+
+void UPDHUDWidget::HandleSpectateChanged()
+{
+	RefreshSpectateDisplay();
+}
+
+void UPDHUDWidget::RefreshSpectateDisplay()
+{
+	if (!Text_SpectateTarget) return;
+
+	APDPlayerController* PC = CachedSpectatorPC.Get();
+	if (!PC || !PC->IsSpectating())
+	{
+		Text_SpectateTarget->SetVisibility(ESlateVisibility::Collapsed);
+		return;
+	}
+
+	const FString TargetName = PC->GetSpectateTargetName();
+	if (TargetName.IsEmpty())
+	{
+		Text_SpectateTarget->SetVisibility(ESlateVisibility::Collapsed);
+		return;
+	}
+
+	Text_SpectateTarget->SetText(FText::FromString(FString::Printf(TEXT("Spectating: %s"), *TargetName)));
+	Text_SpectateTarget->SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 

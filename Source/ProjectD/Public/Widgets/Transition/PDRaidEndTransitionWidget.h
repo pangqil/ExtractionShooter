@@ -8,7 +8,6 @@
 #include "PDRaidEndTransitionWidget.generated.h"
 
 class UPDPlayerRaidEntryWidget;
-class UPDRaidSummaryWidget;
 class UTextBlock;
 class UVerticalBox;
 class UWidgetAnimation;
@@ -21,8 +20,8 @@ class PROJECTD_API UPDRaidEndTransitionWidget : public UPDActivatableBase
 public:
 	/**
 	 * BP_PDGameMode::OnRaidEnded 에서 PushToLayer 직후 호출.
-	 * Entries 가 비어 있으면 GameState->PlayerArray 로 fallback 수집(이름만 채움, Stats 0).
-	 * 멀티 머지 후 BuildFallbackEntries 가 PDPlayerState->Stats/bSurvived 를 그대로 채우도록 2줄만 교체.
+	 * Entries 가 비어 있으면 GameState->PlayerArray 로 fallback 수집 (PDPlayerState->RaidStats/IsExtracted 결합).
+	 * Step 4: 위젯 인스턴싱은 C++ 가 EntryWidgetClass + CreateWidget 으로 직접 처리. BP 위임 폐기.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "PD|Transition")
 	void Configure(bool bInSuccess,
@@ -46,19 +45,16 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Transition")
 	void K2_ApplyAccent(FLinearColor AccentColor);
 
-	/**
-	 * Entries 해석 끝난 직후 BP에 알림. Step 4 에서 C++ 가 CreateWidget 으로 교체 예정.
-	 * 그 전까지 BP 가 Box_PlayerEntries 에 EntryWidgetClass 인스턴스를 채우는 임시 위임자.
-	 */
-	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Transition")
-	void K2_PopulateEntries(const TArray<FPDPlayerRaidEntryData>& Entries, float StaggerInterval);
-
-	/** WBP_PDPlayerRaidEntry 의 base 클래스를 할당. 미할당 시 K2_PopulateEntries no-op 처리는 BP 책임. */
+	/** WBP_PDPlayerRaidEntry 의 base 클래스. 반드시 BP 디폴트에서 할당. 미할당 시 결산 라인 미생성. */
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Entries")
 	TSubclassOf<UPDPlayerRaidEntryWidget> EntryWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Entries", meta = (ClampMin = "0.0"))
 	float EntryStaggerInterval = 0.8f;
+
+	// 메인 텍스트(탈출 성공/실패) 등장 후 첫 Entry reveal 까지의 추가 지연. 옛 BP PlaySummaryReveal 타이밍 복원.
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Entries", meta = (ClampMin = "0.0", ForceUnits = "s"))
+	float EntryRevealInitialDelay = 1.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Success")
 	FLinearColor SuccessAccentColor = FLinearColor(0.357f, 0.753f, 0.922f);
@@ -92,9 +88,6 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_ContinuePrompt;
-
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UPDRaidSummaryWidget> Summary;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_RaidDuration;

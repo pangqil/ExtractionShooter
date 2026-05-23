@@ -37,6 +37,9 @@ namespace PDGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Input_CancelConsumableUse, "Input.CancelConsumableUse");
 
+	UE_DEFINE_GAMEPLAY_TAG(Input_SpectateNext, "Input.SpectateNext");
+	UE_DEFINE_GAMEPLAY_TAG(Input_SpectatePrev, "Input.SpectatePrev");
+
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage, "Data.Damage");
 
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_LegDamaged,  "State.Debuff.LegDamaged");

@@ -84,10 +84,10 @@ void UPDInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UPDInventoryComponent, Items);
-	DOREPLIFETIME(UPDInventoryComponent, GridColumns);
-	DOREPLIFETIME(UPDInventoryComponent, GridRows);
-	DOREPLIFETIME(UPDInventoryComponent, Gold);
+	DOREPLIFETIME_CONDITION(UPDInventoryComponent, Items, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UPDInventoryComponent, GridColumns, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UPDInventoryComponent, GridRows, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UPDInventoryComponent, Gold, COND_OwnerOnly);
 }
 
 void UPDInventoryComponent::OnRep_Items()

@@ -24,6 +24,8 @@ class UPDMainWeaponAmmoWidget;
 class UPDQuickSlotComponent;
 class UPDInteractionComponent;
 class UAbilitySystemComponent;
+class UTextBlock;
+class APDPlayerController;
 struct FOnAttributeChangeData;
 enum class EWeaponType : uint8;
 
@@ -88,6 +90,10 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDMainWeaponAmmoWidget> WBP_MainWeaponAmmo;
+
+	// Step 2-B: 사망 후 관전 모드일 때 "Spectating: <PlayerName>" 표시. BP 에서 선택적으로 추가.
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> Text_SpectateTarget;
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "PD|HUD")
@@ -165,4 +171,13 @@ private:
 	FTimerHandle InteractPromptUpdateTimer;
 	TArray<FBoundAttributeHandle> BoundAttributeHandles;
 	TArray<FBoundTagHandle> BoundTagHandles;
+
+	// Step 2-B: 관전 모드 HUD 표시.
+	void BindSpectatorDelegate(APDPlayerController* PC);
+	void UnbindSpectatorDelegate();
+	UFUNCTION()
+	void HandleSpectateChanged();
+	void RefreshSpectateDisplay();
+
+	TWeakObjectPtr<APDPlayerController> CachedSpectatorPC;
 };

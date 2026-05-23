@@ -4,12 +4,14 @@
 #include "Widgets/Transition/PDRaidEndTransitionWidget.h"
 
 #include "Animation/WidgetAnimation.h"
+#include "Blueprint/UserWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Core/PDPlayerController.h"
+#include "Core/PDPlayerState.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
-#include "Widgets/Transition/PDRaidSummaryWidget.h"
+#include "Widgets/Transition/PDPlayerRaidEntryWidget.h"
 
 void UPDRaidEndTransitionWidget::Configure(bool bInSuccess,
                                            const TArray<FPDPlayerRaidEntryData>& Entries,
@@ -42,22 +44,28 @@ void UPDRaidEndTransitionWidget::Configure(bool bInSuccess,
 		BuildFallbackEntries(ResolvedEntries);
 	}
 
+	// Step 4: C++ 가 직접 EntryWidgetClass 로 인스턴싱 + Configure. BP 위임(K2_PopulateEntries) 폐기.
 	if (Box_PlayerEntries)
 	{
 		Box_PlayerEntries->ClearChildren();
-	}
 
-	// Step 4 전까지 위젯 인스턴싱은 BP 위임. Step 4 들어오면 BIE 폐기 + 여기서 직접 CreateWidget.
-	K2_PopulateEntries(ResolvedEntries, EntryStaggerInterval);
+		if (!EntryWidgetClass)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("PDRaidEndTransitionWidget: EntryWidgetClass 미할당 — 결산 라인 미생성."));
+		}
+		else
+		{
+			APlayerController* OwningPC = GetOwningPlayer();
+			for (int32 Index = 0; Index < ResolvedEntries.Num(); ++Index)
+			{
+				UPDPlayerRaidEntryWidget* Entry = CreateWidget<UPDPlayerRaidEntryWidget>(OwningPC, EntryWidgetClass);
+				if (!Entry) continue;
 
-	// 기존 Summary 는 BindWidgetOptional. 디자이너 작업 전 시각 검증용으로 첫 Entry Stats 만 전달.
-	// Step 4 에서 Summary 완전 폐기 예정.
-	if (Summary)
-	{
-		const FPDRaidStats FirstStats = ResolvedEntries.Num() > 0
-			? ResolvedEntries[0].Stats
-			: FPDRaidStats{};
-		Summary->Configure(FirstStats);
+				Box_PlayerEntries->AddChildToVerticalBox(Entry);
+				const float StaggerDelay = EntryRevealInitialDelay + Index * EntryStaggerInterval;
+				Entry->Configure(ResolvedEntries[Index], StaggerDelay);
+			}
+		}
 	}
 
 	K2_ApplyAccent(bSuccess ? SuccessAccentColor : FailureAccentColor);
@@ -75,9 +83,19 @@ void UPDRaidEndTransitionWidget::BuildFallbackEntries(TArray<FPDPlayerRaidEntryD
 
 		FPDPlayerRaidEntryData Data;
 		Data.PlayerName = PS->GetPlayerName();
-		// 머지 후: Cast<APDPlayerState>(PS) 로 받아 Stats / bSurvived 그대로 채우기.
-		Data.bSurvived = false;
-		Data.Stats     = FPDRaidStats{};
+
+		// Step 2-C: PDPlayerState 의 RaidStats / IsExtracted 를 실값으로 결합.
+		if (const APDPlayerState* PDPS = Cast<APDPlayerState>(PS))
+		{
+			Data.bSurvived = PDPS->IsExtracted();
+			Data.Stats     = PDPS->GetRaidStats();
+		}
+		else
+		{
+			Data.bSurvived = false;
+			Data.Stats     = FPDRaidStats{};
+		}
+
 		OutEntries.Add(MoveTemp(Data));
 	}
 }
