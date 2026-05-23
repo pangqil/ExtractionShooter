@@ -1,4 +1,5 @@
 #include "Widgets/Quest/PDQuestListItemWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -57,6 +58,8 @@ void UPDQuestListItemWidget::UpdateVisualStyle()
 
 void UPDQuestListItemWidget::HandleSelectClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	if (OwnerWidget && !QuestData.QuestID.IsNone())
 	{
 		OwnerWidget->SelectQuest(QuestData.QuestID);

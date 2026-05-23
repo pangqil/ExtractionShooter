@@ -1,4 +1,5 @@
 #include "Widgets/Inventory/PDMarketQuantityPopupWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -341,26 +342,36 @@ FText UPDMarketQuantityPopupWidget::MakeGoldText(int32 Gold) const
 
 void UPDMarketQuantityPopupWidget::HandleMinusClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetQuantity(Quantity - 1);
 }
 
 void UPDMarketQuantityPopupWidget::HandlePlusClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetQuantity(Quantity + 1);
 }
 
 void UPDMarketQuantityPopupWidget::HandleMaxClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetQuantity(GetMaxBuyQuantity());
 }
 
 void UPDMarketQuantityPopupWidget::HandleCancelClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	RemoveFromParent();
 }
 
 void UPDMarketQuantityPopupWidget::HandleBuyClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	if (!CanBuy())
 	{
 		RefreshBuyState();

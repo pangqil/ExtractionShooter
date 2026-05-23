@@ -5,6 +5,8 @@
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDMarketComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 
 APDMarketActor::APDMarketActor()
 {
@@ -87,6 +89,10 @@ void APDMarketActor::Interact_Implementation(AActor* Interactor)
 	if (PlayerController->IsMarketInterfaceOpen() && PlayerController->GetActiveMarketComponent() == MarketComponent)
 	{
 		BindMarketClose(PlayerController);
+		if (MarketOpenSound)
+		{
+			UGameplayStatics::PlaySound2D(this, MarketOpenSound);
+		}
 		OnMarketOpened.Broadcast(this);
 	}
 }
@@ -121,5 +127,9 @@ void APDMarketActor::HandleMarketInterfaceClosed(UPDMarketComponent* ClosedMarke
 	}
 
 	UnbindMarketClose();
+	if (MarketCloseSound)
+	{
+		UGameplayStatics::PlaySound2D(this, MarketCloseSound);
+	}
 	OnMarketClosed.Broadcast(this);
 }

@@ -1,4 +1,5 @@
 #include "Widgets/Inventory/PDMarketItemWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -189,6 +190,8 @@ FText UPDMarketItemWidget::MakePriceText(int32 Price) const
 
 void UPDMarketItemWidget::HandleBuyClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	if (!MarketComponent || !BuyerInventory || EntryIndex == INDEX_NONE || !QuantityPopupWidgetClass)
 	{
 		return;

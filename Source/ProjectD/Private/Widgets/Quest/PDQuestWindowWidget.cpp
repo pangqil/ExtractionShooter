@@ -1,4 +1,5 @@
 #include "Widgets/Quest/PDQuestWindowWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/ActorComponent.h"
@@ -213,21 +214,29 @@ void UPDQuestWindowWidget::HandleQuestUpdated()
 
 void UPDQuestWindowWidget::HandleAvailableClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetTabState(EPDQuestState::Inactive);
 }
 
 void UPDQuestWindowWidget::HandleActiveClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetTabState(EPDQuestState::Active);
 }
 
 void UPDQuestWindowWidget::HandleCompletedClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetTabState(EPDQuestState::Completed);
 }
 
 void UPDQuestWindowWidget::HandleActionClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	if (!QuestComponent || SelectedQuestID.IsNone())
 	{
 		return;

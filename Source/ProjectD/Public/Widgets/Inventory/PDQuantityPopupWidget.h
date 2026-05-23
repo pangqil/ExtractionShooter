@@ -5,6 +5,7 @@
 #include "Type/Types.h"
 #include "PDQuantityPopupWidget.generated.h"
 
+class USoundBase;
 class UTextBlock;
 class UButton;
 class UWidget;
@@ -32,6 +33,9 @@ public:
 	FPDOnQuantityPopupCancelled OnCancelled;
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
 

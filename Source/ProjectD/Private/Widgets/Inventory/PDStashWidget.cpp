@@ -1,4 +1,5 @@
 #include "Widgets/Inventory/PDStashWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Algo/Sort.h"
 
@@ -397,36 +398,50 @@ void UPDStashWidget::ToggleSortOptions()
 
 void UPDStashWidget::HandleEquipmentTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetStashFilterTab(EPDItemFilterTab::Equipment);
 }
 
 void UPDStashWidget::HandleConsumableTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetStashFilterTab(EPDItemFilterTab::Consumable);
 }
 
 void UPDStashWidget::HandleMiscTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetStashFilterTab(EPDItemFilterTab::Misc);
 }
 
 void UPDStashWidget::HandleSortButtonClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	ToggleSortOptions();
 }
 
 void UPDStashWidget::HandleSortByNameClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetStashSortMode(EPDItemSortMode::Name);
 }
 
 void UPDStashWidget::HandleSortByTypeClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetStashSortMode(EPDItemSortMode::Type);
 }
 
 void UPDStashWidget::HandleUpgradeStashClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	RequestStashUpgrade();
 }
 

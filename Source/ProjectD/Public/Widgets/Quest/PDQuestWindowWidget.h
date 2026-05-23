@@ -6,6 +6,7 @@
 #include "Widgets/Screen/PDTabbedContent.h"
 #include "PDQuestWindowWidget.generated.h"
 
+class USoundBase;
 class UButton;
 class UScrollBox;
 class UTextBlock;
@@ -44,6 +45,9 @@ public:
 	bool IsQuestSelected(FName QuestID) const { return SelectedQuestID == QuestID; }
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 

@@ -1,5 +1,6 @@
 
 #include "Widgets/Inventory/PDInventoryWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Algo/Sort.h"
 
@@ -457,31 +458,43 @@ void UPDInventoryWidget::ToggleSortOptions()
 
 void UPDInventoryWidget::HandleEquipmentTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventoryFilterTab(EPDItemFilterTab::Equipment);
 }
 
 void UPDInventoryWidget::HandleConsumableTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventoryFilterTab(EPDItemFilterTab::Consumable);
 }
 
 void UPDInventoryWidget::HandleMiscTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventoryFilterTab(EPDItemFilterTab::Misc);
 }
 
 void UPDInventoryWidget::HandleSortButtonClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	ToggleSortOptions();
 }
 
 void UPDInventoryWidget::HandleSortByNameClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventorySortMode(EPDItemSortMode::Name);
 }
 
 void UPDInventoryWidget::HandleSortByTypeClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventorySortMode(EPDItemSortMode::Type);
 }
 
@@ -1102,6 +1115,8 @@ FVector2D UPDInventoryWidget::GetSlotTooltipPosition(UPDInventorySlotWidget* Slo
 
 void UPDInventoryWidget::HandleContextMenuUseClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex)
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	CloseContextMenu();
 	CloseItemHoverTooltip();
 
@@ -1128,6 +1143,8 @@ void UPDInventoryWidget::HandleContextMenuUseClicked(UPDInventoryItemContextMenu
 
 void UPDInventoryWidget::HandleContextMenuDropClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex)
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	CloseContextMenu();
 	CloseItemHoverTooltip();
 
@@ -1139,6 +1156,8 @@ void UPDInventoryWidget::HandleContextMenuDropClicked(UPDInventoryItemContextMen
 
 void UPDInventoryWidget::HandleContextMenuEquipClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex)
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	CloseContextMenu();
 	CloseItemHoverTooltip();
 

@@ -6,6 +6,7 @@
 #include "Items/PDStashComponent.h"
 #include "PDStashWidget.generated.h"
 
+class USoundBase;
 class UUniformGridPanel;
 class UPDStashComponent;
 class UPDInventoryComponent;
@@ -40,6 +41,9 @@ public:
 	EPDStashUpgradeResult RequestStashUpgrade();
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 

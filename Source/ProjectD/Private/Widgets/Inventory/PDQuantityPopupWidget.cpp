@@ -1,4 +1,5 @@
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -236,22 +237,30 @@ UPDInventorySlotWidget* UPDQuantityPopupWidget::FindPreviewSlotWidget() const
 
 void UPDQuantityPopupWidget::HandleMinusClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetCurrentQuantity(CurrentQuantity - 1);
 }
 
 void UPDQuantityPopupWidget::HandlePlusClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetCurrentQuantity(CurrentQuantity + 1);
 }
 
 void UPDQuantityPopupWidget::HandleConfirmClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	OnConfirmed.Broadcast(CurrentQuantity);
 	RemoveFromParent();
 }
 
 void UPDQuantityPopupWidget::HandleCancelClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	OnCancelled.Broadcast();
 	RemoveFromParent();
 }

@@ -7,6 +7,7 @@
 #include "Widgets/Screen/PDTabbedContent.h"
 #include "PDInventoryWidget.generated.h"
 
+class USoundBase;
 class UUniformGridPanel;
 class UPDInventoryComponent;
 class UPDStashComponent;
@@ -49,6 +50,9 @@ public:
 	void SetActiveStashComponent(UPDStashComponent* InStashComponent);
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;

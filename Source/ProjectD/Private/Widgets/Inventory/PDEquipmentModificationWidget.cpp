@@ -1,4 +1,5 @@
 #include "Widgets/Inventory/PDEquipmentModificationWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -683,36 +684,50 @@ void UPDEquipmentModificationWidget::HandleSelectionSlotItemDropped(UPDInventory
 
 void UPDEquipmentModificationWidget::HandleEquipmentTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventoryFilter(EPDItemType::Equipment);
 }
 
 void UPDEquipmentModificationWidget::HandleMaterialTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventoryFilter(EPDItemType::Misc);
 }
 
 void UPDEquipmentModificationWidget::HandleBoostNoneClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetBoostType(EPDModificationBoostType::None);
 }
 
 void UPDEquipmentModificationWidget::HandleBoostLowClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetBoostType(EPDModificationBoostType::Low);
 }
 
 void UPDEquipmentModificationWidget::HandleBoostMidClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetBoostType(EPDModificationBoostType::Mid);
 }
 
 void UPDEquipmentModificationWidget::HandleBoostHighClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetBoostType(EPDModificationBoostType::High);
 }
 
 void UPDEquipmentModificationWidget::HandleModifyClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	if (!InventoryComponent || !ModificationComponent || SelectedSlotIndex == INDEX_NONE)
 	{
 		SetText(Text_Result, GetResultText(EPDModificationResult::InvalidSlot, false));

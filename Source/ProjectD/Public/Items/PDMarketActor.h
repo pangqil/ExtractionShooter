@@ -10,6 +10,7 @@ class UPDInteractionOutlineComponent;
 class UPDMarketComponent;
 class APDMarketActor;
 class APDPlayerController;
+class USoundBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDMarketStateChangedSignature, APDMarketActor*, MarketActor);
 
@@ -45,6 +46,12 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Market")
 	TObjectPtr<UPDInteractionOutlineComponent> OutlineComponent;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Sound")
+	TObjectPtr<USoundBase> MarketOpenSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Sound")
+	TObjectPtr<USoundBase> MarketCloseSound;
 private:
 	void ConfigureInteractionCollision() const;
 	void BindMarketClose(APDPlayerController* PlayerController);

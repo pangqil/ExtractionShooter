@@ -1,4 +1,5 @@
 #include "Widgets/Inventory/PDInventoryItemContextMenuWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -79,15 +80,21 @@ void UPDInventoryItemContextMenuWidget::RefreshButtonVisibility()
 
 void UPDInventoryItemContextMenuWidget::HandleUseButtonClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	OnUseClicked.Broadcast(this, SlotIndex);
 }
 
 void UPDInventoryItemContextMenuWidget::HandleDropButtonClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	OnDropClicked.Broadcast(this, SlotIndex);
 }
 
 void UPDInventoryItemContextMenuWidget::HandleEquipButtonClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	OnEquipClicked.Broadcast(this, SlotIndex);
 }

@@ -5,6 +5,7 @@
 #include "Items/PDMarketComponent.h"
 #include "PDMarketQuantityPopupWidget.generated.h"
 
+class USoundBase;
 class UButton;
 class UImage;
 class UTextBlock;
@@ -21,6 +22,9 @@ public:
 	void InitializePurchasePopup(UPDMarketComponent* InMarketComponent, UPDInventoryComponent* InBuyerInventory, const FPDMarketEntry& InEntry, int32 InEntryIndex);
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;

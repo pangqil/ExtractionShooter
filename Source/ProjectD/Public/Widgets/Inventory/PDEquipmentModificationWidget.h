@@ -6,6 +6,7 @@
 #include "Items/PDEquipmentModificationComponent.h"
 #include "PDEquipmentModificationWidget.generated.h"
 
+class USoundBase;
 class UButton;
 class UImage;
 class UScrollBox;
@@ -52,6 +53,9 @@ public:
 	void SetBoostType(EPDModificationBoostType BoostType);
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 

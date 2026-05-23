@@ -5,6 +5,7 @@
 #include "Items/PDMarketComponent.h"
 #include "PDMarketItemWidget.generated.h"
 
+class USoundBase;
 class UButton;
 class UImage;
 class UPanelWidget;
@@ -30,6 +31,9 @@ public:
 	void SetQuantityPopupWidgetClass(TSubclassOf<UPDMarketQuantityPopupWidget> InPopupWidgetClass);
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeOnInitialized() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
