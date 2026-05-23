@@ -47,6 +47,94 @@ void APDPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME_CONDITION(APDPlayerState, PersistentData, COND_OwnerOnly);
+	DOREPLIFETIME(APDPlayerState, bIsExtracted);
+	DOREPLIFETIME(APDPlayerState, bIsRaidDead);
+	DOREPLIFETIME(APDPlayerState, RaidStats);
+}
+
+void APDPlayerState::SetExtracted(bool bInExtracted)
+{
+	if (!HasAuthority()) return;
+	if (bIsExtracted == bInExtracted) return;
+	bIsExtracted = bInExtracted;
+	OnRaidParticipationChanged.Broadcast(bIsExtracted, bIsRaidDead);
+	ForceNetUpdate();
+}
+
+void APDPlayerState::SetRaidDead(bool bInDead)
+{
+	if (!HasAuthority()) return;
+	if (bIsRaidDead == bInDead) return;
+	bIsRaidDead = bInDead;
+	OnRaidParticipationChanged.Broadcast(bIsExtracted, bIsRaidDead);
+	ForceNetUpdate();
+}
+
+void APDPlayerState::ResetRaidParticipationState()
+{
+	if (!HasAuthority()) return;
+
+	// 스탯/스냅샷도 리셋 — StartRaid 마다 새 라이드.
+	RaidStats = FPDRaidStats{};
+	RaidInitialGold = 0;
+	RaidInitialItemQuantity = 0;
+
+	if (!bIsExtracted && !bIsRaidDead)
+	{
+		ForceNetUpdate();
+		return;
+	}
+	bIsExtracted = false;
+	bIsRaidDead = false;
+	OnRaidParticipationChanged.Broadcast(bIsExtracted, bIsRaidDead);
+	ForceNetUpdate();
+}
+
+void APDPlayerState::SetRaidStats(const FPDRaidStats& InStats)
+{
+	if (!HasAuthority()) return;
+	RaidStats = InStats;
+	ForceNetUpdate();
+}
+
+void APDPlayerState::AddKill()
+{
+	if (!HasAuthority()) return;
+	++RaidStats.Kills;
+	ForceNetUpdate();
+}
+
+void APDPlayerState::SetSurvivalSeconds(float Seconds)
+{
+	if (!HasAuthority()) return;
+	RaidStats.SurvivalSeconds = FMath::Max(0.f, Seconds);
+	ForceNetUpdate();
+}
+
+void APDPlayerState::SetGoldDelta(int32 Delta)
+{
+	if (!HasAuthority()) return;
+	RaidStats.GoldDelta = Delta;
+	ForceNetUpdate();
+}
+
+void APDPlayerState::SetItemDelta(int32 Delta)
+{
+	if (!HasAuthority()) return;
+	RaidStats.ItemDelta = Delta;
+	ForceNetUpdate();
+}
+
+void APDPlayerState::CaptureInitialRaidSnapshot(int32 InGold, int32 InItemQuantity)
+{
+	if (!HasAuthority()) return;
+	RaidInitialGold = FMath::Max(0, InGold);
+	RaidInitialItemQuantity = FMath::Max(0, InItemQuantity);
+}
+
+void APDPlayerState::OnRep_RaidParticipation()
+{
+	OnRaidParticipationChanged.Broadcast(bIsExtracted, bIsRaidDead);
 }
 
 APDPlayerCharacter* APDPlayerState::GetPDPlayerCharacter() const
