@@ -48,6 +48,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void OnEnterState_Dead() override;
 
 	/** 디자이너가 BP 디폴트에서 지정. nullptr 이면 무기 미장착 — 발사 시 경고. */
@@ -71,7 +72,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	bool bForceInfiniteAmmo = true;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
+	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon, VisibleAnywhere, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	TObjectPtr<APDWeaponBase> EquippedWeapon;
 
 	/** 무기 미장착 또는 무기에 AnimLayer 가 없을 때 사용할 기본 레이어. */
@@ -88,6 +89,10 @@ protected:
 	virtual bool ShouldForceContinuousFire() const { return false; }
 
 private:
+	// 무기 복제 → 원격 클라에서 anim layer 링크 + 발사/장전 몽타주 바인딩(연출 동기화).
+	UFUNCTION()
+	void OnRep_EquippedWeapon();
+
 	UFUNCTION()
 	void HandleTargetChanged(AActor* NewTarget);
 

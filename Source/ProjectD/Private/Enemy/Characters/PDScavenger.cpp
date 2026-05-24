@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
+#include "Net/UnrealNetwork.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 
@@ -31,6 +32,46 @@ void APDScavenger::BeginPlay()
 	if (UPDCombatComponent* Combat = GetCombatComponent())
 	{
 		Combat->OnAttackRequested.AddDynamic(this, &APDScavenger::HandleAttackRequested);
+	}
+}
+
+void APDScavenger::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDScavenger, EquippedWeapon);
+}
+
+void APDScavenger::OnRep_EquippedWeapon()
+{
+	// 클라 전용 연출 동기화. 스폰/파괴·ASC 태그는 서버 권위(SetEquippedWeapon).
+	// 무기 부착은 무기 자체 OnRep_WeaponOwner 가 처리하지만 복제 순서 무관하게 보강.
+	USkeletalMeshComponent* SkelMesh = GetMesh();
+	UPDAnimInstance* AnimInst = SkelMesh ? Cast<UPDAnimInstance>(SkelMesh->GetAnimInstance()) : nullptr;
+
+	if (EquippedWeapon)
+	{
+		AttachActorToWeaponSocket(EquippedWeapon);
+
+		TSubclassOf<UAnimInstance> Layer = EquippedWeapon->GetWeaponAnimLayerClass();
+		if (!Layer) Layer = DefaultAnimLayerClass;
+		if (Layer && SkelMesh)
+		{
+			SkelMesh->LinkAnimClassLayers(Layer);
+		}
+
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
+		}
+	}
+	else
+	{
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponEquipped(nullptr);
+		}
+		LinkDefaultAnimLayer();
 	}
 }
 
@@ -79,6 +120,8 @@ FName APDScavenger::GetEquippedWeaponItemID_Implementation() const
 
 void APDScavenger::SpawnAndEquipDefaultWeapon()
 {
+	// 무기는 서버 권위 — 복제 액터를 클라에서 중복 스폰하지 않도록 게이트. 클라는 복제로 받아 OnRep 연출.
+	if (!HasAuthority()) return;
 	if (!DefaultWeaponClass) return;
 
 	UWorld* World = GetWorld();

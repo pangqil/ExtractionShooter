@@ -23,6 +23,8 @@ class PROJECTD_API APDEnemyBase : public APDCharacterBase, public IPDCombatInter
 public:
 	APDEnemyBase();
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	//~ Begin IPDCombatInterface
 	virtual uint8 GetTeamID_Implementation() const override;
 	virtual EPDStaminaStatus GetStaminaStatus_Implementation() const override;
@@ -57,7 +59,7 @@ protected:
 	void TickFootstep(float DeltaSeconds);
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|AI")
+	UPROPERTY(ReplicatedUsing = OnRep_EnemyState, VisibleAnywhere, BlueprintReadOnly, Category = "PD|AI")
 	EPDEnemyState CurrentState = EPDEnemyState::Idle;
 
 	/** Pitch 중심 오프셋(deg). 무기 forward 가 플레이어 머리로 정렬되는 보정용 — 음수=아래로 내려 몸통 기준. */
@@ -200,6 +202,13 @@ private:
 
 	UFUNCTION()
 	void OnCombatTargetChanged(AActor* NewTarget);
+
+	// 상태 복제 → 원격 클라 연출 동기화. 게임플레이 훅(OnEnterState_*)은 서버 전용.
+	UFUNCTION()
+	void OnRep_EnemyState(EPDEnemyState OldState);
+
+	// 상태 전환 연출(BP 훅 + 오버헤드 위젯 + 사망 몽타주/사운드). 서버는 SetEnemyState, 원격 클라는 OnRep_EnemyState 에서 호출.
+	void ApplyEnemyStateCosmetics(EPDEnemyState NewState);
 
 	void OnTorsoHPChanged(const FOnAttributeChangeData& Data);
 
