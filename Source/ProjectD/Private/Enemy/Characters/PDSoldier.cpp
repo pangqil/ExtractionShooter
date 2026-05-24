@@ -10,6 +10,7 @@
 #include "Enemy/Components/PDCombatComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "HAL/IConsoleManager.h"
+#include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
@@ -53,6 +54,47 @@ void APDSoldier::BeginPlay()
 	{
 		Combat->OnTargetChanged  .AddDynamic(this, &APDSoldier::HandleTargetChanged);
 		Combat->OnAttackRequested.AddDynamic(this, &APDSoldier::HandleAttackRequested);
+	}
+}
+
+void APDSoldier::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDSoldier, EquippedWeapon);
+}
+
+void APDSoldier::OnRep_EquippedWeapon()
+{
+	// 클라 전용 연출 동기화. 스폰/파괴·타이머·탄약·ASC 태그는 서버 권위(SetEquippedWeapon).
+	// 무기 부착은 무기 자체 OnRep_WeaponOwner 가 처리하지만 복제 순서 무관하게 보강.
+	USkeletalMeshComponent* SkelMesh = GetMesh();
+	UPDAnimInstance* AnimInst = SkelMesh ? Cast<UPDAnimInstance>(SkelMesh->GetAnimInstance()) : nullptr;
+
+	if (EquippedWeapon)
+	{
+		AttachActorToWeaponSocket(EquippedWeapon);
+
+		TSubclassOf<UAnimInstance> Layer = EquippedWeapon->GetWeaponAnimLayerClass();
+		if (!Layer) Layer = DefaultAnimLayerClass;
+		if (Layer && SkelMesh)
+		{
+			SkelMesh->LinkAnimClassLayers(Layer);
+		}
+
+		// 발사/장전 몽타주 바인딩 — 무기 멀티캐스트(OnWeaponFired/ReloadStarted)를 클라 AnimInstance 에 연결.
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
+		}
+	}
+	else
+	{
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponEquipped(nullptr); // 이전 무기 바인딩 해제.
+		}
+		LinkDefaultAnimLayer();
 	}
 }
 
@@ -103,6 +145,8 @@ FName APDSoldier::GetEquippedWeaponItemID_Implementation() const
 
 void APDSoldier::SpawnAndEquipDefaultWeapon()
 {
+	// 무기는 서버 권위 — 복제 액터를 클라에서 중복 스폰하지 않도록 게이트. 클라는 복제로 받아 OnRep 연출.
+	if (!HasAuthority()) return;
 	if (!DefaultWeaponClass) return;
 
 	UWorld* World = GetWorld();

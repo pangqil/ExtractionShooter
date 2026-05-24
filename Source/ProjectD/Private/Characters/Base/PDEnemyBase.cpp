@@ -21,6 +21,7 @@
 #include "Data/PDQuestComponent.h"
 #include "GameFramework/Controller.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundBase.h"
 #include "Weapons/Base/PDWeaponBase.h"
@@ -50,6 +51,13 @@ APDEnemyBase::APDEnemyBase()
 	OverheadWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 110.f));
 	OverheadWidgetComponent->SetGenerateOverlapEvents(false);
 	OverheadWidgetComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+void APDEnemyBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDEnemyBase, CurrentState);
 }
 
 void APDEnemyBase::BeginPlay()
@@ -141,7 +149,16 @@ void APDEnemyBase::TickFootstep(float DeltaSeconds)
 void APDEnemyBase::OnTorsoHPChanged(const FOnAttributeChangeData& Data)
 {
 	if (!OverheadWidget || !AttributeSet) return;
-	OverheadWidget->SetHealth(Data.NewValue, AttributeSet->GetMaxTorsoHP());
+
+	const float Max = AttributeSet->GetMaxTorsoHP();
+	OverheadWidget->SetHealth(Data.NewValue, Max);
+
+	// 첫 피해 시 HP 바 영구 노출. 어트리뷰트 복제로 서버/클라 양쪽에서 발화 → 클라 위젯도 켜짐.
+	if (!bHealthBarShown && Data.NewValue < Max)
+	{
+		bHealthBarShown = true;
+		OverheadWidget->ShowHealth();
+	}
 }
 
 
@@ -162,6 +179,7 @@ void APDEnemyBase::SetEnemyState(EPDEnemyState NewState)
 
 	CurrentState = NewState;
 
+	// 게임플레이 훅(서버 권위): 루트 드랍·콜리전·타이머 정리 등. 원격 클라에선 실행되지 않음.
 	switch (NewState)
 	{
 	case EPDEnemyState::Idle:   OnEnterState_Idle();   break;
@@ -172,6 +190,17 @@ void APDEnemyBase::SetEnemyState(EPDEnemyState NewState)
 	default: break;
 	}
 
+	// 연출은 서버(리슨 호스트 포함)에서 즉시, 원격 클라는 CurrentState 복제 후 OnRep_EnemyState 에서.
+	ApplyEnemyStateCosmetics(NewState);
+}
+
+void APDEnemyBase::OnRep_EnemyState(EPDEnemyState /*OldState*/)
+{
+	ApplyEnemyStateCosmetics(CurrentState);
+}
+
+void APDEnemyBase::ApplyEnemyStateCosmetics(EPDEnemyState NewState)
+{
 	OnEnemyStateChanged(NewState);
 
 	// Dead 는 위젯 전체 숨김(시체 위 HP 잔존 방지). 그 외엔 상태 말풍선 갱신.
@@ -184,6 +213,21 @@ void APDEnemyBase::SetEnemyState(EPDEnemyState NewState)
 		else
 		{
 			OverheadWidget->ShowSpeech(NewState, SpeechBubbleDuration);
+		}
+	}
+
+	// 사망 몽타주·사운드: 자동 복제되지 않으므로 상태 복제 시점에 각 머신이 직접 재생.
+	if (NewState == EPDEnemyState::Dead)
+	{
+		if (DeathMontage)
+		{
+			PlayAnimMontage(DeathMontage);
+		}
+		if (DeathSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(
+				this, DeathSound, GetActorLocation(),
+				1.f, 1.f, 0.f, SoundAttenuation);
 		}
 	}
 }
@@ -200,12 +244,7 @@ void APDEnemyBase::ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo)
 			1.f, 1.f, 0.f, SoundAttenuation);
 	}
 
-	// 첫 피격 시 헬스바 영구 노출. 이후 호출은 플래그로 단락.
-	if (!bHealthBarShown && OverheadWidget)
-	{
-		bHealthBarShown = true;
-		OverheadWidget->ShowHealth();
-	}
+	// 헬스바 노출은 OnTorsoHPChanged 가 담당(서버/클라 공통). 여기선 별도 처리 없음.
 
 	// Combat/Dead는 BT가 이미 능동 대응 중이거나 종료된 상태 — 추적 신호 무시.
 	if (CurrentState == EPDEnemyState::Combat || CurrentState == EPDEnemyState::Dead) return;
@@ -267,19 +306,7 @@ void APDEnemyBase::OnEnterState_Dead()
 	DropLootOnDeath();
 	TryDropEquippedWeaponToCorpse();
 
-	// 사망 모션 재생. 애니메이션이 없는 경우에도 문제 없도록 null 체크.
-	if(DeathMontage)
-	{
-		PlayAnimMontage(DeathMontage);
-	}
-
-	// 사망음: SetLifeSpan 으로 액터가 곧 소멸하므로 PlaySoundAtLocation 으로 detach 재생.
-	if (DeathSound)
-	{
-		UGameplayStatics::PlaySoundAtLocation(
-			this, DeathSound, GetActorLocation(),
-			1.f, 1.f, 0.f, SoundAttenuation);
-	}
+	// 사망 몽타주·사운드는 ApplyEnemyStateCosmetics 로 이동 — 서버/클라 모두에서 재생되도록.
 
 	// 0 이하면 영구 보존(시체 컨테이너로 대체되는 시나리오 등) — 그 외에는 LifeSpan 예약.
 	if (CorpseDespawnDelay > 0.f)

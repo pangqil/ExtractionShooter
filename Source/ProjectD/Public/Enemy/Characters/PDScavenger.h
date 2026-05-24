@@ -45,6 +45,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void OnEnterState_Dead() override;
 
 	/** 디자이너가 BP 디폴트에서 지정 (예: BP_WeaponBat). nullptr 이면 무기 미장착 — 공격 시 경고. */
@@ -55,7 +56,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Weapon")
 	bool bAutoFireOnAttackRequested = true;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Scavenger|Weapon")
+	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon, VisibleAnywhere, BlueprintReadOnly, Category = "PD|Scavenger|Weapon")
 	TObjectPtr<APDWeaponBase> EquippedWeapon;
 
 	/** 무기 미장착 또는 무기에 AnimLayer 가 없을 때 사용할 기본 레이어. */
@@ -71,6 +72,10 @@ protected:
 	TSubclassOf<UGameplayAbility> MeleeAttackAbilityClass;
 
 private:
+	// 무기 복제 → 원격 클라에서 anim layer 링크(연출 동기화).
+	UFUNCTION()
+	void OnRep_EquippedWeapon();
+
 	UFUNCTION()
 	void HandleAttackRequested(AActor* Target);
 
