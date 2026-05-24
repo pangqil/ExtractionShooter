@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Engine/EngineTypes.h"
+#include "GameplayTagContainer.h"
 #include "Type/Types.h"
 #include "PDPlayerUIManagerComponent.generated.h"
 
@@ -18,6 +19,7 @@ class UPDQuestWindowWidget;
 class UPDRootLayout;
 class UPDStashComponent;
 class UPDStashWidget;
+class UPDTabbedScreenBase;
 class UPDWorldMapWidget;
 class UUserWidget;
 
@@ -68,9 +70,12 @@ public:
 	void OpenQuest();
 	void CloseQuest();
 	bool IsQuestOpen() const;
-	void ToggleQuest();
 
-	void ToggleInventory();
+	// Hub 통합 화면 토글. Input_Inventory 매핑 키가 이쪽으로 일원화됨.
+	// 페어링 컨텍스트(Stash/Market/Equip)가 열려있으면 먼저 그것을 닫고 끝남(2단계 close UX).
+	// 단독 호출 시 LastHubTabId 기준으로 직전 활성 탭을 복원.
+	void ToggleHub();
+	bool IsHubOpen() const;
 
 	void ShowNotification(const FText& Message, float Duration = 2.f);
 	void ToggleWorldMap();
@@ -120,6 +125,10 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="PD|UI")
 	TSubclassOf<UPDWorldMapWidget> WorldMapClass;
 
+	// Hub 통합 화면 (Loadout/Character/Skill/Quest). BP_PDPlayerController 컴포넌트 디폴트에서 WBP_PlayerHubScreen 할당.
+	UPROPERTY(EditDefaultsOnly, Category="PD|UI|Hub")
+	TSubclassOf<UPDTabbedScreenBase> HubScreenClass;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryWidget> InventoryWidgetInstance;
 
@@ -156,4 +165,7 @@ private:
 	bool bMouseCursorVisibleBeforeModalUI = false;
 	bool bMouseClickEventsEnabledBeforeModalUI = false;
 	bool bMouseOverEventsEnabledBeforeModalUI = false;
+
+	// Hub 마지막 활성 탭. 닫을 때 캡처 → 다음 열 때 그 탭부터.
+	FGameplayTag LastHubTabId;
 };

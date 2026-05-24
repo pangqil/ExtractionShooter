@@ -7,8 +7,9 @@
 #include "Game/PDRaidStats.h"
 #include "PDRaidEndTransitionWidget.generated.h"
 
-class UPDRaidSummaryWidget;
+class UPDPlayerRaidEntryWidget;
 class UTextBlock;
+class UVerticalBox;
 class UWidgetAnimation;
 
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
@@ -17,9 +18,15 @@ class PROJECTD_API UPDRaidEndTransitionWidget : public UPDActivatableBase
 	GENERATED_BODY()
 
 public:
-	/** BP_PDGameMode::OnRaidEnded(bSuccess, Stats)에서 PushToLayer 직후 호출. */
+	/**
+	 * BP_PDGameMode::OnRaidEnded 에서 PushToLayer 직후 호출.
+	 * Entries 가 비어 있으면 GameState->PlayerArray 로 fallback 수집 (PDPlayerState->RaidStats/IsExtracted 결합).
+	 * Step 4: 위젯 인스턴싱은 C++ 가 EntryWidgetClass + CreateWidget 으로 직접 처리. BP 위임 폐기.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "PD|Transition")
-	void Configure(bool bInSuccess, const FPDRaidStats& Stats);
+	void Configure(bool bInSuccess,
+	               const TArray<FPDPlayerRaidEntryData>& Entries,
+	               float RaidDurationSeconds);
 
 protected:
 	virtual void NativeOnActivated() override;
@@ -37,6 +44,17 @@ protected:
 	/** Configure 시점에 BP가 장식 위젯들에 액센트 컬러를 적용하도록 위임. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Transition")
 	void K2_ApplyAccent(FLinearColor AccentColor);
+
+	/** WBP_PDPlayerRaidEntry 의 base 클래스. 반드시 BP 디폴트에서 할당. 미할당 시 결산 라인 미생성. */
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Entries")
+	TSubclassOf<UPDPlayerRaidEntryWidget> EntryWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Entries", meta = (ClampMin = "0.0"))
+	float EntryStaggerInterval = 0.8f;
+
+	// 메인 텍스트(탈출 성공/실패) 등장 후 첫 Entry reveal 까지의 추가 지연. 옛 BP PlaySummaryReveal 타이밍 복원.
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Entries", meta = (ClampMin = "0.0", ForceUnits = "s"))
+	float EntryRevealInitialDelay = 1.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Success")
 	FLinearColor SuccessAccentColor = FLinearColor(0.357f, 0.753f, 0.922f);
@@ -72,9 +90,15 @@ protected:
 	TObjectPtr<UTextBlock> Text_ContinuePrompt;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UPDRaidSummaryWidget> Summary;
+	TObjectPtr<UTextBlock> Text_RaidDuration;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UVerticalBox> Box_PlayerEntries;
 
 private:
+	/** Entries 가 빈 경우 GameState->PlayerArray 로 fallback 빌드. */
+	void BuildFallbackEntries(TArray<FPDPlayerRaidEntryData>& OutEntries) const;
+
 	bool bSuccess = false;
 	bool bReadyForInput = false;
 	bool bInputConsumed = false;

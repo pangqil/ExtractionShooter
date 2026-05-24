@@ -3,8 +3,10 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Data/PDQuestData.h"
+#include "Widgets/Screen/PDTabbedContent.h"
 #include "PDQuestWindowWidget.generated.h"
 
+class USoundBase;
 class UButton;
 class UScrollBox;
 class UTextBlock;
@@ -14,11 +16,16 @@ class UPDQuestComponent;
 class UPDQuestListItemWidget;
 
 UCLASS(Abstract, BlueprintType, meta=(DisableNativeTick))
-class PROJECTD_API UPDQuestWindowWidget : public UUserWidget
+class PROJECTD_API UPDQuestWindowWidget : public UUserWidget, public IPDTabbedContent
 {
 	GENERATED_BODY()
 
 public:
+	// IPDTabbedContent
+	virtual void InitializeForOwner(APlayerController* OwnerPC) override;
+	virtual void OnTabShown() override;
+	virtual void OnTabHidden() override;
+
 	UFUNCTION(BlueprintCallable, Category="PD|Quest")
 	void InitializeQuestWindow(UPDQuestComponent* InQuestComponent, UPDInventoryComponent* InInventoryComponent);
 
@@ -38,6 +45,9 @@ public:
 	bool IsQuestSelected(FName QuestID) const { return SelectedQuestID == QuestID; }
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 

@@ -24,10 +24,10 @@ public:
 	UPROPERTY(ReplicatedUsing=OnRep_Items, EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	TArray<FPDInventorySlot> Items;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
-	int32 GridColumns = 5;
+	UPROPERTY(ReplicatedUsing=OnRep_GridConfig, EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory", meta = (ClampMin = "1"))
+	int32 GridColumns = 4;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
+	UPROPERTY(ReplicatedUsing=OnRep_GridConfig, EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory", meta = (ClampMin = "1"))
 	int32 GridRows = 4;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Gold, EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
@@ -50,6 +50,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="PD|Inventory")
 	bool AddItemByID(FName ItemID, int32 Quantity = 1);
+
+	UFUNCTION(BlueprintPure, Category="PD|Inventory")
+	bool FindItemDataByID(FName ItemID, FPDItemData& OutItemData) const;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	bool RemoveItem(FName ItemID, int32 Quantity = 1);
@@ -129,6 +132,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_Gold();
+
+	UFUNCTION()
+	void OnRep_GridConfig();
 
 	UFUNCTION(Server, Reliable)
 	void ServerRemoveItemFromSlot(int32 SlotIndex, int32 Quantity);

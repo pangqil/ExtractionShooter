@@ -37,6 +37,9 @@ namespace PDGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Input_CancelConsumableUse, "Input.CancelConsumableUse");
 
+	UE_DEFINE_GAMEPLAY_TAG(Input_SpectateNext, "Input.SpectateNext");
+	UE_DEFINE_GAMEPLAY_TAG(Input_SpectatePrev, "Input.SpectatePrev");
+
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage, "Data.Damage");
 
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_LegDamaged,  "State.Debuff.LegDamaged");
@@ -96,5 +99,11 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Character_Footstep, "GameplayCue.Character.Footstep");
 
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Item_Pickup, "GameplayCue.Item.Pickup");
+
+	// UI Tabs - Player Hub
+	UE_DEFINE_GAMEPLAY_TAG(UI_Tab_PlayerHub_Loadout,   "UI.Tab.PlayerHub.Loadout");
+	UE_DEFINE_GAMEPLAY_TAG(UI_Tab_PlayerHub_Character, "UI.Tab.PlayerHub.Character");
+	UE_DEFINE_GAMEPLAY_TAG(UI_Tab_PlayerHub_Skills,    "UI.Tab.PlayerHub.Skills");
+	UE_DEFINE_GAMEPLAY_TAG(UI_Tab_PlayerHub_Quest,     "UI.Tab.PlayerHub.Quest");
 
 }

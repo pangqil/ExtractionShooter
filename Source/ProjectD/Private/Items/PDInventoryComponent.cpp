@@ -2,10 +2,10 @@
 
 #include "Core/PDPlayerState.h"
 #include "Data/PDQuestComponent.h"
-#include "Characters/PDPlayerCharacter.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDEquipmentComponent.h"
-#include "Items/PDQuickSlotComponent.h"
+#include "Items/PDItemSoundLibrary.h"
+#include "Items/PDSecureContainerComponent.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Net/UnrealNetwork.h"
 
@@ -39,26 +39,6 @@ namespace
 		}
 
 		return Component->GetOwner()->FindComponentByClass<UPDEquipmentComponent>();
-	}
-
-	APDPlayerCharacter* FindOwnerPlayerCharacter(const UActorComponent* Component)
-	{
-		if (!Component || !Component->GetOwner())
-		{
-			return nullptr;
-		}
-
-		if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(Component->GetOwner()))
-		{
-			return PlayerCharacter;
-		}
-
-		if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(Component->GetOwner()))
-		{
-			return PDPlayerState->GetPDPlayerCharacter();
-		}
-
-		return nullptr;
 	}
 
 	int32 ResolveDefaultWeaponAmmo(const FPDItemData& ItemData)
@@ -104,8 +84,10 @@ void UPDInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UPDInventoryComponent, Items);
-	DOREPLIFETIME(UPDInventoryComponent, Gold);
+	DOREPLIFETIME_CONDITION(UPDInventoryComponent, Items, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UPDInventoryComponent, GridColumns, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UPDInventoryComponent, GridRows, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UPDInventoryComponent, Gold, COND_OwnerOnly);
 }
 
 void UPDInventoryComponent::OnRep_Items()
@@ -114,6 +96,11 @@ void UPDInventoryComponent::OnRep_Items()
 }
 
 void UPDInventoryComponent::OnRep_Gold()
+{
+	OnInventoryChanged.Broadcast();
+}
+
+void UPDInventoryComponent::OnRep_GridConfig()
 {
 	OnInventoryChanged.Broadcast();
 }
@@ -142,6 +129,40 @@ bool UPDInventoryComponent::AddItem(const FPDItemData& ItemData, int32 Quantity)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
 	return AddItemPartial(ItemData, Quantity) > 0;
+}
+
+bool UPDInventoryComponent::FindItemDataByID(FName ItemID, FPDItemData& OutItemData) const
+{
+	if (!ItemDataTable || ItemID.IsNone())
+	{
+		return false;
+	}
+
+	if (const FPDItemData* RowByName = ItemDataTable->FindRow<FPDItemData>(ItemID, TEXT("FindItemDataByID"), false))
+	{
+		if (RowByName->ItemID == ItemID || RowByName->ItemID.IsNone())
+		{
+			OutItemData = *RowByName;
+			if (OutItemData.ItemID.IsNone())
+			{
+				OutItemData.ItemID = ItemID;
+			}
+			return true;
+		}
+	}
+
+	TArray<FPDItemData*> Rows;
+	ItemDataTable->GetAllRows<FPDItemData>(TEXT("FindItemDataByID"), Rows);
+	for (const FPDItemData* Row : Rows)
+	{
+		if (Row && Row->ItemID == ItemID)
+		{
+			OutItemData = *Row;
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool UPDInventoryComponent::AddItemByID(FName ItemID, int32 Quantity)
@@ -351,6 +372,11 @@ float UPDInventoryComponent::GetCurrentWeight() const
 		TotalWeight += FMath::Max(0.f, Slot.ItemData.Weight) * FMath::Max(0, Slot.Quantity);
 	}
 
+	if (const UPDSecureContainerComponent* SecureContainerComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDSecureContainerComponent>() : nullptr)
+	{
+		TotalWeight += SecureContainerComponent->GetCurrentWeight();
+	}
+
 	return TotalWeight;
 }
 
@@ -461,6 +487,7 @@ int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 	if (AddedQuantity > 0)
 	{
 		InitializeWeaponAmmoState(Items[TargetSlotIndex]);
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		OnInventoryChanged.Broadcast();
 
 		if (UPDQuestComponent* QuestComponent = FindOwnerQuestComponent(this))
@@ -494,9 +521,11 @@ bool UPDInventoryComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 
 		return false;
 	}
 
+	const FPDItemData MovedItemData = Items[SourceSlotIndex].ItemData;
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(Items[SourceSlotIndex], Items[TargetSlotIndex], Quantity);
 	if (bMoved)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, MovedItemData);
 		OnInventoryChanged.Broadcast();
 	}
 
@@ -511,39 +540,23 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 		return 0;
 	}
 
+	if (Items.Num() != GetMaxSlotCount())
+	{
+		InitializeInventory();
+	}
+
 	int32 RemainingQuantity = Quantity;
 	int32 AddedQuantity = 0;
-	bool bEquippedFromThisAdd = false;
 
 	auto HandleAddedItem = [&](int32 InAddedQuantity)
 	{
-		OnInventoryChanged.Broadcast();
-
-		if (ItemData.WeaponType != EWeaponType::None)
+		if (InAddedQuantity <= 0)
 		{
-			if (APDPlayerCharacter* PlayerCharacter = FindOwnerPlayerCharacter(this))
-			{
-				if (!bEquippedFromThisAdd)
-				{
-					FPDInventorySlot WeaponSlot;
-					WeaponSlot.ItemData = ItemData;
-					WeaponSlot.Quantity = 1;
-					WeaponSlot.bIsEmpty = false;
-					WeaponSlot.ModificationLevel = 0;
-					InitializeWeaponAmmoState(WeaponSlot);
-
-					bEquippedFromThisAdd = PlayerCharacter->TryAutoEquipWeaponSlot(WeaponSlot);
-				}
-
-				if (bEquippedFromThisAdd)
-				{
-					if (UPDQuickSlotComponent* QuickSlotComponent = PlayerCharacter->GetQuickSlotComponent())
-					{
-						QuickSlotComponent->AddItemPartial(ItemData, 1);
-					}
-				}
-			}
+			return;
 		}
+
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
+		OnInventoryChanged.Broadcast();
 
 		if (UPDQuestComponent* QuestComponent = FindOwnerQuestComponent(this))
 		{
@@ -563,7 +576,6 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 			{
 				RemainingQuantity -= 1;
 				AddedQuantity += 1;
-				bEquippedFromThisAdd = true;
 			}
 		}
 	}
@@ -577,6 +589,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 	if (!CanAddWeight(ItemData, RemainingQuantity))
 	{
 		BroadcastWeightLimitExceeded();
+		HandleAddedItem(AddedQuantity);
 		return AddedQuantity;
 	}
 
@@ -669,7 +682,18 @@ int32 UPDInventoryComponent::AddSlotPartial(const FPDInventorySlot& SourceSlot)
 		Items[EmptySlot].Quantity = FMath::Max(1, SourceSlot.Quantity);
 		Items[EmptySlot].bIsEmpty = false;
 		InitializeWeaponAmmoState(Items[EmptySlot]);
+		UPDItemSoundLibrary::PlayItemMoveSound(this, SourceSlot.ItemData);
 		OnInventoryChanged.Broadcast();
+
+		if (UPDQuestComponent* QuestComponent = FindOwnerQuestComponent(this))
+		{
+			QuestComponent->ReportItemAcquired(SourceSlot.ItemData.ItemID, Items[EmptySlot].Quantity);
+			if (SourceSlot.ItemData.bIsQuestItem)
+			{
+				QuestComponent->ReportQuestItemAcquired(SourceSlot.ItemData.ItemID, Items[EmptySlot].Quantity);
+			}
+		}
+
 		return Items[EmptySlot].Quantity;
 	}
 

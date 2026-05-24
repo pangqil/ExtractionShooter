@@ -1,6 +1,5 @@
 #include "Ability/PDMeleeAttackAbility.h"
 #include "Characters/Base/PDCharacterBase.h"
-#include "Characters/PDPlayerCharacter.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDMeleeWeaponBase.h"
 #include "Interfaces/PDDamageable.h"
@@ -50,7 +49,7 @@ void UPDMeleeAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	HitActors.Reset();
 
 
-	APDPlayerCharacter* SwingChar = Cast<APDPlayerCharacter>(GetPDCharacter());
+	APDCharacterBase* SwingChar = GetPDCharacter();
 	if (SwingChar)
 	{
 		if (UAbilitySystemComponent* ASCComp = GetAbilitySystemComponentFromActorInfo())
@@ -102,7 +101,7 @@ void UPDMeleeAttackAbility::OnMontageFinished()
 
 void UPDMeleeAttackAbility::PerformSweep()
 {
-	APDPlayerCharacter* Char=Cast<APDPlayerCharacter>(GetPDCharacter());
+	APDCharacterBase* Char=GetPDCharacter();
 	if (!Char) return;
 	if (!Char->HasAuthority()) return;
 

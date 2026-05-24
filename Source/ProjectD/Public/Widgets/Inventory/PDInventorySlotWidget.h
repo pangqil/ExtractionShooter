@@ -32,6 +32,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void SetSlotContainerType(EPDItemContainerType InSlotContainerType);
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
+	void SetEmptySlotLabel(const FText& InEmptySlotLabel);
+
 	UFUNCTION(BlueprintPure, Category = "PD|Inventory")
 	EPDItemContainerType GetSlotContainerType() const { return SlotContainerType; }
 
@@ -46,6 +49,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory|Tooltip")
 	UUserWidget* CreateItemTooltipWidget();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory|Tooltip")
+	void SetTooltipPreviewMode(bool bInPreviewMode);
 
 	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory|Event")
 	FPDOnInventorySlotClicked OnSlotLeftClicked;
@@ -75,12 +81,10 @@ protected:
 	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
-	/* --- 추가 Start--- */
 	virtual bool NativeOnDragOver(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
 	virtual bool CanAcceptDrop(UDragDropOperation* InOperation) const;
-	/* --- 추가 End--- */
 
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Inventory")
 	FPDInventorySlot SlotData;
@@ -94,20 +98,23 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Inventory")
 	bool bLastClickWithControl = false;
 
+	UPROPERTY(BlueprintReadOnly, Category = "PD|Inventory")
+	bool bTooltipPreviewMode = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "PD|Inventory")
+	FText EmptySlotLabel;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Debug")
 	bool bShowDebugSlotIndex = false;
 
-	/* --- 추가 Start--- */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
 	TSoftObjectPtr<UMaterialInterface> SlotBGMaterial_Empty;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
 	TSoftObjectPtr<UMaterialInterface> SlotBGMaterial_Filled;
 
-	/** 등급별 슬롯 배경 틴트. 비어있으면 흰색(원본 머티리얼 그대로). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
 	TSoftObjectPtr<UPDItemGradeColorData> GradeColorData;
-	/* --- 추가 End--- */
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UUserWidget> TooltipWidgetClass;
@@ -119,10 +126,19 @@ protected:
 	FName TooltipItemNameWidgetName = TEXT("Text_ItemName");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
-	FName TooltipDescriptionWidgetName = TEXT("Text_Description");
+	FName TooltipDescriptionWidgetName = TEXT("Text_ItemDesc");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
-	FName TooltipWeightWidgetName = TEXT("Text_Weight");
+	FName TooltipWeightWidgetName = TEXT("Text_ItemWeight");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
+	FName TooltipSellPriceWidgetName = TEXT("Text_SellPrice");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
+	FName TooltipItemGradeWidgetName = TEXT("Text_ItemGrade");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
+	FName TooltipPreviewSlotWidgetName = TEXT("WBP_InventorySlot");
 
 private:
 	void ClearDropOverlays();

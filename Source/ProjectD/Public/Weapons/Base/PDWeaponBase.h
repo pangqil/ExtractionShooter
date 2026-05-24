@@ -14,6 +14,7 @@ class USoundBase;
 class UGCN_Weapon_Equip;
 class UGCN_Weapon_Swing;
 class UGCN_Weapon_MeleeHit;
+class UTexture2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponLevelChanged, APDWeaponBase*, Weapon, int32, NewLevel);
 
@@ -60,12 +61,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|FX")
 	TObjectPtr<USoundBase> EquipSound;
 
+	/** HUD/UI 실루엣 텍스처. 무기 BP 의 Details 패널에서 무기별로 지정. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|UI")
+	TSoftObjectPtr<UTexture2D> UISilhouette;
 
 	UPROPERTY(ReplicatedUsing=OnRep_WeaponIdentity, EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
 	EWeaponType WeaponType = EWeaponType::None;
 
 
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, Category="Weapon|State")
 	int32 CurrentLevel = 1;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Dropped, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
@@ -130,6 +134,10 @@ public:
 	FORCEINLINE TSubclassOf<UAnimInstance> GetWeaponAnimLayerClass() const { return WeaponAnimLayerClass; }
 	FORCEINLINE FName              GetLeftHandGripSocket()  const { return LeftHandGripSocket; }
 	FORCEINLINE FName              GetItemID()              const { return ItemID; }
+
+	/** UISilhouette 동기 로드. 위젯이 무기 스왑 시점에 호출. nullptr 가능. */
+	UFUNCTION(BlueprintPure, Category="Weapon|UI")
+	UTexture2D* GetUISilhouette() const;
 
 protected:
 	FVector GetAimDirectionFromOwner(const FVector& StartLocation) const;

@@ -9,6 +9,7 @@ class UPDInventoryComponent;
 class UPDEquipmentComponent;
 class UPDStashComponent;
 class UCharacterMovementComponent;
+class UAudioComponent;
 class APDPlayerCharacter;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnQuickSlotsChanged);
@@ -218,6 +219,8 @@ private:
 	bool ConsumeItem(const FPDInventorySlot& Slot);
 	void ApplyConsumableMoveSpeed();
 	void RestoreConsumableMoveSpeed();
+	void StartConsumableUseSound(const FPDItemData& ItemData);
+	void StopConsumableUseSound();
 	UCharacterMovementComponent* FindOwnerMovementComponent() const;
 	void StartWeaponQuickSlotCooldown(int32 SlotIndex);
 	void FinishWeaponQuickSlotCooldown();
@@ -233,6 +236,8 @@ private:
 
 	FPDInventorySlot PendingConsumableSlot;
 	FTimerHandle ConsumableUseTimerHandle;
+	UPROPERTY(Transient)
+	TObjectPtr<UAudioComponent> ConsumableUseAudioComponent = nullptr;
 	UPROPERTY(Replicated)
 	float ConsumableUseStartTime = 0.f;
 

@@ -5,6 +5,7 @@
 #include "Data/PDQuestData.h"
 #include "PDQuestListItemWidget.generated.h"
 
+class USoundBase;
 class UButton;
 class UTextBlock;
 class UPDQuestWindowWidget;
@@ -25,6 +26,9 @@ public:
 	FName GetQuestID() const { return QuestData.QuestID; }
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeConstruct() override;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))

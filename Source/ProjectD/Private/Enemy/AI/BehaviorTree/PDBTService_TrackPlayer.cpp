@@ -6,15 +6,44 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
-#include "Kismet/GameplayStatics.h"
 
 UPDBTService_TrackPlayer::UPDBTService_TrackPlayer()
 {
-	NodeName = TEXT("PD Track Player Location");
+	NodeName = TEXT("PD Track Player Target");
 	bNotifyTick = true;
-	// 매 0.2초 정도면 EQS/이동 갱신엔 충분. 디자이너가 Interval/RandomDeviation 으로 조정.
 	Interval = 0.2f;
 	RandomDeviation = 0.05f;
+}
+
+uint16 UPDBTService_TrackPlayer::GetInstanceMemorySize() const
+{
+	return sizeof(FPDTrackPlayerMemory);
+}
+
+namespace
+{
+	// LastSeenDirection 갱신 헬퍼. 위치 델타 우선, 너무 작으면 velocity 폴백.
+	void UpdateDirection(UBlackboardComponent* BB, FPDTrackPlayerMemory* Mem,
+		const AActor* Target, float MinDelta)
+	{
+		if (!BB || !Mem || !Target) return;
+		const FVector NowLoc = Target->GetActorLocation();
+
+		if (Mem->bHadValidTarget)
+		{
+			const FVector Delta = NowLoc - Mem->PrevTargetLoc;
+			if (Delta.SizeSquared2D() >= MinDelta * MinDelta)
+			{
+				BB->SetValueAsVector(PDBTKeys::LastSeenDirection, Delta.GetSafeNormal2D());
+				return;
+			}
+			const FVector Vel = Target->GetVelocity();
+			if (!Vel.IsNearlyZero())
+			{
+				BB->SetValueAsVector(PDBTKeys::LastSeenDirection, Vel.GetSafeNormal2D());
+			}
+		}
+	}
 }
 
 void UPDBTService_TrackPlayer::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
@@ -25,18 +54,16 @@ void UPDBTService_TrackPlayer::TickNode(UBehaviorTreeComponent& OwnerComp, uint8
 	AAIController* AI = OwnerComp.GetAIOwner();
 	APawn* SelfPawn = AI ? AI->GetPawn() : nullptr;
 	UWorld* World = GetWorld();
+	FPDTrackPlayerMemory* Mem = reinterpret_cast<FPDTrackPlayerMemory*>(NodeMemory);
 
-	if (!BB || !SelfPawn || !World)
-	{
-		if (BB) BB->SetValueAsBool(PDBTKeys::bHasTrackedPlayer, false);
-		return;
-	}
+	if (!BB || !SelfPawn || !World || !Mem) return;
 
 	const FVector SelfLoc = SelfPawn->GetActorLocation();
-	const float RangeSq = TrackingRange * TrackingRange;
+	const float AcquireSq = AcquireRange * AcquireRange;
+	const float LoseSq    = LoseRange    * LoseRange;
 
-	// 가장 가까운 PlayerController 의 폰을 추적. 멀티 대응.
-	APawn* ClosestPlayerPawn = nullptr;
+	// 1) AcquireRange 안의 가장 가까운 player 폰 탐색 (멀티 대응).
+	APawn* ClosestPlayer = nullptr;
 	float ClosestDistSq = TNumericLimits<float>::Max();
 
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
@@ -51,17 +78,49 @@ void UPDBTService_TrackPlayer::TickNode(UBehaviorTreeComponent& OwnerComp, uint8
 		if (DistSq < ClosestDistSq)
 		{
 			ClosestDistSq = DistSq;
-			ClosestPlayerPawn = PlayerPawn;
+			ClosestPlayer = PlayerPawn;
 		}
 	}
 
-	if (ClosestPlayerPawn && ClosestDistSq <= RangeSq)
+	// 2) Acquire — 새 target 설정 / 기존 갱신.
+	if (ClosestPlayer && ClosestDistSq <= AcquireSq)
 	{
-		BB->SetValueAsVector(PDBTKeys::TrackedPlayerLocation, ClosestPlayerPawn->GetActorLocation());
+		BB->SetValueAsObject(PDBTKeys::TargetActor, ClosestPlayer);
+		BB->SetValueAsVector(PDBTKeys::LastSeenLocation, ClosestPlayer->GetActorLocation());
 		BB->SetValueAsBool(PDBTKeys::bHasTrackedPlayer, true);
+
+		UpdateDirection(BB, Mem, ClosestPlayer, MinDeltaForDirection);
+
+		Mem->PrevTargetLoc   = ClosestPlayer->GetActorLocation();
+		Mem->bHadValidTarget = true;
+		return;
 	}
-	else
+
+	// 3) Maintain — acquire 범위 밖이지만 기존 TargetActor 가 LoseRange 안이면 유지.
+	AActor* CurTarget = Cast<AActor>(BB->GetValueAsObject(PDBTKeys::TargetActor));
+	if (IsValid(CurTarget))
 	{
-		BB->SetValueAsBool(PDBTKeys::bHasTrackedPlayer, false);
+		const FVector CurLoc = CurTarget->GetActorLocation();
+		const float CurDistSq = FVector::DistSquared(SelfLoc, CurLoc);
+
+		if (CurDistSq <= LoseSq)
+		{
+			// hysteresis 영역 — target 유지, last seen 만 갱신.
+			BB->SetValueAsVector(PDBTKeys::LastSeenLocation, CurLoc);
+			BB->SetValueAsBool(PDBTKeys::bHasTrackedPlayer, true);
+
+			UpdateDirection(BB, Mem, CurTarget, MinDeltaForDirection);
+
+			Mem->PrevTargetLoc   = CurLoc;
+			Mem->bHadValidTarget = true;
+			return;
+		}
+
+		// 4) Lose — LoseRange 밖 OR invalid. stamp 후 클리어.
+		BB->SetValueAsVector(PDBTKeys::LastSeenLocation, CurLoc);
+		BB->ClearValue(PDBTKeys::TargetActor);
 	}
+
+	BB->SetValueAsBool(PDBTKeys::bHasTrackedPlayer, false);
+	Mem->bHadValidTarget = false;
 }

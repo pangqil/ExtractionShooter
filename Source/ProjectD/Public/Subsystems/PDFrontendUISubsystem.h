@@ -39,6 +39,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI|Layered")
 	UPDActivatableBase* PushToLayer(EUILayer Layer, TSubclassOf<UPDActivatableBase> ScreenClass);
 
+	/** RootLayout 등록 시점에 자동으로 push할 초기 화면 요청.
+	 *  RootLayout이 이미 등록되어 있으면 즉시 push, 아니면 RegisterRootLayout 시점에 flush.
+	 *  Lobby GameMode의 PostLogin처럼 PC BeginPlay(=RootLayout 등록)보다 앞서 호출되는 경우를 위한 큐잉 API. */
+	UFUNCTION(BlueprintCallable, Category = "UI|Layered")
+	void RequestInitialPush(EUILayer Layer, TSubclassOf<UPDActivatableBase> ScreenClass);
+
 	/** 레이어 스택 top을 pop */
 	UFUNCTION(BlueprintCallable, Category = "UI|Layered")
 	void PopFromLayer(EUILayer Layer);
@@ -57,6 +63,13 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDRootLayout> RootLayout;
 
+	UPROPERTY(Transient)
+	TSubclassOf<UPDActivatableBase> PendingInitialPushClass;
+
+	EUILayer PendingInitialPushLayer{};
+	bool bHasPendingInitialPush = false;
+
 	void HandleAnyStackChanged(UPDWidgetStack* ChangedStack);
 	EWidgetInputMode ComputeEffectiveInputMode() const;
+	void FlushPendingInitialPush();
 };

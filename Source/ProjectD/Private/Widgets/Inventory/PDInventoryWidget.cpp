@@ -1,5 +1,6 @@
 
 #include "Widgets/Inventory/PDInventoryWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Algo/Sort.h"
 
@@ -9,6 +10,10 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
+#include "Components/ScaleBox.h"
+#include "Components/ScaleBoxSlot.h"
+#include "Components/SizeBox.h"
+#include "Components/SizeBoxSlot.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/PanelWidget.h"
@@ -18,13 +23,28 @@
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDQuickSlotComponent.h"
-#include "Widgets/Inventory/PDEquipmentSlotWidget.h"
+#include "Items/PDSecureContainerComponent.h"
 #include "Characters/PDPlayerCharacter.h"
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDStashComponent.h"
 #include "Widgets/Inventory/PDInventoryItemContextMenuWidget.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
+#include "Widgets/Inventory/PDInventoryWeightBarWidget.h"
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
+
+void UPDInventoryWidget::InitializeForOwner(APlayerController* /*OwnerPC*/)
+{
+}
+
+void UPDInventoryWidget::OnTabShown()
+{
+}
+
+void UPDInventoryWidget::OnTabHidden()
+{
+	CloseContextMenu();
+	CloseItemHoverTooltip();
+}
 
 void UPDInventoryWidget::NativeOnInitialized()
 {
@@ -73,7 +93,7 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 
 	InventoryGridPanel->ClearChildren();
 	RefreshGoldText();
-	RefreshInventoryWeightText();
+	RefreshInventoryWeightBar();
 
 	if (!InventorySlotWidgetClass)
 	{
@@ -83,9 +103,19 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 
 	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
 
-	const int32 Columns = InventoryComponent ? FMath::Max(1, InventoryComponent->GridColumns) : FMath::Max(1, FallbackGridColumns);
-	const int32 Rows = InventoryComponent ? FMath::Max(1, InventoryComponent->GridRows) : FMath::Max(1, FallbackGridRows);
-	const int32 SlotCount = InventoryComponent ? InventoryComponent->GetMaxSlotCount() : Columns * Rows;
+	if (!InventoryComponent)
+	{
+		return;
+	}
+
+	const int32 Columns = FMath::Max(1, InventoryComponent->GridColumns);
+	const int32 Rows = FMath::Max(1, InventoryComponent->GridRows);
+	const int32 SlotCount = Columns * Rows;
+	const float SlotWidth = FMath::Max(1.f, InventorySlotWidth);
+	const float SlotHeight = FMath::Max(1.f, InventorySlotHeight);
+
+	InventoryGridPanel->SetMinDesiredSlotWidth(SlotWidth);
+	InventoryGridPanel->SetMinDesiredSlotHeight(SlotHeight);
 
 	TArray<int32> DisplaySlotIndices;
 	if (InventoryComponent)
@@ -146,7 +176,44 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 			}
 		}
 
-		UUniformGridSlot* GridSlot = InventoryGridPanel->AddChildToUniformGrid(CreatedSlotWidget, DisplayIndex / Columns, DisplayIndex % Columns);
+		UWidget* GridChildWidget = CreatedSlotWidget;
+		USizeBox* SlotSizeBox = WidgetTree ? WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass()) : nullptr;
+		if (SlotSizeBox)
+		{
+			SlotSizeBox->SetWidthOverride(SlotWidth);
+			SlotSizeBox->SetHeightOverride(SlotHeight);
+			SlotSizeBox->SetMinDesiredWidth(SlotWidth);
+			SlotSizeBox->SetMinDesiredHeight(SlotHeight);
+
+			UWidget* SlotContentWidget = CreatedSlotWidget;
+			if (bScaleInventorySlotWidgetToFit)
+			{
+				UScaleBox* SlotScaleBox = WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass());
+				if (SlotScaleBox)
+				{
+					SlotScaleBox->SetStretch(EStretch::ScaleToFit);
+					SlotScaleBox->SetStretchDirection(EStretchDirection::Both);
+
+					if (UScaleBoxSlot* ScaleBoxSlot = Cast<UScaleBoxSlot>(SlotScaleBox->AddChild(CreatedSlotWidget)))
+					{
+						ScaleBoxSlot->SetHorizontalAlignment(HAlign_Fill);
+						ScaleBoxSlot->SetVerticalAlignment(VAlign_Fill);
+					}
+
+					SlotContentWidget = SlotScaleBox;
+				}
+			}
+
+			if (USizeBoxSlot* SizeBoxSlot = Cast<USizeBoxSlot>(SlotSizeBox->AddChild(SlotContentWidget)))
+			{
+				SizeBoxSlot->SetHorizontalAlignment(HAlign_Fill);
+				SizeBoxSlot->SetVerticalAlignment(VAlign_Fill);
+			}
+
+			GridChildWidget = SlotSizeBox;
+		}
+
+		UUniformGridSlot* GridSlot = InventoryGridPanel->AddChildToUniformGrid(GridChildWidget, DisplayIndex / Columns, DisplayIndex % Columns);
 		if (GridSlot)
 		{
 			GridSlot->SetHorizontalAlignment(HAlign_Center);
@@ -288,9 +355,7 @@ int32 UPDInventoryWidget::GetInventoryDisplaySlotCount() const
 		return FMath::Max(1, InventoryComponent->GetMaxSlotCount());
 	}
 
-	const int32 Columns = FMath::Max(1, FallbackGridColumns);
-	const int32 Rows = FMath::Max(1, FallbackGridRows);
-	return Columns * Rows;
+	return 16;
 }
 
 void UPDInventoryWidget::SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const
@@ -393,31 +458,43 @@ void UPDInventoryWidget::ToggleSortOptions()
 
 void UPDInventoryWidget::HandleEquipmentTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventoryFilterTab(EPDItemFilterTab::Equipment);
 }
 
 void UPDInventoryWidget::HandleConsumableTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventoryFilterTab(EPDItemFilterTab::Consumable);
 }
 
 void UPDInventoryWidget::HandleMiscTabClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventoryFilterTab(EPDItemFilterTab::Misc);
 }
 
 void UPDInventoryWidget::HandleSortButtonClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	ToggleSortOptions();
 }
 
 void UPDInventoryWidget::HandleSortByNameClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventorySortMode(EPDItemSortMode::Name);
 }
 
 void UPDInventoryWidget::HandleSortByTypeClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	SetInventorySortMode(EPDItemSortMode::Type);
 }
 
@@ -438,16 +515,37 @@ void UPDInventoryWidget::RegisterEquipmentSlotWidget(EPDEquipmentSlotType SlotTy
 		return;
 	}
 
-	UPDEquipmentSlotWidget* EquipmentSlotWidget = Cast<UPDEquipmentSlotWidget>(WidgetTree->FindWidget(WidgetName));
+	UPDInventorySlotWidget* EquipmentSlotWidget = Cast<UPDInventorySlotWidget>(WidgetTree->FindWidget(WidgetName));
 	if (!EquipmentSlotWidget)
 	{
 		return;
 	}
 
-	EquipmentSlotWidget->InitializeEquipmentSlot(SlotType);
-	EquipmentSlotWidget->OnEquipmentSlotRightClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotRightClicked);
-			EquipmentSlotWidget->OnEquipmentSlotItemDropped.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotItemDropped);
+	const int32 SlotIndex = static_cast<int32>(SlotType);
+	EquipmentSlotWidget->SetSlotContainerType(EPDItemContainerType::Equipment);
+	EquipmentSlotWidget->SetEmptySlotLabel(GetEquipmentSlotLabel(SlotType));
+	EquipmentSlotWidget->ClearSlotData(SlotIndex);
+	EquipmentSlotWidget->OnSlotRightClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotRightClicked);
+	EquipmentSlotWidget->OnSlotItemDropped.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotItemDropped);
 	EquipmentSlotWidgets.Add(SlotType, EquipmentSlotWidget);
+}
+
+
+FText UPDInventoryWidget::GetEquipmentSlotLabel(EPDEquipmentSlotType SlotType) const
+{
+	switch (SlotType)
+	{
+	case EPDEquipmentSlotType::Weapon:
+		return FText::FromString(TEXT("Weapon"));
+	case EPDEquipmentSlotType::Head:
+		return FText::FromString(TEXT("Head"));
+	case EPDEquipmentSlotType::Armor:
+		return FText::FromString(TEXT("Armor"));
+	case EPDEquipmentSlotType::Bag:
+		return FText::FromString(TEXT("Bag"));
+	default:
+		return FText::FromString(TEXT("Equipment"));
+	}
 }
 
 void UPDInventoryWidget::BindEquipmentChanged()
@@ -478,33 +576,38 @@ void UPDInventoryWidget::UnbindEquipmentChanged()
 void UPDInventoryWidget::RefreshEquipmentSlots()
 {
 	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
-	for (const TPair<EPDEquipmentSlotType, TWeakObjectPtr<UPDEquipmentSlotWidget>>& Pair : EquipmentSlotWidgets)
+	for (const TPair<EPDEquipmentSlotType, TWeakObjectPtr<UPDInventorySlotWidget>>& Pair : EquipmentSlotWidgets)
 	{
-		UPDEquipmentSlotWidget* EquipmentSlotWidget = Pair.Value.Get();
+		UPDInventorySlotWidget* EquipmentSlotWidget = Pair.Value.Get();
 		if (!EquipmentSlotWidget)
 		{
 			continue;
 		}
+
+		const int32 SlotIndex = static_cast<int32>(Pair.Key);
+		EquipmentSlotWidget->SetSlotContainerType(EPDItemContainerType::Equipment);
+		EquipmentSlotWidget->SetEmptySlotLabel(GetEquipmentSlotLabel(Pair.Key));
 
 		if (EquipmentComponent)
 		{
 			const FPDInventorySlot EquippedSlot = EquipmentComponent->GetEquippedSlot(Pair.Key);
 			if (!EquippedSlot.IsEmpty())
 			{
-				EquipmentSlotWidget->SetEquippedItem(EquippedSlot);
+				EquipmentSlotWidget->SetSlotData(EquippedSlot, SlotIndex);
 				continue;
 			}
 		}
 
-		EquipmentSlotWidget->ClearEquippedItem();
+		EquipmentSlotWidget->ClearSlotData(SlotIndex);
 	}
 }
 
-void UPDInventoryWidget::HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType)
+void UPDInventoryWidget::HandleEquipmentSlotRightClicked(UPDInventorySlotWidget* SlotWidget, int32 EquipmentSlotIndex)
 {
 	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
 	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
-	if (!SlotWidget || !InventoryComponent || !EquipmentComponent)
+	const EPDEquipmentSlotType SlotType = static_cast<EPDEquipmentSlotType>(EquipmentSlotIndex);
+	if (!SlotWidget || !InventoryComponent || !EquipmentComponent || SlotType == EPDEquipmentSlotType::None)
 	{
 		return;
 	}
@@ -517,13 +620,26 @@ void UPDInventoryWidget::HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget*
 }
 
 
-void UPDInventoryWidget::HandleEquipmentSlotItemDropped(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType, UPDInventoryDragDropOperation* DragOperation)
+void UPDInventoryWidget::HandleEquipmentSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 EquipmentSlotIndex, UPDInventoryDragDropOperation* DragOperation)
 {
 	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
 	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
+	const EPDEquipmentSlotType SlotType = static_cast<EPDEquipmentSlotType>(EquipmentSlotIndex);
 
-	if (!SlotWidget || !DragOperation || !InventoryComponent || !EquipmentComponent)
+	if (!SlotWidget || !DragOperation || !InventoryComponent || !EquipmentComponent || SlotType == EPDEquipmentSlotType::None)
 	{
+		return;
+	}
+
+	if (DragOperation->SourceContainerType == EPDItemContainerType::Equipment)
+	{
+		const EPDEquipmentSlotType SourceSlotType = static_cast<EPDEquipmentSlotType>(DragOperation->SourceSlotIndex);
+		if (SourceSlotType != SlotType)
+		{
+			return;
+		}
+
+		RefreshEquipmentSlots();
 		return;
 	}
 
@@ -547,16 +663,6 @@ void UPDInventoryWidget::HandleEquipmentSlotItemDropped(UPDEquipmentSlotWidget* 
 	{
 		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
-			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
-			{
-				const AActor* QuickSlotOwner = QuickSlotComponent->GetOwner();
-				if (!QuickSlotOwner || !QuickSlotOwner->HasAuthority())
-				{
-					PlayerController->ServerEquipInventoryWeaponSlot(DragOperation->SourceSlotIndex);
-					return;
-				}
-			}
-
 			if (QuickSlotComponent->EquipInventoryWeaponSlot(DragOperation->SourceSlotIndex))
 			{
 				RefreshEquipmentSlots();
@@ -606,6 +712,11 @@ void UPDInventoryWidget::ResolveInventoryGridPanel()
 
 void UPDInventoryWidget::RefreshGoldText()
 {
+	if (!GoldTextWidget)
+	{
+		GoldTextWidget = Text_Gold;
+	}
+
 	if (!GoldTextWidget && WidgetTree && !GoldTextWidgetName.IsNone())
 	{
 		GoldTextWidget = Cast<UTextBlock>(WidgetTree->FindWidget(GoldTextWidgetName));
@@ -617,17 +728,45 @@ void UPDInventoryWidget::RefreshGoldText()
 	}
 
 	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
-	GoldTextWidget->SetText(FText::FromString(FString::Printf(TEXT("Gold : %d"), InventoryComponent ? InventoryComponent->GetGold() : 0)));
+	GoldTextWidget->SetText(FText::AsNumber(FMath::Max(0, InventoryComponent ? InventoryComponent->GetGold() : 0)));
 }
 
-void UPDInventoryWidget::RefreshInventoryWeightText()
+void UPDInventoryWidget::ResolveInventoryWeightBarWidget()
 {
-	if (!InventoryWeightTextWidget && WidgetTree && !InventoryWeightTextWidgetName.IsNone())
+	if (InventoryWeightBarWidget)
 	{
-		InventoryWeightTextWidget = Cast<UTextBlock>(WidgetTree->FindWidget(InventoryWeightTextWidgetName));
+		return;
 	}
 
-	if (!InventoryWeightTextWidget)
+	if (!WidgetTree)
+	{
+		return;
+	}
+
+	if (!InventoryWeightBarWidgetName.IsNone())
+	{
+		InventoryWeightBarWidget = Cast<UPDInventoryWeightBarWidget>(WidgetTree->FindWidget(InventoryWeightBarWidgetName));
+	}
+
+	if (InventoryWeightBarWidget)
+	{
+		return;
+	}
+
+	WidgetTree->ForEachWidget([this](UWidget* Widget)
+	{
+		if (!InventoryWeightBarWidget)
+		{
+			InventoryWeightBarWidget = Cast<UPDInventoryWeightBarWidget>(Widget);
+		}
+	});
+}
+
+void UPDInventoryWidget::RefreshInventoryWeightBar()
+{
+	ResolveInventoryWeightBarWidget();
+
+	if (!InventoryWeightBarWidget)
 	{
 		return;
 	}
@@ -635,19 +774,20 @@ void UPDInventoryWidget::RefreshInventoryWeightText()
 	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
 	const float CurrentWeight = InventoryComponent ? InventoryComponent->GetCurrentWeight() : 0.f;
 	const float MaxWeight = InventoryComponent ? InventoryComponent->GetMaxWeight() : 0.f;
-	InventoryWeightTextWidget->SetText(FText::FromString(FString::Printf(TEXT("Weight %.1f / %.1f"), CurrentWeight, MaxWeight)));
+	InventoryWeightBarWidget->SetWeight(CurrentWeight, MaxWeight);
 }
 
 UPDInventoryComponent* UPDInventoryWidget::FindInventoryComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	// 2번 구조: InventoryComponent는 PlayerState에 있으므로 PlayerController 헬퍼 사용.
+	if (APDPlayerController* PC = Cast<APDPlayerController>(GetOwningPlayer()))
 	{
-		if (UPDInventoryComponent* InventoryComponent = PDController->GetPlayerInventoryComponent())
+		if (UPDInventoryComponent* Comp = PC->GetPlayerInventoryComponent())
 		{
-			return InventoryComponent;
+			return Comp;
 		}
 	}
-
+	// Fallback: Pawn에 직접 붙은 경우도 원래 구조 호환.
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();
@@ -668,14 +808,13 @@ void UPDInventoryWidget::SetActiveStashComponent(UPDStashComponent* InStashCompo
 
 UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (APDPlayerController* PC = Cast<APDPlayerController>(GetOwningPlayer()))
 	{
-		if (UPDQuickSlotComponent* QuickSlotComponent = PDController->GetPlayerQuickSlotComponent())
+		if (UPDQuickSlotComponent* Comp = PC->GetPlayerQuickSlotComponent())
 		{
-			return QuickSlotComponent;
+			return Comp;
 		}
 	}
-
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDQuickSlotComponent>();
@@ -684,16 +823,26 @@ UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 	return nullptr;
 }
 
-UPDEquipmentComponent* UPDInventoryWidget::FindEquipmentComponent() const
+UPDSecureContainerComponent* UPDInventoryWidget::FindSecureContainerComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	// SecureContainerComponent는 PlayerCharacter에 붙어있음.
+	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
-		if (UPDEquipmentComponent* EquipmentComponent = PDController->GetPlayerEquipmentComponent())
-		{
-			return EquipmentComponent;
-		}
+		return OwningPawn->FindComponentByClass<UPDSecureContainerComponent>();
 	}
 
+	return nullptr;
+}
+
+UPDEquipmentComponent* UPDInventoryWidget::FindEquipmentComponent() const
+{
+	if (APDPlayerController* PC = Cast<APDPlayerController>(GetOwningPlayer()))
+	{
+		if (UPDEquipmentComponent* Comp = PC->GetPlayerEquipmentComponent())
+		{
+			return Comp;
+		}
+	}
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDEquipmentComponent>();
@@ -739,6 +888,14 @@ const FPDInventorySlot* UPDInventoryWidget::FindSourceSlot(EPDItemContainerType 
 		if (const UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
 			return QuickSlotComponent->QuickSlotItems.IsValidIndex(SlotIndex) ? &QuickSlotComponent->QuickSlotItems[SlotIndex] : nullptr;
+		}
+		return nullptr;
+	case EPDItemContainerType::Equipment:
+		return nullptr;
+	case EPDItemContainerType::SecureContainer:
+		if (const UPDSecureContainerComponent* SecureContainerComponent = FindSecureContainerComponent())
+		{
+			return SecureContainerComponent->GetSecureSlot(SlotIndex);
 		}
 		return nullptr;
 	default:
@@ -845,6 +1002,7 @@ void UPDInventoryWidget::HandleInventorySlotRightClicked(UPDInventorySlotWidget*
 void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex)
 {
 	CloseContextMenu();
+	CloseItemHoverTooltip();
 
 	if (!SlotWidget || !ContextMenuWidgetClass)
 	{
@@ -853,14 +1011,6 @@ void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int
 
 	const FPDInventorySlot& SlotData = SlotWidget->GetSlotData();
 	if (SlotData.IsEmpty())
-	{
-		return;
-	}
-
-	OpenItemHoverTooltip(SlotWidget);
-
-	UPanelWidget* ContextMenuContainer = FindContextMenuContainer();
-	if (!ContextMenuContainer)
 	{
 		return;
 	}
@@ -875,53 +1025,31 @@ void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int
 	ActiveContextMenu->OnDropClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleContextMenuDropClicked);
 	ActiveContextMenu->OnEquipClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleContextMenuEquipClicked);
 	ActiveContextMenu->InitializeContextMenu(SlotIndex, SlotData);
-	ContextMenuContainer->ClearChildren();
-	ContextMenuContainer->AddChild(ActiveContextMenu);
-	ContextMenuContainer->SetVisibility(ESlateVisibility::Visible);
-	ActiveContextMenu->ForceLayoutPrepass();
+	ActiveContextMenu->SetVisibility(ESlateVisibility::Visible);
+	ActiveContextMenu->AddToViewport(300);
+
+	FVector2D MousePosition = FVector2D::ZeroVector;
+	if (APlayerController* PlayerController = GetOwningPlayer())
+	{
+		UWidgetLayoutLibrary::GetMousePositionScaledByDPI(PlayerController, MousePosition.X, MousePosition.Y);
+	}
+
+	ActiveContextMenu->SetPositionInViewport(MousePosition, false);
 }
 
 void UPDInventoryWidget::CloseContextMenu()
 {
-	if (ActiveContextMenu)
+	if (!ActiveContextMenu)
 	{
-		ActiveContextMenu->OnUseClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuUseClicked);
-		ActiveContextMenu->OnDropClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuDropClicked);
-		ActiveContextMenu->OnEquipClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuEquipClicked);
-		ActiveContextMenu->RemoveFromParent();
-		ActiveContextMenu = nullptr;
+		return;
 	}
 
-	if (UPanelWidget* ContextMenuContainer = FindContextMenuContainer())
-	{
-		ContextMenuContainer->ClearChildren();
-		ContextMenuContainer->SetVisibility(ESlateVisibility::Collapsed);
-	}
+	ActiveContextMenu->OnUseClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuUseClicked);
+	ActiveContextMenu->OnDropClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuDropClicked);
+	ActiveContextMenu->OnEquipClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuEquipClicked);
+	ActiveContextMenu->RemoveFromParent();
+	ActiveContextMenu = nullptr;
 }
-
-UPanelWidget* UPDInventoryWidget::FindContextMenuContainer() const
-{
-	if (!ActiveItemTooltip || !ActiveItemTooltip->WidgetTree)
-	{
-		return nullptr;
-	}
-
-	if (!ContextMenuContainerWidgetName.IsNone())
-	{
-		if (UPanelWidget* FoundPanel = Cast<UPanelWidget>(ActiveItemTooltip->WidgetTree->FindWidget(ContextMenuContainerWidgetName)))
-		{
-			return FoundPanel;
-		}
-	}
-
-	if (UPanelWidget* FoundPanel = Cast<UPanelWidget>(ActiveItemTooltip->WidgetTree->FindWidget(TEXT("ContextMenuContainer"))))
-	{
-		return FoundPanel;
-	}
-
-	return nullptr;
-}
-
 
 void UPDInventoryWidget::OpenItemHoverTooltip(UPDInventorySlotWidget* SlotWidget)
 {
@@ -987,6 +1115,8 @@ FVector2D UPDInventoryWidget::GetSlotTooltipPosition(UPDInventorySlotWidget* Slo
 
 void UPDInventoryWidget::HandleContextMenuUseClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex)
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	CloseContextMenu();
 	CloseItemHoverTooltip();
 
@@ -1013,6 +1143,8 @@ void UPDInventoryWidget::HandleContextMenuUseClicked(UPDInventoryItemContextMenu
 
 void UPDInventoryWidget::HandleContextMenuDropClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex)
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	CloseContextMenu();
 	CloseItemHoverTooltip();
 
@@ -1024,6 +1156,8 @@ void UPDInventoryWidget::HandleContextMenuDropClicked(UPDInventoryItemContextMen
 
 void UPDInventoryWidget::HandleContextMenuEquipClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex)
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	CloseContextMenu();
 	CloseItemHoverTooltip();
 
@@ -1044,16 +1178,6 @@ void UPDInventoryWidget::HandleContextMenuEquipClicked(UPDInventoryItemContextMe
 	{
 		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
-			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
-			{
-				const AActor* QuickSlotOwner = QuickSlotComponent->GetOwner();
-				if (!QuickSlotOwner || !QuickSlotOwner->HasAuthority())
-				{
-					PlayerController->ServerEquipInventoryWeaponSlot(SlotIndex);
-					return;
-				}
-			}
-
 			if (QuickSlotComponent->EquipInventoryWeaponSlot(SlotIndex))
 			{
 				RefreshEquipmentSlots();
@@ -1085,13 +1209,6 @@ void UPDInventoryWidget::ExecuteInventoryQuickAction(int32 SlotIndex, int32 Quan
 
 		if (InventoryComponent && StashComponent)
 		{
-			const AActor* StashOwner = StashComponent->GetOwner();
-			if (!StashOwner || !StashOwner->HasAuthority())
-			{
-				PlayerController->ServerStoreInventorySlotQuantityToStash(StashComponent, SlotIndex, INDEX_NONE, Quantity);
-				return;
-			}
-
 			StashComponent->StoreInventorySlotQuantity(InventoryComponent, SlotIndex, Quantity);
 		}
 
@@ -1121,46 +1238,30 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 	switch (SourceContainerType)
 	{
 	case EPDItemContainerType::Inventory:
-		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
-		{
-			const AActor* InventoryOwner = InventoryComponent->GetOwner();
-			if (!InventoryOwner || !InventoryOwner->HasAuthority())
-			{
-				PlayerController->ServerMoveInventorySlotQuantity(SourceSlotIndex, TargetSlotIndex, Quantity);
-				return;
-			}
-		}
 		InventoryComponent->MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
 		break;
 	case EPDItemContainerType::Stash:
 		if (UPDStashComponent* StashComponent = FindStashComponent())
 		{
-			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
-			{
-				const AActor* StashOwner = StashComponent->GetOwner();
-				if (!StashOwner || !StashOwner->HasAuthority())
-				{
-					PlayerController->ServerTakeStashSlotQuantityToInventorySlot(StashComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
-					return;
-				}
-			}
-
 			StashComponent->TakeStashSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
 		}
 		break;
 	case EPDItemContainerType::QuickSlot:
 		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
-			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
-			{
-				const AActor* QuickSlotOwner = QuickSlotComponent->GetOwner();
-				if (!QuickSlotOwner || !QuickSlotOwner->HasAuthority())
-				{
-					PlayerController->ServerTakeQuickSlotQuantityToInventorySlot(SourceSlotIndex, TargetSlotIndex, Quantity);
-					return;
-				}
-			}
 			QuickSlotComponent->TakeQuickSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+		}
+		break;
+	case EPDItemContainerType::Equipment:
+		if (UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent())
+		{
+			EquipmentComponent->UnequipItemToInventorySlot(InventoryComponent, static_cast<EPDEquipmentSlotType>(SourceSlotIndex), TargetSlotIndex);
+		}
+		break;
+	case EPDItemContainerType::SecureContainer:
+		if (UPDSecureContainerComponent* SecureContainerComponent = FindSecureContainerComponent())
+		{
+			SecureContainerComponent->TakeSecureSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
 		}
 		break;
 	default:
@@ -1217,7 +1318,14 @@ void UPDInventoryWidget::OpenQuantityPopup(int32 SlotIndex, int32 MaxQuantity, c
 	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->AddToViewport(100);
-	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	if (const FPDInventorySlot* PreviewSlot = FindInventorySlot(SlotIndex))
+	{
+		ActiveQuantityPopup->InitializeQuantityPopupWithSlot(MaxQuantity, Title, *PreviewSlot);
+	}
+	else
+	{
+		ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	}
 }
 
 void UPDInventoryWidget::OpenTransferQuantityPopup(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 MaxQuantity, const FText& Title)
@@ -1250,7 +1358,14 @@ void UPDInventoryWidget::OpenTransferQuantityPopup(EPDItemContainerType SourceCo
 	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->AddToViewport(100);
-	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	if (const FPDInventorySlot* PreviewSlot = FindSourceSlot(SourceContainerType, SourceSlotIndex))
+	{
+		ActiveQuantityPopup->InitializeQuantityPopupWithSlot(MaxQuantity, Title, *PreviewSlot);
+	}
+	else
+	{
+		ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+	}
 }
 
 void UPDInventoryWidget::HandleQuantityConfirmed(int32 Quantity)

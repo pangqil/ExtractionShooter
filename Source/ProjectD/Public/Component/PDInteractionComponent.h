@@ -44,6 +44,7 @@ protected:
 
 private:
 	void PollTarget();
+	void ApplyInteractTargetChange(AActor* NewTarget);
 
 	UFUNCTION()
 	void HandleOwnerControllerChanged(APawn* InPawn, AController* OldController, AController* NewController);

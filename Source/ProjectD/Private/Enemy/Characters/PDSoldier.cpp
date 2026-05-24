@@ -128,6 +128,11 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 {
 	if (EquippedWeapon == NewWeapon) return;
 
+	// 무기 교체 전 fire timer 활성 여부 기록 — BT(예: PeekFire) 가 발사 중이면 교체 후 재개,
+	// 발사 중이 아니면(=combat 상태만으로 가만히 있던 경우) 새 무기로도 자동 발사 시작 금지.
+	const UWorld* World = GetWorld();
+	const bool bWasFiring = World && World->GetTimerManager().IsTimerActive(FireTimerHandle);
+
 	UPDAnimInstance* AnimInst = GetMesh() ? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
 
 	if (EquippedWeapon)
@@ -175,18 +180,16 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 		}
 	}
 
-	// 무기 변경 후 연사 timer 재평가 — Rifle Auto↔비-Rifle/단발 전환 즉시 반영.
-	// OnTargetChanged 는 무기 변경 시 호출되지 않으므로 여기서 강제 재평가.
-	if (UPDCombatComponent* Combat = GetCombatComponent())
+	// 무기 변경 후 연사 timer 재평가 — bWasFiring 이 true 일 때만 재개.
+	// BT 가 발사 중이지 않았다면 새 무기가 풀오토여도 자동 시작 안 함 (사용자 정책: BT-driven only).
+	// Elite peek 중에는 단발 무기(Shotgun/Sniper) swap 도 timer 보존 — ShouldForceContinuousFire 로 우회.
+	if (bWasFiring && EquippedWeapon && (IsCurrentWeaponFullAutoMode() || ShouldForceContinuousFire()))
 	{
-		if (Combat->HasValidTarget() && EquippedWeapon && IsCurrentWeaponFullAutoMode())
-		{
-			StartContinuousFire();
-		}
-		else
-		{
-			StopContinuousFire();
-		}
+		StartContinuousFire();
+	}
+	else
+	{
+		StopContinuousFire();
 	}
 }
 
@@ -200,12 +203,10 @@ void APDSoldier::HandleTargetChanged(AActor* NewTarget)
 
 	if (!bAutoFireOnAttackRequested) return;
 
-	// 연사 timer 는 Rifle Auto 에서만 사용. 단발/비-Rifle 은 BT 의 RequestAttack 단발 경로로.
-	if (NewTarget && EquippedWeapon && IsCurrentWeaponFullAutoMode())
-	{
-		StartContinuousFire();
-	}
-	else
+	// 발사 시작은 BT task (FireAtTarget / MeleeAttack / PeekFireFromCover) 가 담당.
+	// 본 콜백은 target 소실 시 timer leak 방지용 safety stop 만 수행.
+	// (perception 만으로 자동 발사되던 경로 제거 — combat 상태만으로 자동 사격하지 않음.)
+	if (!NewTarget)
 	{
 		StopContinuousFire();
 	}
@@ -275,10 +276,16 @@ void APDSoldier::StartContinuousFire()
 {
 	UWorld* World = GetWorld();
 	if (!World) return;
-	if (World->GetTimerManager().IsTimerActive(FireTimerHandle)) return;
 
-	// 첫 발은 지연 없이 즉시 시도.
-	OnFireTick();
+	// 이미 timer 가 도는 중이어도 return 하지 않음 — 무기 swap 시 새 weapon FireRate 로 interval 갱신 필요.
+	// 첫 발 즉시 시도는 timer 가 정말 새로 시작될 때만.
+	const bool bAlreadyActive = World->GetTimerManager().IsTimerActive(FireTimerHandle);
+
+	if (!bAlreadyActive)
+	{
+		// 첫 발은 지연 없이 즉시 시도.
+		OnFireTick();
+	}
 
 	// 플레이어 GA_FireAbility 와 동일하게 무기 stat 의 FireRate 사용.
 	// 미설정/0 이면 FireInterval(BP 디폴트) 로 폴백.
@@ -290,6 +297,7 @@ void APDSoldier::StartContinuousFire()
 	}
 	Interval = FMath::Max(Interval, 0.0167f); // 1 프레임 클램프.
 
+	// 같은 handle 로 SetTimer 호출 → 기존 timer 대체. swap 케이스에서 안전한 interval 갱신.
 	World->GetTimerManager().SetTimer(FireTimerHandle, this, &APDSoldier::OnFireTick, Interval, /*bLoop=*/true);
 }
 
@@ -311,7 +319,9 @@ void APDSoldier::OnFireTick()
 	}
 
 	// 무기 교체/FireMode 토글로 더 이상 연사 대상이 아니면 timer 정리 — 단발 경로(HandleAttackRequested)로 위임.
-	if (!IsCurrentWeaponFullAutoMode())
+	// 단, 자식 클래스가 ShouldForceContinuousFire()=true 면 무기 타입 무관 timer 유지 (Elite peek 사격용).
+	// 발사 속도는 무기의 FireRate stat + 무기 내부 cooldown(bCanFire) 가 결정.
+	if (!IsCurrentWeaponFullAutoMode() && !ShouldForceContinuousFire())
 	{
 		PD_SOLDIER_FIRE_LOG("STOP (weapon not full-auto)");
 		StopContinuousFire();

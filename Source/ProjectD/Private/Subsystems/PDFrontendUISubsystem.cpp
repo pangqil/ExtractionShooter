@@ -51,6 +51,8 @@ void UPDFrontendUISubsystem::RegisterRootLayout(UPDRootLayout* InRootLayout)
 				Stack->OnStackChanged.AddUObject(this, &UPDFrontendUISubsystem::HandleAnyStackChanged);
 			}
 		}
+
+		FlushPendingInitialPush();
 	}
 
 	OnEffectiveUIStateChanged.Broadcast(ComputeEffectiveInputMode());
@@ -79,6 +81,42 @@ UPDActivatableBase* UPDFrontendUISubsystem::PushToLayer(EUILayer Layer, TSubclas
 	}
 	UPDWidgetStack* Stack = RootLayout->GetLayerStack(Layer);
 	return Stack ? Stack->Push(ScreenClass) : nullptr;
+}
+
+void UPDFrontendUISubsystem::RequestInitialPush(EUILayer Layer, TSubclassOf<UPDActivatableBase> ScreenClass)
+{
+	if (!ScreenClass)
+	{
+		return;
+	}
+
+	if (RootLayout)
+	{
+		PushToLayer(Layer, ScreenClass);
+		return;
+	}
+
+	PendingInitialPushLayer = Layer;
+	PendingInitialPushClass = ScreenClass;
+	bHasPendingInitialPush = true;
+}
+
+void UPDFrontendUISubsystem::FlushPendingInitialPush()
+{
+	if (!bHasPendingInitialPush || !PendingInitialPushClass)
+	{
+		bHasPendingInitialPush = false;
+		PendingInitialPushClass = nullptr;
+		return;
+	}
+
+	const EUILayer Layer = PendingInitialPushLayer;
+	TSubclassOf<UPDActivatableBase> Class = PendingInitialPushClass;
+
+	bHasPendingInitialPush = false;
+	PendingInitialPushClass = nullptr;
+
+	PushToLayer(Layer, Class);
 }
 
 void UPDFrontendUISubsystem::PopFromLayer(EUILayer Layer)

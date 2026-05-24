@@ -6,7 +6,9 @@
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDStashComponent.h"
+#include "Items/PDItemSoundLibrary.h"
 #include "Weapons/Base/PDWeaponBase.h"
+#include "Components/AudioComponent.h"
 
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
@@ -49,6 +51,7 @@ void UPDQuickSlotComponent::OnRep_ConsumableUseState()
 	if (!bIsUsingConsumable)
 	{
 		RestoreConsumableMoveSpeed();
+		StopConsumableUseSound();
 	}
 }
 
@@ -763,7 +766,7 @@ bool UPDQuickSlotComponent::UseWeaponQuickSlot(int32 SlotIndex, const FPDInvento
 		const EWeaponSlot WeaponSlot = PlayerCharacter->GetSlotForWeaponType(Slot.ItemData.WeaponType);
 		if (APDWeaponBase* Weapon = PlayerCharacter->GetWeaponInSlot(WeaponSlot))
 		{
-			if (Weapon->GetItemID() == Slot.ItemData.ItemID || Weapon->GetWeaponType() == Slot.ItemData.WeaponType)
+			if (Weapon->GetItemID() == Slot.ItemData.ItemID)
 			{
 				PlayerCharacter->SwitchToSlot(WeaponSlot);
 				SetSelectedIndex(SlotIndex);
@@ -806,31 +809,10 @@ bool UPDQuickSlotComponent::EquipWeaponFromInventorySlot(int32 InventorySlotInde
 		return false;
 	}
 
-	// IsEquippedItem(ItemID) 기반 거부 검사 제거 — 같은 모델 두 자루 사이의 스왑 허용.
-	// 인스턴스 식별은 InventorySlotIndex 단계에서 이미 보장됨.
 	const bool bEquipped = EquipmentComponent->EquipItemFromInventoryToSlot(InventoryComponent, InventorySlotIndex, EPDEquipmentSlotType::Weapon);
 	if (!bEquipped)
 	{
 		return false;
-	}
-
-	// 양방향 스왑: equip 이후 InventoryComponent->Items[InventorySlotIndex]에는
-	// 직전 메인 무기가 들어가 있음. 그 항목을 그대로 퀵슬롯에 stamp 해서
-	// 사용자가 같은 키를 다시 누르면 원래 무기로 되돌아오게 만든다.
-	// 인벤토리에 빈 슬롯이 남았다면 (이전 메인이 없었던 경우) 퀵슬롯도 비움.
-	if (QuickSlotItems.IsValidIndex(CooldownSlotIndex) && InventoryComponent->Items.IsValidIndex(InventorySlotIndex))
-	{
-		const FPDInventorySlot& DisplacedSlot = InventoryComponent->Items[InventorySlotIndex];
-		if (DisplacedSlot.IsEmpty()
-			|| DisplacedSlot.ItemData.ItemType != EPDItemType::Equipment
-			|| DisplacedSlot.ItemData.EquipmentSlotType != EPDEquipmentSlotType::Weapon)
-		{
-			QuickSlotItems[CooldownSlotIndex].Clear();
-		}
-		else
-		{
-			QuickSlotItems[CooldownSlotIndex] = DisplacedSlot;
-		}
 	}
 
 	if (QuickSlotItems.IsValidIndex(CooldownSlotIndex))
@@ -884,6 +866,7 @@ bool UPDQuickSlotComponent::BeginConsumableUse(int32 SlotIndex, const FPDInvento
 	ConsumableUseStartTime = World->GetTimeSeconds();
 	ConsumableUseEndTime = ConsumableUseStartTime + Duration;
 
+	StartConsumableUseSound(Slot.ItemData);
 	ApplyConsumableMoveSpeed();
 	World->GetTimerManager().SetTimer(ConsumableUseTimerHandle, this, &UPDQuickSlotComponent::FinishConsumableUse, Duration, false);
 	if (QuickSlotItems.IsValidIndex(SlotIndex))
@@ -910,6 +893,7 @@ void UPDQuickSlotComponent::FinishConsumableUse()
 	ConsumableUseEndTime = 0.f;
 	PendingConsumableSlot.Clear();
 	RestoreConsumableMoveSpeed();
+	StopConsumableUseSound();
 
 	if (ConsumeItem(CompletedSlot))
 	{
@@ -964,6 +948,7 @@ bool UPDQuickSlotComponent::CancelConsumableUse()
 {
 	if (GetOwner() && !GetOwner()->HasAuthority())
 	{
+		StopConsumableUseSound();
 		ServerCancelConsumableUse();
 		return true;
 	}
@@ -987,6 +972,7 @@ bool UPDQuickSlotComponent::CancelConsumableUse()
 	ConsumableUseStartTime = 0.f;
 	ConsumableUseEndTime = 0.f;
 	RestoreConsumableMoveSpeed();
+	StopConsumableUseSound();
 	OnConsumableUseCanceled.Broadcast(CanceledSlotIndex, CanceledItemData);
 	return true;
 }
@@ -1034,6 +1020,24 @@ float UPDQuickSlotComponent::GetWeaponQuickSlotCooldownRemainingTime() const
 
 	const UWorld* World = GetWorld();
 	return World ? FMath::Max(0.f, WeaponCooldownEndTime - World->GetTimeSeconds()) : 0.f;
+}
+
+void UPDQuickSlotComponent::StartConsumableUseSound(const FPDItemData& ItemData)
+{
+	StopConsumableUseSound();
+	ConsumableUseAudioComponent = UPDItemSoundLibrary::SpawnConsumableUseSound(this, ItemData);
+}
+
+void UPDQuickSlotComponent::StopConsumableUseSound()
+{
+	if (!IsValid(ConsumableUseAudioComponent))
+	{
+		ConsumableUseAudioComponent = nullptr;
+		return;
+	}
+
+	ConsumableUseAudioComponent->Stop();
+	ConsumableUseAudioComponent = nullptr;
 }
 
 void UPDQuickSlotComponent::ApplyConsumableMoveSpeed()
