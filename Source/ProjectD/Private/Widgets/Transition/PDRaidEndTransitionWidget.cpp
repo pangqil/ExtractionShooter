@@ -34,7 +34,7 @@ void UPDRaidEndTransitionWidget::Configure(bool bInSuccess,
 		const int32 TotalSeconds = FMath::Max(0, FMath::FloorToInt(RaidDurationSeconds));
 		const int32 Minutes = TotalSeconds / 60;
 		const int32 Seconds = TotalSeconds % 60;
-		Text_RaidDuration->SetText(FText::FromString(FString::Printf(TEXT("%02d:%02d"), Minutes, Seconds)));
+		Text_RaidDuration->SetText(FText::FromString(FString::Printf(TEXT("RAID TIME  %02d:%02d"), Minutes, Seconds)));
 	}
 
 	// Entries 결정: 외부 전달이 비어 있으면 GameState->PlayerArray 로 fallback.
@@ -45,6 +45,22 @@ void UPDRaidEndTransitionWidget::Configure(bool bInSuccess,
 	}
 
 	// Step 4: C++ 가 직접 EntryWidgetClass 로 인스턴싱 + Configure. BP 위임(K2_PopulateEntries) 폐기.
+	// Reveal 은 별도 — Anim_IntroSequence 의 stats reveal 노티파이가 BeginEntryReveals 호출 시점에 발생.
+	EntryWidgets.Reset();
+
+	// PS 이름으로 lookup map 구축 — entry 가 ACK 추적용 PS 받음.
+	TMap<FString, APDPlayerState*> PSByName;
+	if (const AGameStateBase* GSForLookup = GetWorld() ? GetWorld()->GetGameState() : nullptr)
+	{
+		for (APlayerState* PS : GSForLookup->PlayerArray)
+		{
+			if (APDPlayerState* PDPS = Cast<APDPlayerState>(PS))
+			{
+				PSByName.Add(PS->GetPlayerName(), PDPS);
+			}
+		}
+	}
+
 	if (Box_PlayerEntries)
 	{
 		Box_PlayerEntries->ClearChildren();
@@ -62,13 +78,31 @@ void UPDRaidEndTransitionWidget::Configure(bool bInSuccess,
 				if (!Entry) continue;
 
 				Box_PlayerEntries->AddChildToVerticalBox(Entry);
-				const float StaggerDelay = EntryRevealInitialDelay + Index * EntryStaggerInterval;
-				Entry->Configure(ResolvedEntries[Index], StaggerDelay);
+				APDPlayerState* MatchedPS = PSByName.FindRef(ResolvedEntries[Index].PlayerName);
+				Entry->Configure(ResolvedEntries[Index], MatchedPS);
+				EntryWidgets.Add(Entry);
 			}
 		}
 	}
 
 	K2_ApplyAccent(bSuccess ? SuccessAccentColor : FailureAccentColor);
+}
+
+void UPDRaidEndTransitionWidget::BeginEntryReveals()
+{
+	if (EntryWidgets.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("PDRaidEndTransitionWidget::BeginEntryReveals: EntryWidgets 비어있음 (Configure 미호출 또는 entry 0개)."));
+		return;
+	}
+
+	for (int32 Index = 0; Index < EntryWidgets.Num(); ++Index)
+	{
+		UPDPlayerRaidEntryWidget* Entry = EntryWidgets[Index];
+		if (!Entry) continue;
+		const float Delay = Index * EntryStaggerInterval;
+		Entry->PlayRevealAfter(Delay);
+	}
 }
 
 void UPDRaidEndTransitionWidget::BuildFallbackEntries(TArray<FPDPlayerRaidEntryData>& OutEntries) const

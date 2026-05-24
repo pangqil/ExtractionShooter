@@ -41,6 +41,14 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "PD|Transition")
 	void HandleTravelTrigger();
 
+	/**
+	 * Anim_IntroSequence 의 stats reveal 시점 Animation Notify 에서 호출.
+	 * Configure 가 미리 생성해둔 entry 위젯들을 EntryStaggerInterval 간격으로 페이드인.
+	 * BP 가 안 호출하면 entry 들은 영원히 보이지 않음 (의도) — 부재 시 LogTemp Warning.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "PD|Transition")
+	void BeginEntryReveals();
+
 	/** Configure 시점에 BP가 장식 위젯들에 액센트 컬러를 적용하도록 위임. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Transition")
 	void K2_ApplyAccent(FLinearColor AccentColor);
@@ -51,10 +59,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Entries", meta = (ClampMin = "0.0"))
 	float EntryStaggerInterval = 0.8f;
-
-	// 메인 텍스트(탈출 성공/실패) 등장 후 첫 Entry reveal 까지의 추가 지연. 옛 BP PlaySummaryReveal 타이밍 복원.
-	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Entries", meta = (ClampMin = "0.0", ForceUnits = "s"))
-	float EntryRevealInitialDelay = 1.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Success")
 	FLinearColor SuccessAccentColor = FLinearColor(0.357f, 0.753f, 0.922f);
@@ -98,6 +102,10 @@ protected:
 private:
 	/** Entries 가 빈 경우 GameState->PlayerArray 로 fallback 빌드. */
 	void BuildFallbackEntries(TArray<FPDPlayerRaidEntryData>& OutEntries) const;
+
+	// Configure 에서 생성한 entry 위젯 보관. BeginEntryReveals 가 인덱스 기반 stagger 로 reveal.
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UPDPlayerRaidEntryWidget>> EntryWidgets;
 
 	bool bSuccess = false;
 	bool bReadyForInput = false;

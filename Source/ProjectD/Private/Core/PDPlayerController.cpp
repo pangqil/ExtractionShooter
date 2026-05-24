@@ -42,6 +42,7 @@
 #include "Widgets/Transition/PDRaidEndTransitionWidget.h"
 #include "Game/PDRaidStats.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
+#include "Subsystems/PDLoadingScreenSubsystem.h"
 #include "Subsystems/PDQuipSubsystem.h"
 #include "Data/PDQuipDataAsset.h"
 #include "Blueprint/UserWidget.h"
@@ -117,6 +118,29 @@ void APDPlayerController::Client_ShowRaidEndTransition_Implementation(bool bSucc
 	}
 
 	Transition->Configure(bSuccess, Entries, RaidDurationSeconds);
+}
+
+void APDPlayerController::Client_NotifyReviveStarted_Implementation(AActor* Target, float Duration)
+{
+	if (UIManagerComponent)
+	{
+		if (UPDHUDWidget* HUD = UIManagerComponent->GetHUDInstance())
+		{
+			HUD->StartReviveProgress(Target, Duration);
+		}
+	}
+}
+
+void APDPlayerController::Client_NotifyReviveEnded_Implementation(bool bCompleted)
+{
+	if (UIManagerComponent)
+	{
+		if (UPDHUDWidget* HUD = UIManagerComponent->GetHUDInstance())
+		{
+			if (bCompleted) HUD->CompleteReviveProgress();
+			else            HUD->StopReviveProgress();
+		}
+	}
 }
 
 void APDPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -523,6 +547,27 @@ void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+void APDPlayerController::PreClientTravel(const FString& PendingURL, ETravelType TravelType, bool bIsSeamlessTravel)
+{
+	Super::PreClientTravel(PendingURL, TravelType, bIsSeamlessTravel);
+
+	// 클라이언트 머신의 PC만 이 hook으로 LoadingScreen을 띄움.
+	// 호스트(=Authority)는 자기 트래블 시 TravelToLevel에서 이미 ShowImmediate 호출하므로 제외 —
+	// 그렇지 않으면 새 클라이언트 join처럼 호스트 측에 PreClientTravel이 어떤 경로로든 trigger될 때 중복 표시됨.
+	if (!IsLocalController() || HasAuthority())
+	{
+		return;
+	}
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UPDLoadingScreenSubsystem* LSS = GI->GetSubsystem<UPDLoadingScreenSubsystem>())
+		{
+			LSS->ShowImmediate();
+		}
+	}
+}
+
 void APDPlayerController::OnPossess(APawn* InPawn)
 {
 	UnbindInventoryNotifications();
@@ -862,6 +907,12 @@ void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
 		LootWidgetInstance->InitializeLoot(LootSource);
 	}
 
+	// Stash/Market 처럼 InventoryWidget 도 같이 띄움 — Loot 와 인벤 간 드래그/비교 가능.
+	if (UIManagerComponent)
+	{
+		UIManagerComponent->OpenInventoryForLoot();
+	}
+
 	SetGameplayInputBlockedByModalUI(true, LootWidgetInstance);
 }
 
@@ -875,6 +926,12 @@ void APDPlayerController::CloseLootInterface()
 	}
 	LootWidgetInstance = nullptr;
 	ActiveLootComponent.Reset();
+
+	// Loot 위젯과 함께 띄웠던 InventoryWidget 도 해제 (다른 UI 가 유지 안 할 때).
+	if (UIManagerComponent)
+	{
+		UIManagerComponent->CloseInventoryForLoot();
+	}
 
 	if (ClosingLootComponent)
 	{
