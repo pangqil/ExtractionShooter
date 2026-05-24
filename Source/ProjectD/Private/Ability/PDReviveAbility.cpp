@@ -7,7 +7,17 @@
 #include "Animation/AnimMontage.h"
 #include "Characters/Base/PDCharacterBase.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Core/PDPlayerController.h"
+#include "GameFramework/PlayerController.h"
 #include "GameplayTag/PDGameplayTags.h"
+
+namespace
+{
+	APDPlayerController* GetReviverPC(APDCharacterBase* Reviver)
+	{
+		return Reviver ? Cast<APDPlayerController>(Reviver->GetController()) : nullptr;
+	}
+}
 
 UPDReviveAbility::UPDReviveAbility()
 {
@@ -52,6 +62,12 @@ void UPDReviveAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
+	// Reviver 측 클라이언트에 HUD CircularProgress 시작 알림 (Target 위치 추적용).
+	if (APDPlayerController* ReviverPC = GetReviverPC(Reviver))
+	{
+		ReviverPC->Client_NotifyReviveStarted(ReviveTarget, ReviveTarget->GetReviveTime());
+	}
+
 	PlayReviveLoopMontage();
 
 	UAbilityTask_WaitGameplayEvent* CancelEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
@@ -76,6 +92,12 @@ void UPDReviveAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 		{
 			ReviveTarget->CancelReviveInteraction(Reviver);
 		}
+	}
+
+	// Reviver 측 클라이언트에 HUD CircularProgress 종료 알림 (성공/취소 둘 다).
+	if (APDPlayerController* ReviverPC = GetReviverPC(GetPDCharacter()))
+	{
+		ReviverPC->Client_NotifyReviveEnded(!bWasCancelled);
 	}
 
 	StopReviveMontages(bWasCancelled ? 0.1f : 0.15f);
