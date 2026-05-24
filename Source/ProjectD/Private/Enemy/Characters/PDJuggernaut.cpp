@@ -23,7 +23,7 @@
 
 #if ENABLE_DRAW_DEBUG
 // 컨트롤러가 정의한 pd.ai.debugdraw 토글을 보스도 공유 — 처음 호출 시 한 번 찾아 캐시.
-static IConsoleVariable* GetPDAIDebugCVar()
+static IConsoleVariable* GetJuggernautDebugCVar()
 {
 	static IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("pd.ai.debugdraw"));
 	return CVar;
@@ -82,7 +82,7 @@ void APDJuggernaut::Tick(float DeltaSeconds)
 	}
 
 #if ENABLE_DRAW_DEBUG
-	if (const IConsoleVariable* CVar = GetPDAIDebugCVar())
+	if (const IConsoleVariable* CVar = GetJuggernautDebugCVar())
 	{
 		if (CVar->GetInt() != 0)
 		{
