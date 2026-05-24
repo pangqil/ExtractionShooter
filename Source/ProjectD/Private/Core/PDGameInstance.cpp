@@ -1,16 +1,23 @@
 #include "Core/PDGameInstance.h"
 #include "AbilitySystemGlobals.h"
+#include "Core/PDLocalSessionService.h"
 #include "Core/PDSaveGame.h"
+#include "Core/PDSessionService.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Misc/PackageName.h"
 #include "Kismet/GameplayStatics.h"
+#include "Subsystems/PDLoadingScreenSubsystem.h"
 
 void UPDGameInstance::Init()
 {
 	Super::Init();
 	UAbilitySystemGlobals::Get().InitGlobalData();
 	LoadFromDisk();
+
+	const TSubclassOf<UPDSessionService> ResolvedClass =
+		SessionServiceClass ? SessionServiceClass : TSubclassOf<UPDSessionService>(UPDLocalSessionService::StaticClass());
+	ActiveSessionService = NewObject<UPDSessionService>(this, ResolvedClass);
 }
 
 void UPDGameInstance::SetPlayerData(const FPDPlayerData& InData)
@@ -189,14 +196,31 @@ void UPDGameInstance::TravelToLevel(TSoftObjectPtr<UWorld> Level, bool bMarkBase
 		return;
 	}
 
-	if (World->GetNetMode() != NM_Standalone)
+	// 호스트 측 LoadingScreen을 viewport에 즉시 추가.
+	// (클라이언트 측은 APDPlayerController::PreClientTravel에서 자동 처리)
+	if (UPDLoadingScreenSubsystem* LSS = GetSubsystem<UPDLoadingScreenSubsystem>())
 	{
-		const FString LevelPackageName = FPackageName::ObjectPathToPackageName(Level.ToSoftObjectPath().ToString());
-		World->ServerTravel(LevelPackageName);
-		return;
+		LSS->ShowImmediate();
 	}
 
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, Level);
+	// 한 프레임 지연 후 실제 트래블 — LoadingScreen이 먼저 렌더된 뒤 ServerTravel/OpenLevel cleanup이 시작되도록.
+	// 즉시 ServerTravel을 호출하면 같은 프레임에 게임 스레드가 cleanup으로 점유되어 LoadingScreen이 한 프레임도 안 보임.
+	World->GetTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateWeakLambda(this, [this, Level]()
+		{
+			UWorld* W = GetWorld();
+			if (!W) return;
+
+			if (W->GetNetMode() != NM_Standalone)
+			{
+				const FString LevelPackageName = FPackageName::ObjectPathToPackageName(Level.ToSoftObjectPath().ToString());
+				W->ServerTravel(LevelPackageName);
+			}
+			else
+			{
+				UGameplayStatics::OpenLevelBySoftObjectPtr(this, Level);
+			}
+		}));
 }
 
 bool UPDGameInstance::ConsumePendingResetToBase()

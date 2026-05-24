@@ -6,6 +6,7 @@
 #include "PDGameInstance.generated.h"
 
 class APlayerController;
+class UPDSessionService;
 
 UCLASS()
 class PROJECTD_API UPDGameInstance : public UGameInstance
@@ -91,8 +92,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Levels")
 	TSoftObjectPtr<UWorld> GetBaseLevel() const { return BaseLevel; }
 
+	UFUNCTION(BlueprintPure, Category = "PD|Levels")
+	TSoftObjectPtr<UWorld> GetLobbyLevel() const { return LobbyLevel; }
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Levels")
 	bool ConsumePendingResetToBase();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Session")
+	UPDSessionService* GetSessionService() const { return ActiveSessionService; }
 
 protected:
 	UPROPERTY()
@@ -104,6 +111,16 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Levels")
 	TSoftObjectPtr<UWorld> BaseLevel;
+
+	/** 호스트가 listen 모드로 띄울 LobbyLevel 자산. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Levels")
+	TSoftObjectPtr<UWorld> LobbyLevel;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Session")
+	TSubclassOf<UPDSessionService> SessionServiceClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDSessionService> ActiveSessionService;
 
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Levels")
 	bool bPendingResetToBase = false;
