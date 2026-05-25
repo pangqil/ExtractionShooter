@@ -89,8 +89,14 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientOpenStashInterface(UPDStashComponent* StashSource);
 
+	UFUNCTION(Client, Reliable)
+	void ClientCloseStashInterface(UPDStashComponent* StashSource);
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void CloseStashInterface();
+
+	UFUNCTION(Server, Reliable)
+	void ServerNotifyStashInterfaceClosed(UPDStashComponent* StashSource);
 
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	bool IsStashInterfaceOpen() const;
@@ -303,6 +309,9 @@ protected:
 public:
 
 	void AddRecoilOffset(float YawDelta);
+
+	UFUNCTION(Client, Unreliable)
+	void ClientAddRecoilOffset(float YawDelta);
 
 	FORCEINLINE float GetRecoilYawOffset() const { return RecoilYawOffset; }
 	bool GetRecoiledHitResult(ECollisionChannel TraceChannel, bool bTraceComplex, FHitResult& OutHit) const;

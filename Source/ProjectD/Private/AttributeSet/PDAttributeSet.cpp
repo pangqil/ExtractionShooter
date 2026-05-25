@@ -165,6 +165,12 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 	AActor* OwnerActor = GetOwningActor();
 	const bool bHasAuthority = OwnerActor && OwnerActor->HasAuthority();
 
+	if (Data.EvaluatedData.Attribute == GetStaminaAttribute())
+	{
+		SetStamina(FMath::Clamp(GetStamina(), 0.f, GetMaxStamina()));
+		return;
+	}
+
 	if (Data.EvaluatedData.Attribute==GetDamageAttribute())
 	{
 		const float LocalDamage=GetDamage();
@@ -236,8 +242,14 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		}
 
 		const float OldHP=GetHPByPart(Part);
-		const float NewHP=FMath::Max(GetHPByPart(Part)-LocalDamage, 0.f);
-		SetHPByPart(Part, NewHP);
+		const float DamageToPart = FMath::Min(LocalDamage, OldHP);
+		const float OverflowDamage = LocalDamage - DamageToPart;
+		SetHPByPart(Part, FMath::Max(OldHP - DamageToPart, 0.f));
+
+		if (Part != EBodyPart::Torso && OverflowDamage > 0.f)
+		{
+			SetTorsoHP(FMath::Max(GetTorsoHP() - OverflowDamage, 0.f));
+		}
 
 		if (APDCharacterBase* Owner=Cast<APDCharacterBase>(OwnerActor))
 		{
