@@ -99,6 +99,7 @@ void UPDCircularProgressWidget::StartProgress(float InDuration)
 	SetProgressScalar(0.f);
 	UpdateRemainingText(Duration);
 	RefreshCancelHint();
+	RefreshCenterKeyIcon();
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
@@ -128,6 +129,7 @@ void UPDCircularProgressWidget::StartExternalDriven()
 
 	SetProgressScalar(0.f);
 	RefreshCancelHint();
+	RefreshCenterKeyIcon();
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 

@@ -210,6 +210,9 @@ void UPDLoadingScreenSubsystem::HideLoadingScreen()
 	OnLoadingReasonUpdated.RemoveDynamic(ActiveWidget, &UPDLoadingScreenWidget::HandleLoadingReasonUpdated);
 
 	ActiveWidget = nullptr;
+
+	// 로딩스크린 제거 완료 → 후속 연출(트랜지션) 시작 신호.
+	OnLoadingScreenHidden.Broadcast();
 }
 
 bool UPDLoadingScreenSubsystem::ShouldDisplayInCurrentEnvironment() const

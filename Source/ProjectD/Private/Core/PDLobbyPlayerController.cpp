@@ -3,6 +3,7 @@
 
 #include "Core/PDLobbyPlayerController.h"
 
+#include "Core/PDLobbyGameState.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
 #include "Type/Types.h"
 #include "Widgets/PDActivatableBase.h"
@@ -19,5 +20,16 @@ void APDLobbyPlayerController::BeginPlay()
 	if (UPDFrontendUISubsystem* Subsystem = UPDFrontendUISubsystem::Get(this))
 	{
 		Subsystem->RequestInitialPush(EUILayer::Frontend, LobbyScreenClass);
+	}
+}
+
+void APDLobbyPlayerController::Server_SetRoomJoined_Implementation(bool bJoined)
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (APDLobbyGameState* GS = World->GetGameState<APDLobbyGameState>())
+		{
+			GS->SetPlayerJoined(PlayerState, bJoined);
+		}
 	}
 }

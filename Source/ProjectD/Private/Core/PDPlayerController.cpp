@@ -42,6 +42,7 @@
 #include "Widgets/PDRootLayout.h"
 #include "Widgets/PDNotificationWidget.h"
 #include "Widgets/Transition/PDRaidEndTransitionWidget.h"
+#include "Widgets/Transition/PDRaidStartTransitionWidget.h"
 #include "Game/PDRaidStats.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
 #include "Subsystems/PDLoadingScreenSubsystem.h"
@@ -120,6 +121,57 @@ void APDPlayerController::Client_ShowRaidEndTransition_Implementation(bool bSucc
 	}
 
 	Transition->Configure(bSuccess, Entries, RaidDurationSeconds);
+}
+
+void APDPlayerController::Client_ShowRaidStartTransition_Implementation(const FText& ZoneName)
+{
+	// PostLogin 시점 push 라 RootLayout 등록 전에 도착할 수 있음 → 준비될 때까지 재시도.
+	PendingRaidStartZoneName = ZoneName;
+	bHasPendingRaidStartTransition = true;
+	RaidStartTransitionRetryCount = 0;
+	TryShowRaidStartTransition();
+}
+
+void APDPlayerController::TryShowRaidStartTransition()
+{
+	if (!bHasPendingRaidStartTransition) return;
+
+	if (!RaidStartTransitionClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("RaidStartTransition: RaidStartTransitionClass 미할당 (PC=%s)"), *GetName());
+		bHasPendingRaidStartTransition = false;
+		return;
+	}
+
+	UPDFrontendUISubsystem* Subsystem = UPDFrontendUISubsystem::Get(this);
+	const bool bUIReady = Subsystem && Subsystem->GetRootLayout();
+
+	// RootLayout 준비되면 즉시 push — 로딩스크린이 떠 있어도 OK (위젯이 검정을 그 밑에 미리 깔고,
+	// 로딩스크린 내려가는 순간 조립 시작하므로 raw 맵 노출 갭이 없음). 로딩스크린 대기는 위젯이 담당.
+	if (!bUIReady)
+	{
+		if (++RaidStartTransitionRetryCount > 50)
+		{
+			UE_LOG(LogPDCharacter, Warning, TEXT("RaidStartTransition: UI 준비 안 됨, 재시도 포기 (PC=%s)"), *GetName());
+			bHasPendingRaidStartTransition = false;
+			return;
+		}
+		GetWorldTimerManager().SetTimer(
+			RaidStartTransitionRetryHandle, this, &APDPlayerController::TryShowRaidStartTransition, 0.1f, false);
+		return;
+	}
+
+	UPDActivatableBase* Pushed = Subsystem->PushToLayer(EUILayer::Modal, RaidStartTransitionClass);
+	UPDRaidStartTransitionWidget* Transition = Cast<UPDRaidStartTransitionWidget>(Pushed);
+	if (!Transition)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("RaidStartTransition: PushToLayer 실패 또는 캐스트 실패 (PC=%s)"), *GetName());
+		bHasPendingRaidStartTransition = false;
+		return;
+	}
+
+	Transition->Configure(PendingRaidStartZoneName);
+	bHasPendingRaidStartTransition = false;
 }
 
 void APDPlayerController::Client_NotifyReviveStarted_Implementation(AActor* Target, float Duration)

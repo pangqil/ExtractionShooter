@@ -68,6 +68,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UWidgetSwitcher> Switcher_Content;
 
+	/** 화면 타이틀(레퍼런스의 "LOADOUT" 등). 활성 탭의 Label로 자동 채움. 없으면 무시. */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TXT_ScreenTitle;
+
 	/** 풋터 영역의 활성 탭 설명 텍스트. DA entry의 Description으로 자동 채움. 없으면 무시. */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TXT_Description;

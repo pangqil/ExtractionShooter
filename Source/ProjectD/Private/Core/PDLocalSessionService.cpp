@@ -5,6 +5,7 @@
 
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/PackageName.h"
 
 void UPDLocalSessionService::HostSession(int32 MaxPlayers, TSoftObjectPtr<UWorld> LobbyLevel)
 {
@@ -43,5 +44,39 @@ void UPDLocalSessionService::JoinSession(APlayerController* LocalPC)
 
 void UPDLocalSessionService::DestroySession()
 {
+	OnDestroyComplete.Broadcast(true);
+}
+
+void UPDLocalSessionService::LeaveSession(APlayerController* LocalPC, TSoftObjectPtr<UWorld> FallbackLevel)
+{
+	if (FallbackLevel.IsNull())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UPDLocalSessionService::LeaveSession: FallbackLevel is not set"));
+		OnDestroyComplete.Broadcast(false);
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		OnDestroyComplete.Broadcast(false);
+		return;
+	}
+
+	if (World->GetNetMode() == NM_Client)
+	{
+		// 클라: 서버 연결을 끊고 자기 머신만 메인 메뉴로.
+		if (LocalPC)
+		{
+			const FString URL = FPackageName::ObjectPathToPackageName(FallbackLevel.ToSoftObjectPath().ToString());
+			LocalPC->ClientTravel(URL, TRAVEL_Absolute);
+		}
+	}
+	else
+	{
+		// 호스트(listen/standalone): 방을 닫고 메인 메뉴로. 남은 클라는 연결이 끊김.
+		UGameplayStatics::OpenLevelBySoftObjectPtr(World, FallbackLevel);
+	}
+
 	OnDestroyComplete.Broadcast(true);
 }
