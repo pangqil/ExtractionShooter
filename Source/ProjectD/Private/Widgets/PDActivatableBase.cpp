@@ -37,7 +37,7 @@ void UPDActivatableBase::NativeOnActivated()
 {
 	// UIOnly(Menu) 화면은 ESC 등 키 입력을 직접 받아야 하므로 활성 시 키보드 포커스를 가져온다.
 	// GameAndMenu/Game은 게임 입력 유지를 위해 포커스를 강제하지 않는다.
-	if (InputMode == EWidgetInputMode::Menu)
+	if (InputMode == EWidgetInputMode::Menu || InputMode == EWidgetInputMode::Cinematic)
 	{
 		SetIsFocusable(true);
 		if (APlayerController* PC = GetOwningPlayer())
@@ -153,6 +153,14 @@ void UPDActivatableBase::ApplyInputMode()
 			Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 			PC->SetInputMode(Mode);
 			PC->SetShowMouseCursor(bShowMouseCursor);
+			break;
+		}
+	case EWidgetInputMode::Cinematic:
+		{
+			FInputModeUIOnly Mode;
+			Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			PC->SetInputMode(Mode);
+			PC->SetShowMouseCursor(false);
 			break;
 		}
 	case EWidgetInputMode::Passive:

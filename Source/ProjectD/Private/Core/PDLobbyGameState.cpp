@@ -11,6 +11,7 @@ void APDLobbyGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(APDLobbyGameState, LobbyVersion);
 	DOREPLIFETIME(APDLobbyGameState, HostPlayerState);
+	DOREPLIFETIME(APDLobbyGameState, JoinedPlayers);
 }
 
 void APDLobbyGameState::AddPlayerState(APlayerState* PlayerState)
@@ -35,6 +36,37 @@ void APDLobbyGameState::RemovePlayerState(APlayerState* PlayerState)
 	Super::RemovePlayerState(PlayerState);
 
 	if (HasAuthority())
+	{
+		// 연결이 끊긴 플레이어는 입장 목록에서도 제거.
+		JoinedPlayers.Remove(PlayerState);
+
+		++LobbyVersion;
+		OnLobbyPlayersChanged.Broadcast();
+	}
+}
+
+void APDLobbyGameState::SetPlayerJoined(APlayerState* PlayerState, bool bJoined)
+{
+	if (!HasAuthority() || !PlayerState)
+	{
+		return;
+	}
+
+	bool bChanged = false;
+	if (bJoined)
+	{
+		if (!JoinedPlayers.Contains(PlayerState))
+		{
+			JoinedPlayers.Add(PlayerState);
+			bChanged = true;
+		}
+	}
+	else
+	{
+		bChanged = JoinedPlayers.Remove(PlayerState) > 0;
+	}
+
+	if (bChanged)
 	{
 		++LobbyVersion;
 		OnLobbyPlayersChanged.Broadcast();

@@ -8,9 +8,18 @@
 #include "AttributeSet/PDAttributeSet.h"
 #include "Characters/Base/PDCharacterBase.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Core/PDPlayerController.h"
 #include "GameplayEffect.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "UObject/ConstructorHelpers.h"
+
+namespace
+{
+	APDPlayerController* GetReviverPC(APDCharacterBase* Reviver)
+	{
+		return Reviver ? Cast<APDPlayerController>(Reviver->GetController()) : nullptr;
+	}
+}
 
 UGA_ReviveAbility::UGA_ReviveAbility()
 {
@@ -81,6 +90,13 @@ void UGA_ReviveAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	const float ReviveDuration = GetReviveDuration();
 	ReviveTarget->BeginReviveDisplay(Reviver, ReviveDuration);
 
+	// Reviver 측 클라이언트에 HUD CircularProgress(WBP_ReviveProgress) 시작 알림.
+	// 위젯은 ReviveTarget 위치를 따라다니므로 Target 동봉.
+	if (APDPlayerController* ReviverPC = GetReviverPC(Reviver))
+	{
+		ReviverPC->Client_NotifyReviveStarted(ReviveTarget, ReviveDuration);
+	}
+
 	PlayReviveLoopMontage();
 
 	UAbilityTask_WaitGameplayEvent* CancelEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
@@ -104,6 +120,15 @@ void UGA_ReviveAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	if (ReviveTarget && ReviveTarget->HasAuthority())
 	{
 		ReviveTarget->ClearReviveDisplay();
+	}
+
+	// Reviver 측 클라이언트에 HUD CircularProgress 종료 알림 (성공/취소 둘 다). 서버에서만 발사.
+	if (ReviverCharacter && ReviverCharacter->HasAuthority())
+	{
+		if (APDPlayerController* ReviverPC = GetReviverPC(ReviverCharacter))
+		{
+			ReviverPC->Client_NotifyReviveEnded(!bWasCancelled);
+		}
 	}
 
 	StopReviveMontages(bWasCancelled ? 0.1f : 0.15f);

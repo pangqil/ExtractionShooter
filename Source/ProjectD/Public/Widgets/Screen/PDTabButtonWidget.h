@@ -11,6 +11,7 @@ class UImage;
 class UTexture2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPDTabButtonClicked, FGameplayTag, TabId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPDTabSelectionChanged, FGameplayTag, TabId, bool, bIsSelected);
 
 /**
  * 탭 한 개의 버튼 위젯. TabbedScreenBase가 DA를 순회하며 인스턴스를 생성/구성한다.
@@ -36,6 +37,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "PD|Tab")
 	FOnPDTabButtonClicked OnTabButtonClicked;
+
+	/** 선택 상태가 바뀔 때 broadcast. 외부 위젯(Hub/사이드패널 등)이 이벤트 그래프에서 구독 가능. */
+	UPROPERTY(BlueprintAssignable, Category = "PD|Tab")
+	FOnPDTabSelectionChanged OnSelectionChanged;
 
 protected:
 	virtual void NativeConstruct() override;

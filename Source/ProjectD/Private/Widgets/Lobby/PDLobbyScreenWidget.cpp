@@ -8,9 +8,11 @@
 #include "Components/VerticalBox.h"
 #include "Core/PDGameInstance.h"
 #include "Core/PDLobbyGameState.h"
-#include "Core/PDSessionService.h"
+#include "Core/PDLobbyPlayerController.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "Subsystems/PDFrontendUISubsystem.h"
+#include "Type/Types.h"
 #include "Widgets/Lobby/PDLobbyPlayerEntryWidget.h"
 
 void UPDLobbyScreenWidget::NativeOnActivated()
@@ -28,21 +30,52 @@ void UPDLobbyScreenWidget::NativeOnActivated()
 
 	ApplyHostState();
 
-	if (UWorld* World = GetWorld())
+	AttemptBindGameState();
+
+	// 방 화면에 진입 → 서버에 입장 등록 (PlayerArray=연결된 전원과 구분되는 "입장" 상태).
+	if (APDLobbyPlayerController* LPC = Cast<APDLobbyPlayerController>(GetOwningPlayer()))
 	{
-		if (AGameStateBase* GS = World->GetGameState())
-		{
-			BindToLobbyGameState(Cast<APDLobbyGameState>(GS));
-		}
-		else
-		{
-			GameStateSetHandle = World->GameStateSetEvent.AddUObject(this, &UPDLobbyScreenWidget::HandleGameStateSet);
-		}
+		LPC->Server_SetRoomJoined(true);
 	}
+}
+
+void UPDLobbyScreenWidget::AttemptBindGameState()
+{
+	if (BoundGameState.IsValid())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// 클라이언트에서 GameState가 늦게 도착하거나(=null) 막 도착해 타입 매칭이 될 때까지 재시도.
+	if (APDLobbyGameState* LobbyGS = World->GetGameState<APDLobbyGameState>())
+	{
+		BindToLobbyGameState(LobbyGS);
+		return;
+	}
+
+	// GameStateSetEvent(아직 set 전) + 폴링(이미 set됐으나 타입/타이밍 어긋남) 양쪽 대비.
+	if (!GameStateSetHandle.IsValid())
+	{
+		GameStateSetHandle = World->GameStateSetEvent.AddUObject(this, &UPDLobbyScreenWidget::HandleGameStateSet);
+	}
+	World->GetTimerManager().SetTimer(
+		BindRetryHandle, this, &UPDLobbyScreenWidget::AttemptBindGameState, 0.25f, false);
 }
 
 void UPDLobbyScreenWidget::NativeOnDeactivated()
 {
+	// 방 화면 이탈 → 서버에 입장 해제.
+	if (APDLobbyPlayerController* LPC = Cast<APDLobbyPlayerController>(GetOwningPlayer()))
+	{
+		LPC->Server_SetRoomJoined(false);
+	}
+
 	if (Button_StartGame)
 	{
 		Button_StartGame->OnClicked.RemoveDynamic(this, &UPDLobbyScreenWidget::HandleStartGameClicked);
@@ -65,6 +98,7 @@ void UPDLobbyScreenWidget::NativeOnDeactivated()
 			World->GameStateSetEvent.Remove(GameStateSetHandle);
 			GameStateSetHandle.Reset();
 		}
+		World->GetTimerManager().ClearTimer(BindRetryHandle);
 	}
 
 	Super::NativeOnDeactivated();
@@ -100,18 +134,11 @@ void UPDLobbyScreenWidget::HandleStartGameClicked()
 
 void UPDLobbyScreenWidget::HandleLeaveClicked()
 {
-	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
-	if (!GI)
+	// 방에서 나가 PlayModeSelect로 복귀(레이어 pop).
+	if (UPDFrontendUISubsystem* Sub = UPDFrontendUISubsystem::Get(this))
 	{
-		return;
+		Sub->PopFromLayer(EUILayer::Frontend);
 	}
-	UPDSessionService* Service = GI->GetSessionService();
-	if (!Service)
-	{
-		return;
-	}
-
-	Service->LeaveSession(GetOwningPlayer(), GI->GetStartupLevel());
 }
 
 void UPDLobbyScreenWidget::HandleGameStateSet(AGameStateBase* NewGameState)
@@ -136,6 +163,18 @@ void UPDLobbyScreenWidget::BindToLobbyGameState(APDLobbyGameState* LobbyGS)
 
 	BoundGameState = LobbyGS;
 	LobbyGS->OnLobbyPlayersChanged.AddDynamic(this, &UPDLobbyScreenWidget::HandleLobbyPlayersChanged);
+
+	// 바인딩 성공 → 재시도 타이머/GameStateSet 폴백 정리.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BindRetryHandle);
+		if (GameStateSetHandle.IsValid())
+		{
+			World->GameStateSetEvent.Remove(GameStateSetHandle);
+			GameStateSetHandle.Reset();
+		}
+	}
+
 	RefreshPlayerList();
 }
 
@@ -159,9 +198,9 @@ void UPDLobbyScreenWidget::RefreshPlayerList()
 
 	VerticalBox_PlayerList->ClearChildren();
 
-	// 유효 참가자만 추려냄.
+	// 연결된 전원(PlayerArray)이 아니라 방에 "입장한" 플레이어만 표시.
 	TArray<APlayerState*> ValidPlayers;
-	for (APlayerState* PS : GS->PlayerArray)
+	for (const TObjectPtr<APlayerState>& PS : GS->GetJoinedPlayers())
 	{
 		if (PS && !PS->IsInactive())
 		{

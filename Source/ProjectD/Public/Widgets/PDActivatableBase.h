@@ -14,7 +14,8 @@ enum class EWidgetInputMode : uint8
 	Game        UMETA(DisplayName = "Game Only"),       // 게임 입력 그대로
 	GameAndMenu UMETA(DisplayName = "Game And Menu"),   // HUD 위에 떠도 게임 계속
 	Menu        UMETA(DisplayName = "Menu Only"),       // 인벤토리/맵 — 게임 입력 차단, 마우스 노출
-	Passive     UMETA(DisplayName = "Passive")          // 입력 모드/커서 상태를 건드리지 않음
+	Passive     UMETA(DisplayName = "Passive"),         // 입력 모드/커서 상태를 건드리지 않음
+	Cinematic   UMETA(DisplayName = "Cinematic")        // 연출 — 게임 입력 차단 + 커서 숨김 (트랜지션/컷신)
 };
 
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))

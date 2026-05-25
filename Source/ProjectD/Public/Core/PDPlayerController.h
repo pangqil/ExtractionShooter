@@ -297,6 +297,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI|Transition")
 	TSubclassOf<UPDRaidStartTransitionWidget> RaidStartTransitionClass;
 
+	// 진입 연출 push 재시도 — PostLogin 시점 RPC 가 RootLayout 등록 전 도착할 수 있어 UI 준비까지 대기.
+	void TryShowRaidStartTransition();
+	FText PendingRaidStartZoneName;
+	FTimerHandle RaidStartTransitionRetryHandle;
+	int32 RaidStartTransitionRetryCount = 0;
+	bool bHasPendingRaidStartTransition = false;
+
 	/** Quip(캐릭터 멘트) 데이터. UPDQuipSubsystem에 주입되어 태그→Line 라우팅에 사용. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSoftObjectPtr<UPDQuipDataAsset> QuipDataAsset;

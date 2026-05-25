@@ -53,6 +53,14 @@ UWidget* UPDPlayModeSelectScreenWidget::GetDesiredFocusTarget_Implementation() c
 
 void UPDPlayModeSelectScreenWidget::HandleHostClicked()
 {
+	// PIE Listen Server 등 이미 연결된 상태 → 세션 작업 불필요, 방 화면으로 전환만.
+	if (IsAlreadyConnected())
+	{
+		PushLobbyScreen();
+		return;
+	}
+
+	// Standalone(빌드/Steam) → 실제 호스팅.
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
 	if (!GI)
 	{
@@ -70,6 +78,13 @@ void UPDPlayModeSelectScreenWidget::HandleHostClicked()
 
 void UPDPlayModeSelectScreenWidget::HandleJoinClicked()
 {
+	// 이미 연결된 상태(Client) → 방 화면으로 전환만.
+	if (IsAlreadyConnected())
+	{
+		PushLobbyScreen();
+		return;
+	}
+
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
 	if (!GI)
 	{
@@ -90,5 +105,25 @@ void UPDPlayModeSelectScreenWidget::HandleBackClicked()
 	if (UPDFrontendUISubsystem* Sub = UPDFrontendUISubsystem::Get(this))
 	{
 		Sub->PopFromLayer(EUILayer::Frontend);
+	}
+}
+
+bool UPDPlayModeSelectScreenWidget::IsAlreadyConnected() const
+{
+	const UWorld* World = GetWorld();
+	return World && World->GetNetMode() != NM_Standalone;
+}
+
+void UPDPlayModeSelectScreenWidget::PushLobbyScreen()
+{
+	if (!LobbyScreenClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UPDPlayModeSelectScreenWidget: LobbyScreenClass not set"));
+		return;
+	}
+
+	if (UPDFrontendUISubsystem* Sub = UPDFrontendUISubsystem::Get(this))
+	{
+		Sub->PushToLayer(EUILayer::Frontend, LobbyScreenClass);
 	}
 }

@@ -44,6 +44,7 @@ void UPDTabButtonWidget::SetSelected(bool bInSelected)
 	}
 	bSelected = bInSelected;
 	BP_OnSelectionChanged(bSelected);
+	OnSelectionChanged.Broadcast(TabId, bSelected);
 }
 
 void UPDTabButtonWidget::NativeConstruct()

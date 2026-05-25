@@ -12,6 +12,7 @@ class UTexture2D;
 struct FWorldContext;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnLoadingReasonUpdated, const FText&, NewReason);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPDOnLoadingScreenHidden);
 
 UCLASS()
 class PROJECTD_API UPDLoadingScreenSubsystem : public UGameInstanceSubsystem, public FTickableGameObject
@@ -44,8 +45,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|LoadingScreen")
 	void ShowImmediate();
 
+	/** 로딩스크린이 현재 viewport 에 떠 있는지 (Hold 구간 포함). 트랜지션 등 후속 연출 타이밍 게이트용. */
+	UFUNCTION(BlueprintPure, Category = "PD|LoadingScreen")
+	bool IsLoadingScreenActive() const { return ActiveWidget != nullptr; }
+
 	UPROPERTY(BlueprintAssignable, Category = "PD|LoadingScreen")
 	FPDOnLoadingReasonUpdated OnLoadingReasonUpdated;
+
+	// 로딩스크린이 viewport 에서 제거되는 순간 발화 (Hold 종료 → HideLoadingScreen). 후속 연출 시작 트리거.
+	UPROPERTY(BlueprintAssignable, Category = "PD|LoadingScreen")
+	FPDOnLoadingScreenHidden OnLoadingScreenHidden;
 
 private:
 	void HandlePreLoadMapWithContext(const FWorldContext& WorldContext, const FString& MapName);

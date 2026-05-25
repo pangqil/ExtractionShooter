@@ -19,6 +19,9 @@ public:
 
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 
+	// seamless travel 시 PostLogin 미발화 → 트래블 플레이어에 트랜지션 push + AutoStart 디바운스 동일 처리.
+	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
+
 	UFUNCTION(BlueprintCallable, Category="PD|Raid")
 	void StartRaid();
 
@@ -33,6 +36,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="PD|Raid")
 	void EndRaid(bool bSuccess);
+
+	// ─── 디버그 전용: 호스트가 즉시 라이드 종료 강제 (전원 일괄 처리 + EndRaid + 트래블) ───
+	// 성공: 전원 추출 처리 → 인벤토리 stash 이체(유지). 실패: 전원 사망 처리 → 인벤토리 드롭(소실).
+	UFUNCTION(BlueprintCallable, Category="PD|Raid|Debug")
+	void DebugForceRaidSuccess();
+
+	UFUNCTION(BlueprintCallable, Category="PD|Raid|Debug")
+	void DebugForceRaidFail();
 
 	void OnPlayerDied(APlayerController* PC, AActor* Killer);
 	FORCEINLINE ERaidState GetRaidState() { return CurrentRaidState; }
@@ -126,6 +137,10 @@ private:
 	bool bRaidStarted = false;
 	FTimerHandle AutoStartDebounceHandle;
 	void HandleAutoStartDebounceFired();
+
+	// PostLogin / HandleSeamlessTravelPlayer 공용 — 디바운스 무장 + 트랜지션 push.
+	void ArmAutoStartDebounce(APlayerController* ContextPC);
+	void PushRaidStartTransitionTo(APlayerController* PC);
 
 	// 현재 맵이 AutoStartRaidLevels 화이트리스트에 있는지. PIE prefix 제거 후 비교.
 	bool IsCurrentMapAutoStartEnabled() const;

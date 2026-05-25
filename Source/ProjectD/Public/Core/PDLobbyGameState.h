@@ -31,12 +31,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Lobby")
 	APlayerState* GetHostPlayerState() const { return HostPlayerState; }
 
+	/** 방 화면(LobbyScreen)에 실제로 입장한 플레이어만. PlayerArray(=연결된 전원)와 구분.
+	 *  PIE Listen Server는 전원이 자동 연결되므로, 방에 들어온 사람만 집계하려면 이 목록을 본다. */
+	const TArray<TObjectPtr<APlayerState>>& GetJoinedPlayers() const { return JoinedPlayers; }
+
+	/** 서버 전용. LobbyScreen 진입/이탈 시 PC의 ServerRPC를 통해 호출. */
+	void SetPlayerJoined(APlayerState* PlayerState, bool bJoined);
+
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_LobbyVersion)
 	int32 LobbyVersion = 0;
 
 	UPROPERTY(Replicated)
 	TObjectPtr<APlayerState> HostPlayerState;
+
+	UPROPERTY(Replicated)
+	TArray<TObjectPtr<APlayerState>> JoinedPlayers;
 
 	UFUNCTION()
 	void OnRep_LobbyVersion();
