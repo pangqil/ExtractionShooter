@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
 #include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
+#include "Enemy/Characters/PDJuggernautMissile.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
@@ -133,6 +134,7 @@ void APDJuggernaut::OnEnterState_Dead()
 		TM.ClearTimer(PatternChargeHandle);
 		TM.ClearTimer(Pattern1FireHandle);
 		TM.ClearTimer(Pattern2LaunchHandle);
+		TM.ClearTimer(Pattern2LaunchFallbackHandle);
 	}
 
 	Pattern2PendingImpacts.Reset();
@@ -510,6 +512,7 @@ void APDJuggernaut::EndPattern()
 	TM.ClearTimer(PatternChargeHandle);
 	TM.ClearTimer(Pattern1FireHandle);
 	TM.ClearTimer(Pattern2LaunchHandle);
+	TM.ClearTimer(Pattern2LaunchFallbackHandle);
 	Pattern2PendingImpacts.Reset();
 
 	bIsExecutingPattern = false;
@@ -544,21 +547,55 @@ void APDJuggernaut::StartPattern2(AActor* Target)
 	StopContinuousFire();
 
 	Pattern2LaunchedCount = 0;
-	Pattern2HatchIndex = 0;
+	Pattern2VolleyIndex = 0;
 	Pattern2PendingImpacts.Reset();
 
+	// 런처 애님 재생(모든 머신). 발사각 도달 프레임의 PDJuggernautLaunchNotify 가 OnPattern2LaunchNotify 호출 → 발사 시작.
 	Multicast_OnPattern2Begin(Target);
 
-	// 첫 발 즉시 + 이후 stagger 발사.
-	Pattern2LaunchTick();
+	// 안전망: 애님/노티파이 미설정(또는 데디서버 노티파이 미발화) 시 발사가 안 시작돼 패턴이 안 끝나는 소프트락 방지.
+	GetWorldTimerManager().SetTimer(Pattern2LaunchFallbackHandle, this,
+		&APDJuggernaut::OnPattern2LaunchNotify, FMath::Max(Pattern2LaunchFallbackDelay, 0.1f), /*bLoop=*/false);
+}
+
+void APDJuggernaut::OnPattern2LaunchNotify()
+{
+	// 발사 게임플레이는 서버 전용(노티파이는 모든 머신에서 발화하므로 가드 필수).
+	if (!HasAuthority()) return;
+	if (CurrentPattern != EPDJuggernautPattern::Annihilate || !bIsExecutingPattern) return;
+	if (Pattern2LaunchedCount > 0) return;   // 이미 시작됨 — 노티파이/폴백 중복 무시.
+
+	GetWorldTimerManager().ClearTimer(Pattern2LaunchFallbackHandle);
+
+	// 첫 볼리 즉시 + 이후 볼리 stagger 발사(볼리 = 짝지은 해치 동시 발사).
+	Pattern2LaunchVolley();
 	if (Pattern2LaunchedCount < Pattern2MissileCount)
 	{
 		GetWorldTimerManager().SetTimer(Pattern2LaunchHandle, this,
-			&APDJuggernaut::Pattern2LaunchTick, FMath::Max(Pattern2LaunchInterval, 0.02f), /*bLoop=*/true);
+			&APDJuggernaut::Pattern2LaunchVolley, FMath::Max(Pattern2LaunchInterval, 0.02f), /*bLoop=*/true);
 	}
 }
 
-void APDJuggernaut::Pattern2LaunchTick()
+void APDJuggernaut::Pattern2LaunchVolley()
+{
+	// 한 볼리 = Pattern2MissilesPerVolley 발 동시 발사. 해치 짝 = v, v+NumVolleys, ...
+	// (예: 해치 8·볼리당 2발 → 0&4, 1&5, 2&6, 3&7 순으로 stagger.)
+	const int32 PerVolley  = FMath::Max(Pattern2MissilesPerVolley, 1);
+	const int32 NumVolleys = FMath::Max(FMath::DivideAndRoundUp(Pattern2MissileCount, PerVolley), 1);
+
+	for (int32 m = 0; m < PerVolley && Pattern2LaunchedCount < Pattern2MissileCount; ++m)
+	{
+		Pattern2LaunchMissile(Pattern2VolleyIndex + m * NumVolleys);
+	}
+
+	++Pattern2VolleyIndex;
+	if (Pattern2LaunchedCount >= Pattern2MissileCount || Pattern2VolleyIndex >= NumVolleys)
+	{
+		GetWorldTimerManager().ClearTimer(Pattern2LaunchHandle);
+	}
+}
+
+void APDJuggernaut::Pattern2LaunchMissile(int32 HatchIndex)
 {
 	// 착탄 중심 = 발사 시점의 플레이어 위치(스웜이 이동을 어느 정도 따라감). 타겟 무효 시 전방 폴백.
 	const AActor* Target = ActiveTarget.Get();
@@ -569,30 +606,25 @@ void APDJuggernaut::Pattern2LaunchTick()
 	// 이미 예약된 착탄과 떨어지도록 분산 선정 — 한곳에 뭉쳐 AoE 가 겹치는 문제 완화.
 	const FVector Impact = PickScatterImpactLocation(Center);
 
-	// 발사 해치 소켓 순환.
+	// 지정 해치 소켓에서 발사.
 	FName Hatch = NAME_None;
 	FVector LaunchLoc = GetActorLocation();
 	if (Pattern2HatchSockets.Num() > 0)
 	{
-		Hatch = Pattern2HatchSockets[Pattern2HatchIndex % Pattern2HatchSockets.Num()];
+		Hatch = Pattern2HatchSockets[HatchIndex % Pattern2HatchSockets.Num()];
 		if (MissileLauncherMesh && Hatch != NAME_None && MissileLauncherMesh->DoesSocketExist(Hatch))
 		{
 			LaunchLoc = MissileLauncherMesh->GetSocketLocation(Hatch);
 		}
 	}
-	++Pattern2HatchIndex;
 
 	Multicast_OnPattern2Launch(Hatch, LaunchLoc, Impact, Pattern2TravelTime);
 
-	// 착탄 예약 — Tick 이 world-time 으로 처리(8개 개별 타이머의 수명 이슈 회피).
+	// 착탄 예약 — Tick 이 world-time 으로 처리(개별 타이머 수명 이슈 회피).
 	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	Pattern2PendingImpacts.Add({ Impact, Now + Pattern2TravelTime });
 
 	++Pattern2LaunchedCount;
-	if (Pattern2LaunchedCount >= Pattern2MissileCount)
-	{
-		GetWorldTimerManager().ClearTimer(Pattern2LaunchHandle);
-	}
 }
 
 FVector APDJuggernaut::PickScatterImpactLocation(const FVector& Center) const
@@ -688,11 +720,27 @@ void APDJuggernaut::ApplyPattern2Damage(const FVector& Center)
 		// 착탄 원(2D) 안의 플레이어만 피해 — 탑뷰 기준.
 		if ((PlayerPawn->GetActorLocation() - Center).SizeSquared2D() > RadiusSq) continue;
 
-		FPDDamageInfo DamageInfo;
-		DamageInfo.BaseDamage = Pattern2Damage;
-		DamageInfo.Instigator = this;
-		DamageInfo.DamageTypeClass = nullptr;
-		IPDDamageable::Execute_ApplyDamage(PlayerPawn, DamageInfo);
+		// 부위별 시스템 대응: 부위마다 매핑되는 본을 지정해 각 부위에 개별 ApplyDamage.
+		// (HitResult.BoneName → 대상 BodyPartConfig 가 부위로 라우팅. 코어 데미지 경로는 변경 없음.)
+		if (Pattern2ImpactBones.Num() > 0)
+		{
+			for (const FName& Bone : Pattern2ImpactBones)
+			{
+				FPDDamageInfo DamageInfo;
+				DamageInfo.BaseDamage = Pattern2Damage;
+				DamageInfo.Instigator = this;
+				DamageInfo.HitResult.BoneName = Bone;
+				IPDDamageable::Execute_ApplyDamage(PlayerPawn, DamageInfo);
+			}
+		}
+		else
+		{
+			// 본 목록 미설정 시 단일 부위(Torso) 기본 동작.
+			FPDDamageInfo DamageInfo;
+			DamageInfo.BaseDamage = Pattern2Damage;
+			DamageInfo.Instigator = this;
+			IPDDamageable::Execute_ApplyDamage(PlayerPawn, DamageInfo);
+		}
 	}
 }
 
@@ -750,8 +798,40 @@ void APDJuggernaut::Multicast_OnPattern1End_Implementation()
 	StopPattern1Audio();
 	BP_OnPattern1End();
 }
-void APDJuggernaut::Multicast_OnPattern2Begin_Implementation(AActor* Target)            { BP_OnPattern2Begin(Target); }
-void APDJuggernaut::Multicast_OnPattern2Launch_Implementation(FName HatchSocket, FVector LaunchLocation, FVector ImpactLocation, float TravelTime) { BP_OnPattern2Launch(HatchSocket, LaunchLocation, ImpactLocation, TravelTime); }
+void APDJuggernaut::Multicast_OnPattern2Begin_Implementation(AActor* Target)
+{
+	// 런처 애님 원샷 재생(발사각으로 raise). 14프레임 등의 발사 노티파이가 발사를 트리거. 모든 머신.
+	if (MissileLauncherMesh && Pattern2LauncherAnim)
+	{
+		MissileLauncherMesh->PlayAnimation(Pattern2LauncherAnim, /*bLooping=*/false);
+	}
+	BP_OnPattern2Begin(Target);
+}
+void APDJuggernaut::Multicast_OnPattern2Launch_Implementation(FName HatchSocket, FVector LaunchLocation, FVector ImpactLocation, float TravelTime)
+{
+	// 코스메틱 미사일 스폰(렌더되는 머신만 — 데디서버 제외). 데미지는 서버가 착탄 시 AoE 로 처리.
+	if (Pattern2MissileClass && GetNetMode() != NM_DedicatedServer)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.Owner = this;
+			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			if (APDJuggernautMissile* Missile = World->SpawnActor<APDJuggernautMissile>(
+					Pattern2MissileClass, LaunchLocation, FRotator::ZeroRotator, SpawnParams))
+			{
+				Missile->InitMissile(LaunchLocation, ImpactLocation, TravelTime, Pattern2ImpactRadius);
+			}
+		}
+	}
+	// 발사 사운드 — 해치 위치에서 1회 재생(데디서버는 PlaySoundAtLocation 이 무음 처리).
+	if (Pattern2LaunchSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, Pattern2LaunchSound, LaunchLocation);
+	}
+
+	BP_OnPattern2Launch(HatchSocket, LaunchLocation, ImpactLocation, TravelTime);
+}
 void APDJuggernaut::Multicast_OnPattern2Impact_Implementation(FVector ImpactLocation)   { BP_OnPattern2Impact(ImpactLocation); }
 void APDJuggernaut::Multicast_OnPattern2End_Implementation()                            { BP_OnPattern2End(); }
 

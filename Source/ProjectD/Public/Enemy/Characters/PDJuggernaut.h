@@ -2,12 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Enemy/Characters/PDSoldier.h"
-#include "Enemy/Interfaces/PDBossGimmickInterface.h"
 #include "PDJuggernaut.generated.h"
 
 class USkeletalMeshComponent;
 class APDEnemyAIControllerBase;
 class APDProjectile;
+class APDJuggernautMissile;
 class UAnimSequence;
 class UParticleSystem;
 class UAudioComponent;
@@ -52,7 +52,7 @@ enum class EPDJuggernautPattern : uint8
  *  - 패턴 시작 후에는 거리 조건을 벗어나도 중단하지 않음(비활성화 보류).
  */
 UCLASS(Blueprintable)
-class PROJECTD_API APDJuggernaut : public APDSoldier, public IPDBossGimmickInterface
+class PROJECTD_API APDJuggernaut : public APDSoldier
 {
 	GENERATED_BODY()
 
@@ -67,6 +67,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Boss")
 	FORCEINLINE bool IsExecutingPattern() const { return bIsExecutingPattern; }
+
+	/** 패턴2 런처 애님의 발사 프레임 노티파이가 호출 — 미사일 스웜 발사 시퀀스 시작(서버 전용). */
+	void OnPattern2LaunchNotify();
 
 protected:
 	virtual void BeginPlay() override;
@@ -186,9 +189,29 @@ protected:
 		TEXT("Missilehatch0"), TEXT("Missilehatch1"), TEXT("Missilehatch2"), TEXT("Missilehatch3"),
 		TEXT("Missilehatch4"), TEXT("Missilehatch5"), TEXT("Missilehatch6"), TEXT("Missilehatch7") };
 
-	/** 미사일 간 발사 간격(초) — 스웜 순차 발사 stagger. */
+	/** 볼리 간 발사 간격(초) — 볼리 단위 순차 stagger. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2", meta = (ClampMin = "0.0"))
 	float Pattern2LaunchInterval = 0.15f;
+
+	/** 볼리당 동시 발사 미사일 수. 해치를 균등 분할해 짝지어 발사(예: 해치 8·2발 → 0&4,1&5,2&6,3&7). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2", meta = (ClampMin = "1"))
+	int32 Pattern2MissilesPerVolley = 2;
+
+	/** 발사 런처 애님(원샷: 발사각으로 raise). 14프레임 등에 PDJuggernautLaunchNotify 를 배치해 발사 시작. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2")
+	TObjectPtr<UAnimSequence> Pattern2LauncherAnim;
+
+	/** 발사 시 스폰할 코스메틱 미사일(포물선 비행 후 폭발). 미설정 시 미사일 비주얼 없음(데미지는 그대로 적용). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2")
+	TSubclassOf<APDJuggernautMissile> Pattern2MissileClass;
+
+	/** 미사일 발사 시 재생할 사운드(발사마다 1회, 해치 위치). 미설정 시 발사음 없음. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2")
+	TObjectPtr<USoundBase> Pattern2LaunchSound;
+
+	/** 발사 시작 안전망(초). 노티파이가 이 시간 내 발사를 못 시작하면 강제 발사(소프트락 방지). 애님 발사프레임 시간보다 길게. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2", meta = (ClampMin = "0.1"))
+	float Pattern2LaunchFallbackDelay = 2.0f;
 
 	/** 발사 → 착탄 시간(초). 인디케이터 차오름 시간 = 미사일 비행 시간(BP 연출과 동기). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2", meta = (ClampMin = "0.1"))
@@ -206,9 +229,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2", meta = (ClampMin = "0.0"))
 	float Pattern2ImpactRadius = 250.f;
 
-	/** 착탄 1회당 데미지. */
+	/** 착탄 1회당 (부위당) 데미지. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2", meta = (ClampMin = "0.0"))
 	float Pattern2Damage = 25.f;
+
+	/** 폭발 시 데미지를 줄 부위 본 이름들 — 부위마다 1개씩 지정 시 각 부위가 Pattern2Damage 만큼 피해.
+	 *  대상 BodyPartConfig(DA_BodyPartConfig)에 등록된 이름이어야 해당 부위로 라우팅됨. 비우면 단일 부위(Torso).
+	 *  기본값 = DA_BodyPartConfig 등록 본(Head/Torso/Arm_L/Arm_R/Leg_L/Leg_R). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2")
+	TArray<FName> Pattern2ImpactBones = {
+		TEXT("head"), TEXT("Torso"),
+		TEXT("upperarm_l"), TEXT("upperarm_r"),
+		TEXT("thigh_l"), TEXT("thigh_r") };
 
 	// ─── BP 연출 훅 (타이밍·데미지는 C++, 비주얼만 BP) ──────────────────────────
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Boss")
@@ -296,7 +328,8 @@ private:
 	void StopPattern1Audio();                                   // 차징/발사 루프 사운드 정지
 
 	void StartPattern2(AActor* Target);
-	void Pattern2LaunchTick();          // 미사일 1발 발사 + 착탄 예약
+	void Pattern2LaunchVolley();                  // 볼리(짝지은 해치) 동시 발사 + 볼리 종료 판정
+	void Pattern2LaunchMissile(int32 HatchIndex); // 지정 해치에서 미사일 1발 발사 + 착탄 예약
 	void TickPattern2Impacts();         // world-time 기준 착탄 처리(Tick에서 호출)
 	void ApplyPattern2Damage(const FVector& Center);
 	FVector PickScatterImpactLocation(const FVector& Center) const; // 기존 착탄과 떨어지도록 best-candidate 분산
@@ -340,7 +373,7 @@ private:
 	};
 	TArray<FPDPendingImpact> Pattern2PendingImpacts;
 	int32 Pattern2LaunchedCount = 0;
-	int32 Pattern2HatchIndex = 0;
+	int32 Pattern2VolleyIndex = 0;
 
 	FTimerHandle ActivationTimerHandle;
 	FTimerHandle DeactivationTimerHandle;
@@ -348,4 +381,5 @@ private:
 	FTimerHandle PatternChargeHandle;    // 조준 → 발사 전환
 	FTimerHandle Pattern1FireHandle;     // 발사 루프
 	FTimerHandle Pattern2LaunchHandle;   // 미사일 스웜 stagger 발사
+	FTimerHandle Pattern2LaunchFallbackHandle; // 노티파이 미발화 시 발사 강제 시작(안전망)
 };
