@@ -4,7 +4,7 @@
 #include "Components/TextBlock.h"
 
 #include "Characters/PDPlayerCharacter.h"
-#include "Items/PDEquipmentComponent.h"
+#include "Items/Equipment/PDEquipmentComponent.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 
 void UPDMainWeaponAmmoWidget::NativeOnInitialized()
@@ -58,6 +58,12 @@ void UPDMainWeaponAmmoWidget::HandleWeaponReloaded(APDWeaponBase* /*Weapon*/)
 	RefreshAmmoText();
 }
 
+void UPDMainWeaponAmmoWidget::HandleWeaponAmmoChanged(APDWeaponBase* /*Weapon*/, int32 /*CurrentAmmo*/, int32 /*MaxAmmo*/, int32 /*AvailableAmmo*/, bool /*bIsReloading*/)
+{
+	RefreshAmmoText();
+	RefreshVisibility();
+}
+
 void UPDMainWeaponAmmoWidget::HandleWeaponSwapped(APDWeaponBase* /*NewWeapon*/, EWeaponSlot /*WeaponSlot*/)
 {
 	BindWeapon(ResolveCurrentRangedWeapon());
@@ -104,6 +110,7 @@ void UPDMainWeaponAmmoWidget::BindWeapon(APDRangedWeaponBase* InWeapon)
 
 	InWeapon->OnWeaponFired.AddDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponFired);
 	InWeapon->OnWeaponReloaded.AddDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponReloaded);
+	InWeapon->OnWeaponAmmoChanged.AddDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponAmmoChanged);
 	BoundWeapon = InWeapon;
 }
 
@@ -113,6 +120,7 @@ void UPDMainWeaponAmmoWidget::UnbindWeapon()
 	{
 		Weapon->OnWeaponFired.RemoveDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponFired);
 		Weapon->OnWeaponReloaded.RemoveDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponReloaded);
+		Weapon->OnWeaponAmmoChanged.RemoveDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponAmmoChanged);
 	}
 	BoundWeapon.Reset();
 }
@@ -140,7 +148,7 @@ void UPDMainWeaponAmmoWidget::RefreshAmmoText()
 	if (Text_ReserveAmmo)
 	{
 		const FString ReserveStr = bUnlimitedReserve
-			? FString::Printf(TEXT("%s∞"), *ReservePrefix)
+			? FString::Printf(TEXT("%s--"), *ReservePrefix)
 			: FString::Printf(TEXT("%s%d"), *ReservePrefix, RawReserve);
 		Text_ReserveAmmo->SetText(FText::FromString(ReserveStr));
 	}
@@ -148,7 +156,7 @@ void UPDMainWeaponAmmoWidget::RefreshAmmoText()
 	if (Text_Combined)
 	{
 		const FString Combined = bUnlimitedReserve
-			? FString::Printf(TEXT("%d / ∞"), Current)
+			? FString::Printf(TEXT("%d / --"), Current)
 			: FString::Printf(TEXT("%d / %d"), Current, RawReserve);
 		Text_Combined->SetText(FText::FromString(Combined));
 	}
@@ -167,7 +175,7 @@ void UPDMainWeaponAmmoWidget::RefreshMetadata()
 		}
 		else
 		{
-			// 자동 해석 데이터 소스가 아직 없음 → 빈 텍스트. 필요 시 setter로 덮어쓰기.
+			// ?�동 ?�석 ?�이???�스가 ?�직 ?�음 ??�??�스?? ?�요 ??setter�???��?�기.
 			Text_Caliber->SetText(FText::GetEmpty());
 		}
 	}
@@ -186,7 +194,7 @@ void UPDMainWeaponAmmoWidget::RefreshMetadata()
 		}
 	}
 
-	// 실루엣 해석 우선순위: 외부 Override > 무기 BP 의 UISilhouette > Collapsed.
+	// ?�루???�석 ?�선?�위: ?��? Override > 무기 BP ??UISilhouette > Collapsed.
 	if (Image_Silhouette)
 	{
 		UTexture2D* Resolved = SilhouetteOverride;

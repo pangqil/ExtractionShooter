@@ -212,7 +212,12 @@ UGCN_Weapon_Reload::UGCN_Weapon_Reload()
 
 bool UGCN_Weapon_Reload::OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const
 {
-	if (!ReloadSound) return false;
+	USoundBase* Sound = const_cast<USoundBase*>(Cast<USoundBase>(Parameters.SourceObject.Get()));
+	if (!Sound)
+	{
+		Sound = ReloadSound.Get();
+	}
+	if (!Sound) return false;
 
 	USceneComponent* AttachComponent = Parameters.TargetAttachComponent.Get();
 	if (!AttachComponent)
@@ -225,11 +230,11 @@ bool UGCN_Weapon_Reload::OnExecute_Implementation(AActor* MyTarget, const FGamep
 
 	if (AttachComponent)
 	{
-		UGameplayStatics::SpawnSoundAttached(ReloadSound, AttachComponent);
+		UGameplayStatics::SpawnSoundAttached(Sound, AttachComponent);
 	}
 	else
 	{
-		UGameplayStatics::PlaySoundAtLocation(MyTarget, ReloadSound, Parameters.Location);
+		UGameplayStatics::PlaySoundAtLocation(MyTarget, Sound, Parameters.Location);
 	}
 	return true;
 }

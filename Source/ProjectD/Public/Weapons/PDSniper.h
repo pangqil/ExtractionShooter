@@ -50,8 +50,8 @@ public:
 
 private:
     bool CanPenetrate() const;
-    void SpawnProjectile(bool bPenetrate);
-    FVector GetAimDirection() const;
+    bool BuildAimShot(FVector& OutStart, FVector& OutDirection, FVector& OutTraceEnd) const;
+    void SpawnProjectile(bool bPenetrate, const FVector& Start, const FVector& AimDirection);
 
     UFUNCTION()
     void OnBoltActionMontageEnded(UAnimMontage* Montage, bool bInterrupted);

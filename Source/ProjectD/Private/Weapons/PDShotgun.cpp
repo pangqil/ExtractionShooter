@@ -1,7 +1,65 @@
 #include "Weapons/PDShotgun.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Core/PDPlayerController.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
+
+namespace
+{
+bool RefineCharacterHitToMesh(const FHitResult& SourceHit, const FVector& Start, const FVector& End,
+    const FCollisionQueryParams& QueryParams, FHitResult& OutHit)
+{
+    ACharacter* HitCharacter = Cast<ACharacter>(SourceHit.GetActor());
+    if (!HitCharacter)
+    {
+        return false;
+    }
+
+    USkeletalMeshComponent* Mesh = HitCharacter->GetMesh();
+    if (!Mesh || SourceHit.GetComponent() == Mesh)
+    {
+        return false;
+    }
+
+    FCollisionQueryParams MeshQueryParams = QueryParams;
+    MeshQueryParams.bTraceComplex = false;
+
+    FHitResult MeshHit;
+    if (!Mesh->LineTraceComponent(MeshHit, Start, End, MeshQueryParams))
+    {
+        FVector ClosestBoneLocation = FVector::ZeroVector;
+        const FName ClosestBoneName = Mesh->FindClosestBone(SourceHit.ImpactPoint, &ClosestBoneLocation, 0.f, false);
+        if (ClosestBoneName.IsNone())
+        {
+            return false;
+        }
+
+        OutHit = SourceHit;
+        OutHit.Component = Mesh;
+        OutHit.BoneName = ClosestBoneName;
+        OutHit.MyBoneName = ClosestBoneName;
+        OutHit.TraceStart = Start;
+        OutHit.TraceEnd = End;
+        return true;
+    }
+
+    OutHit = SourceHit;
+    OutHit.Component = Mesh;
+    OutHit.BoneName = MeshHit.BoneName;
+    OutHit.MyBoneName = MeshHit.MyBoneName;
+    OutHit.ImpactPoint = MeshHit.ImpactPoint;
+    OutHit.Location = MeshHit.Location;
+    OutHit.ImpactNormal = MeshHit.ImpactNormal;
+    OutHit.Normal = MeshHit.Normal;
+    OutHit.TraceStart = Start;
+    OutHit.TraceEnd = End;
+    OutHit.Distance = MeshHit.Distance;
+    OutHit.FaceIndex = MeshHit.FaceIndex;
+    OutHit.PhysMaterial = MeshHit.PhysMaterial;
+    return true;
+}
+}
 
 APDShotgun::APDShotgun()
 {
@@ -30,6 +88,7 @@ void APDShotgun::Fire_Implementation()
 
 
     TSet<AActor*> DamagedActors;
+    bool bImpactCueSent = false;
     for (const FHitResult& Hit : Hits)
     {
         AActor* HitActor = Hit.GetActor();
@@ -41,7 +100,11 @@ void APDShotgun::Fire_Implementation()
             ApplyDamage(HitActor, GetCurrentStats().Damage, Hit);
         }
 
-        ExecuteImpactCue(Hit);
+        if (!bImpactCueSent)
+        {
+            ExecuteImpactCue(Hit);
+            bImpactCueSent = true;
+        }
     }
 
     PlayWeaponMontage(FireMontage);
@@ -94,14 +157,26 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
     Params.bTraceComplex = true;
 
     const int32 Pellets = GetCurrentPelletCount();
+    const float EffectiveSpreadAngle = SpreadAngle * FMath::Clamp(1.f - GetCurrentStats().Accuracy, 0.f, 1.f);
+
     for (int32 i = 0; i < Pellets; ++i)
     {
-        FVector RandDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(SpreadAngle));
+        FVector RandDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(EffectiveSpreadAngle));
         FVector End     = Start + RandDir * TraceLength;
 
         FHitResult Hit;
         const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params);
+        if (bHit)
+        {
+            FHitResult MeshHit;
+            if (RefineCharacterHitToMesh(Hit, Start, End, Params, MeshHit))
+            {
+                Hit = MeshHit;
+            }
+        }
+
 
         if (bHit) OutHits.Add(Hit);
     }
+
 }

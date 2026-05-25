@@ -79,6 +79,9 @@ private:
 	void HandleWeaponReloaded(APDWeaponBase* Weapon);
 
 	UFUNCTION()
+	void HandleWeaponAmmoChanged(APDWeaponBase* Weapon, int32 CurrentAmmo, int32 MaxAmmo, int32 AvailableAmmo, bool bIsReloading);
+
+	UFUNCTION()
 	void HandleWeaponSwapped(APDWeaponBase* NewWeapon, EWeaponSlot WeaponSlot);
 
 	void EnsureOwnerBound();

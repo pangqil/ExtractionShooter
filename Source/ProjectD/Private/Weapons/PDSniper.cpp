@@ -1,5 +1,7 @@
 #include "Weapons/PDSniper.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
+#include "Core/PDPlayerController.h"
+#include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 
@@ -17,22 +19,30 @@ APDSniper::APDSniper()
 
 void APDSniper::Fire_Implementation()
 {
-    if (!HasAuthority()) return;
-    if (!CanFire()) return;
+    if (!HasAuthority())
+    {
+        return;
+    }
+    if (!CanFire())
+    {
+        return;
+    }
     if (!ProjectileClass)
     {
         return;
     }
 
-    const FVector MuzzleLoc = WeaponMesh->DoesSocketExist(MuzzleSocketName)
-        ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
-        : GetActorLocation();
+    FVector MuzzleLoc = FVector::ZeroVector;
+    FVector AimDirection = FVector::ForwardVector;
+    FVector TraceEnd = FVector::ZeroVector;
+    if (!BuildAimShot(MuzzleLoc, AimDirection, TraceEnd))
+    {
+        return;
+    }
 
+    ExecuteFireCue(MuzzleLoc, TraceEnd);
 
-
-    ExecuteFireCue(MuzzleLoc, FVector::ZeroVector);
-
-    SpawnProjectile(CanPenetrate());
+    SpawnProjectile(CanPenetrate(), MuzzleLoc, AimDirection);
 
     if (BoltActionMontage)
     {
@@ -68,39 +78,78 @@ void APDSniper::ToggleZoom()
     OnScopeToggled.Broadcast(bIsZoomed);
 }
 
-void APDSniper::SpawnProjectile(bool bPenetrate)
+void APDSniper::SpawnProjectile(bool bPenetrate, const FVector& Start, const FVector& AimDirection)
 {
     AActor* WeaponOwnerActor = GetWeaponOwner();
-    if (!WeaponOwnerActor) return;
+    if (!WeaponOwnerActor)
+    {
+        return;
+    }
 
-    FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
-        ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
-        : WeaponOwnerActor->GetActorLocation();
-
-    FRotator SpawnRot = GetAimDirection().Rotation();
-
-    FActorSpawnParameters SpawnParams;
-    SpawnParams.Owner       = this;
-    SpawnParams.Instigator  = Cast<APawn>(WeaponOwnerActor);
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-    APDProjectile* Projectile = GetWorld()->SpawnActor<APDProjectile>(
-        ProjectileClass, Start, SpawnRot, SpawnParams);
+    const FRotator SpawnRot = AimDirection.Rotation();
+    const FTransform SpawnTransform(SpawnRot, Start);
+    APDProjectile* Projectile = GetWorld()->SpawnActorDeferred<APDProjectile>(
+        ProjectileClass,
+        SpawnTransform,
+        this,
+        Cast<APawn>(WeaponOwnerActor),
+        ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
     if (Projectile)
-        Projectile->InitProjectile(GetCurrentStats().Damage, WeaponOwnerActor, bPenetrate);
+    {
+        Projectile->InitProjectile(GetCurrentStats().Damage, WeaponOwnerActor, bPenetrate, AimDirection);
+        Projectile->FinishSpawning(SpawnTransform);
+    }
 }
 
-FVector APDSniper::GetAimDirection() const
+bool APDSniper::BuildAimShot(FVector& OutStart, FVector& OutDirection, FVector& OutTraceEnd) const
 {
     AActor* WeaponOwnerActor = GetWeaponOwner();
-    if (!WeaponOwnerActor) return FVector::ForwardVector;
+    if (!WeaponOwnerActor)
+    {
+        return false;
+    }
+    if (!WeaponMesh)
+    {
+        return false;
+    }
 
-    FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
+    OutStart = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
         : WeaponOwnerActor->GetActorLocation();
 
-    return GetAimDirectionFromOwner(Start);
+    OutDirection = GetAimDirectionFromOwner(OutStart);
+    if (OutDirection.IsNearlyZero())
+    {
+        OutDirection = WeaponOwnerActor->GetActorForwardVector();
+    }
+
+    float TraceLength = GetCurrentStats().Range;
+    FVector AimLocation = FVector::ZeroVector;
+    if (const APawn* OwnerPawn = Cast<APawn>(WeaponOwnerActor))
+    {
+        if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()))
+        {
+            if (const APDPlayerController* PDPC = Cast<APDPlayerController>(PC);
+                PDPC && PDPC->GetCachedAimWorldLocation(AimLocation))
+            {
+                TraceLength = FVector::Dist(OutStart, AimLocation);
+            }
+            else
+            {
+                FHitResult CursorHit;
+                if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
+                {
+                    TraceLength = FVector::Dist(OutStart, CursorHit.Location);
+                    AimLocation = CursorHit.Location;
+                }
+            }
+        }
+    }
+
+    OutDirection = OutDirection.GetSafeNormal();
+    OutTraceEnd = OutStart + OutDirection * TraceLength;
+    return true;
 }
 
 bool APDSniper::CanPenetrate() const
