@@ -22,6 +22,13 @@ void APDStashActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	SetReplicates(true);
+	bAlwaysRelevant = true;
+	if (StashComponent)
+	{
+		StashComponent->SetIsReplicated(true);
+	}
+
 	SetDoorOpen(false, true);
 }
 

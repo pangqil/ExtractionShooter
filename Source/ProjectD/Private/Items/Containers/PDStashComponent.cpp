@@ -3,6 +3,7 @@
 #include "Core/PDGameInstance.h"
 #include "Core/PDPlayerController.h"
 #include "Core/PDPlayerState.h"
+#include "GameFramework/Actor.h"
 #include "Items/Data/PDItemSlotTransfer.h"
 #include "Net/UnrealNetwork.h"
 
@@ -23,11 +24,13 @@ namespace
 	{
 		if (AActor* StashOwner = StashComponent ? StashComponent->GetOwner() : nullptr)
 		{
+			StashOwner->FlushNetDormancy();
 			StashOwner->ForceNetUpdate();
 		}
 
 		if (AActor* InventoryOwner = InventoryComponent ? InventoryComponent->GetOwner() : nullptr)
 		{
+			InventoryOwner->FlushNetDormancy();
 			InventoryOwner->ForceNetUpdate();
 		}
 	}
