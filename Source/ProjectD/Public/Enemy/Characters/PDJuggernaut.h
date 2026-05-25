@@ -29,8 +29,7 @@ enum class EPDJuggernautPattern : uint8
 {
 	None       UMETA(DisplayName = "None"),
 	Pulverize  UMETA(DisplayName = "Pulverize (MachineGun)"),    // 패턴1 분쇄
-	Annihilate UMETA(DisplayName = "Annihilate (Missile Swarm)"),// 패턴2 섬멸 (미구현)
-	Extinction UMETA(DisplayName = "Extinction (Homing Missile)"),// 패턴3 소멸 (미구현)
+	Annihilate UMETA(DisplayName = "Annihilate (Missile Swarm)"),// 패턴2 섬멸
 };
 
 /**
@@ -229,9 +228,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2", meta = (ClampMin = "0.0"))
 	float Pattern2ImpactRadius = 250.f;
 
-	/** 착탄 1회당 (부위당) 데미지. */
+	/** 착탄 1회당 (부위당) 기본 데미지. Pattern2BoneDamageOverrides 에 없는 본은 이 값. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2", meta = (ClampMin = "0.0"))
-	float Pattern2Damage = 25.f;
+	float Pattern2Damage = 40.f;
 
 	/** 폭발 시 데미지를 줄 부위 본 이름들 — 부위마다 1개씩 지정 시 각 부위가 Pattern2Damage 만큼 피해.
 	 *  대상 BodyPartConfig(DA_BodyPartConfig)에 등록된 이름이어야 해당 부위로 라우팅됨. 비우면 단일 부위(Torso).
@@ -241,6 +240,11 @@ protected:
 		TEXT("neck_01"), TEXT("spine_01"),
 		TEXT("upperarm_l"), TEXT("upperarm_r"),
 		TEXT("thigh_l"), TEXT("thigh_r") };
+
+	/** 부위별 데미지 오버라이드(본 이름 → 데미지). 등록된 본은 Pattern2Damage 대신 이 값.
+	 *  키는 Pattern2ImpactBones 의 본과 일치해야 적용됨. 기본: 머리(neck_01)=20, 나머지=Pattern2Damage(40). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2")
+	TMap<FName, float> Pattern2BoneDamageOverrides = { { TEXT("neck_01"), 20.f } };
 
 	// ─── BP 연출 훅 (타이밍·데미지는 C++, 비주얼만 BP) ──────────────────────────
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Boss")

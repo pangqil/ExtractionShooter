@@ -20,6 +20,7 @@
 #include "Components/Button.h"
 #include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
+#include "Items/Containers/PDLootComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Items/Containers/PDInventoryComponent.h"
 #include "Items/Data/PDItemSlotTransfer.h"
@@ -780,12 +781,12 @@ void UPDInventoryWidget::RefreshInventoryWeightBar()
 
 UPDInventoryComponent* UPDInventoryWidget::FindInventoryComponent() const
 {
-	// 2�?구조: InventoryComponent??PlayerState???�으므�?PlayerController ?�퍼 ?�용.
+	// 2�?구조: InventoryComponent??PlayerState???�으므�?PlayerController ?�퍼 ?�용.
 	if (UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer()))
 	{
 		return Inventory;
 	}
-	// Fallback: Pawn??직접 붙�? 경우???�래 구조 ?�환.
+	// Fallback: Pawn??직접 붙�? 경우???�래 구조 ?�환.
 	return FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
 }
 
@@ -824,7 +825,7 @@ UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 
 UPDSecureContainerComponent* UPDInventoryWidget::FindSecureContainerComponent() const
 {
-	// SecureContainerComponent??PlayerCharacter??붙어?�음.
+	// SecureContainerComponent??PlayerCharacter??붙어?�음.
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDSecureContainerComponent>();
@@ -887,6 +888,15 @@ const FPDInventorySlot* UPDInventoryWidget::FindSourceSlot(EPDItemContainerType 
 		if (const UPDSecureContainerComponent* SecureContainerComponent = FindSecureContainerComponent())
 		{
 			return SecureContainerComponent->GetSecureSlot(SlotIndex);
+		}
+		return nullptr;
+	case EPDItemContainerType::Loot:
+		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+		{
+			if (const UPDLootComponent* LootComponent = PlayerController->GetActiveLootComponent())
+			{
+				return LootComponent->LootItems.IsValidIndex(SlotIndex) ? &LootComponent->LootItems[SlotIndex] : nullptr;
+			}
 		}
 		return nullptr;
 	default:
@@ -1247,6 +1257,15 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 		if (UPDSecureContainerComponent* SecureContainerComponent = FindSecureContainerComponent())
 		{
 			SecureContainerComponent->TakeSecureSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+		}
+		break;
+	case EPDItemContainerType::Loot:
+		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+		{
+			if (UPDLootComponent* LootComponent = PlayerController->GetActiveLootComponent())
+			{
+				LootComponent->TakeSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+			}
 		}
 		break;
 	default:

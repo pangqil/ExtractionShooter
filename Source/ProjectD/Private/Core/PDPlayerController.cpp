@@ -115,7 +115,7 @@ void APDPlayerController::Client_ShowRaidEndTransition_Implementation(bool bSucc
 	UPDRaidEndTransitionWidget* Transition = Cast<UPDRaidEndTransitionWidget>(Pushed);
 	if (!Transition)
 	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidEndTransition: PushToLayer ?�패 ?�는 캐스???�패 (PC=%s)"), *GetName());
+		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidEndTransition: PushToLayer ?�패 ?�는 캐스???�패 (PC=%s)"), *GetName());
 		return;
 	}
 
@@ -162,7 +162,7 @@ void APDPlayerController::StartSpectatingDeath(APlayerController* InitialTarget)
 	SpectateTargetPC = InitialTarget;
 	SetViewTargetWithBlend(InitialTarget->GetPawn(), 0.5f);
 
-	// Listen-server host(?�버=로컬)?�서??OnRep ???�동 발화?��? ?�으므�??�동 브로?�캐?�트.
+	// Listen-server host(?�버=로컬)?�서??OnRep ???�동 발화?��? ?�으므�??�동 브로?�캐?�트.
 	if (IsLocalController())
 	{
 		OnRep_SpectateState();
@@ -202,8 +202,8 @@ void APDPlayerController::CycleSpectateTargetServer(int32 Direction)
 
 	if (Candidates.Num() == 0)
 	{
-		// ???�상 ?�아?�는 관???�?�이 ?�음. ?�기 ?�신 ?�점?�로 ?�냅?�면 죽�? ?�기 몸으�?컷이 ?�??		// 부?�연?�러?��?�?마�?막으�?보던 ??방금 죽거??추출???�?????�점??그�?�??��?.
-		// EndRaid 가 �?결산 ?�젯???�우므�?카메???�태??거기????��.
+		// ???�상 ?�아?�는 관???�?�이 ?�음. ?�기 ?�신 ?�점?�로 ?�냅?�면 죽�? ?�기 몸으�?컷이 ?�??		// 부?�연?�러?��?�?마�?막으�?보던 ??방금 죽거??추출???�?????�점??그�?�??��?.
+		// EndRaid 가 �?결산 ?�젯???�우므�?카메???�태??거기????��.
 		UE_LOG(LogPDCharacter, Log, TEXT("CycleSpectate: %s -> no candidates, keep current view target"), *GetName());
 		return;
 	}
@@ -459,7 +459,7 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Map,
 		ETriggerEvent::Started, this, &APDPlayerController::OnToggleWorldMap);
 
-	// Step 2-B: 관???�음/?�전 (?�망 ?�에�??�성?????�들?�에??bIsSpectating 체크).
+	// Step 2-B: 관???�음/?�전 (?�망 ?�에�??�성?????�들?�에??bIsSpectating 체크).
 	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_SpectateNext))
 	{
 		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SpectateNext,
@@ -485,8 +485,8 @@ void APDPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 멀?? ?�력모드/HUD/RootLayout/Subsystem ?�록?� 로컬 PC?�서�??��?가 ?�음.
-	// ?�버???�는 ?�격 ?�라?�언?�의 PC ?�스?�스가 ?�기 ?�어?�면 GI ?�일 RootLayout??마�?�??�출????��?�는 ?�고가 ??
+	// 멀?? ?�력모드/HUD/RootLayout/Subsystem ?�록?� 로컬 PC?�서�??��?가 ?�음.
+	// ?�버???�는 ?�격 ?�라?�언?�의 PC ?�스?�스가 ?�기 ?�어?�면 GI ?�일 RootLayout??마�?�??�출????��?�는 ?�고가 ??
 	if (!IsLocalController())
 	{
 		return;
@@ -558,8 +558,8 @@ void APDPlayerController::PreClientTravel(const FString& PendingURL, ETravelType
 {
 	Super::PreClientTravel(PendingURL, TravelType, bIsSeamlessTravel);
 
-	// ?�라?�언??머신??PC�???hook?�로 LoadingScreen???��?.
-	// ?�스??=Authority)???�기 ?�래�???TravelToLevel?�서 ?��? ShowImmediate ?�출?��?�??�외 ??	// 그렇지 ?�으�????�라?�언??join처럼 ?�스??측에 PreClientTravel???�떤 경로로든 trigger????중복 ?�시??
+	// ?�라?�언??머신??PC�???hook?�로 LoadingScreen???��?.
+	// ?�스??=Authority)???�기 ?�래�???TravelToLevel?�서 ?��? ShowImmediate ?�출?��?�??�외 ??	// 그렇지 ?�으�????�라?�언??join처럼 ?�스??측에 PreClientTravel???�떤 경로로든 trigger????중복 ?�시??
 	if (!IsLocalController() || HasAuthority())
 	{
 		return;
@@ -579,7 +579,7 @@ void APDPlayerController::OnPossess(APawn* InPawn)
 	UnbindInventoryNotifications();
 	Super::OnPossess(InPawn);
 
-	// Step 2-B ?�속: ????빙의 ??관???�태 carry-over 차단. HUD "Spectating: ..." ?�존 방�?.
+	// Step 2-B ?�속: ????빙의 ??관???�태 carry-over 차단. HUD "Spectating: ..." ?�존 방�?.
 	if (HasAuthority() && (bIsSpectating || SpectateTargetPC))
 	{
 		bIsSpectating = false;
@@ -932,8 +932,8 @@ UPDStashComponent* APDPlayerController::GetActiveStashComponent() const
 	return UIManagerComponent ? UIManagerComponent->GetActiveStashComponent() : nullptr;
 }
 
-// ?�?�?� LootBox ?�터?�이???�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-// codex 브랜치는 InventoryWidget ?�이?�사?�클??UIManager �??�임?��?�?develop 구현???�순????// LootWidget �?PlayerController 가 직접 ?�루�? ?�력 차단?� 기존 ?�퍼 ?�사??
+// ?�?�?� LootBox ?�터?�이???�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
+// codex 브랜치는 InventoryWidget ?�이?�사?�클??UIManager �??�임?��?�?develop 구현???�순????// LootWidget �?PlayerController 가 직접 ?�루�? ?�력 차단?� 기존 ?�퍼 ?�사??
 void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
 {
 	if (!LootWidgetClass || !LootSource)
@@ -942,7 +942,36 @@ void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
 		return;
 	}
 
-	// ?�른 모달 UI 가 같�? viewport ?�역???�유?��?�?먼�? ?�음.
+	// 위젯 생성은 로컬 PC 에서만 가능 — 서버에서 원격 클라 대상이면 Client RPC 로 위임(Stash/Market 동일 패턴).
+	if (HasAuthority() && !IsLocalController())
+	{
+		ClientOpenLootInterface(LootSource);
+		return;
+	}
+
+	OpenLootInterfaceLocal(LootSource);
+}
+
+void APDPlayerController::ClientOpenLootInterface_Implementation(UPDLootComponent* LootSource)
+{
+	// 토글: 같은 박스 재상호작용이면 닫기. 서버는 위젯 상태를 모르므로 토글 판정은 클라에서.
+	if (IsLootInterfaceOpen() && GetActiveLootComponent() == LootSource)
+	{
+		CloseLootInterfaceLocal();
+		return;
+	}
+	OpenLootInterfaceLocal(LootSource);
+}
+
+void APDPlayerController::OpenLootInterfaceLocal(UPDLootComponent* LootSource)
+{
+	if (!LootWidgetClass || !LootSource)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("OpenLootInterface: missing widget class or source"));
+		return;
+	}
+
+	// ?�른 모달 UI 가 같�? viewport ?�역???�유?��?�?먼�? ?�음.
 	if (IsStashInterfaceOpen())  CloseStashInterface();
 	if (IsMarketInterfaceOpen()) CloseMarketInterface();
 
@@ -962,7 +991,7 @@ void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
 		LootWidgetInstance->InitializeLoot(LootSource);
 	}
 
-	// Stash/Market 처럼 InventoryWidget ??같이 ?��? ??Loot ?� ?�벤 �??�래�?비교 가??
+	// Stash/Market 처럼 InventoryWidget ??같이 ?��? ??Loot ?� ?�벤 �??�래�?비교 가??
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->OpenInventoryForLoot();
@@ -973,6 +1002,26 @@ void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
 
 void APDPlayerController::CloseLootInterface()
 {
+	// 위젯 제거도 로컬 PC 에서만 — 서버에서 원격 클라 대상이면 Client RPC 로 위임.
+	if (HasAuthority() && !IsLocalController())
+	{
+		ClientCloseLootInterface(ActiveLootComponent.Get());
+		return;
+	}
+
+	CloseLootInterfaceLocal();
+}
+
+void APDPlayerController::ClientCloseLootInterface_Implementation(UPDLootComponent* LootSource)
+{
+	if (!LootSource || GetActiveLootComponent() == LootSource)
+	{
+		CloseLootInterfaceLocal();
+	}
+}
+
+void APDPlayerController::CloseLootInterfaceLocal()
+{
 	UPDLootComponent* ClosingLootComponent = ActiveLootComponent.Get();
 
 	if (LootWidgetInstance && LootWidgetInstance->IsInViewport())
@@ -982,7 +1031,7 @@ void APDPlayerController::CloseLootInterface()
 	LootWidgetInstance = nullptr;
 	ActiveLootComponent.Reset();
 
-	// Loot ?�젯�??�께 ?�웠??InventoryWidget ???�제 (?�른 UI 가 ?��? ??????.
+	// Loot ?�젯�??�께 ?�웠??InventoryWidget ???�제 (?�른 UI 가 ?��? ??????.
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->CloseInventoryForLoot();
@@ -999,6 +1048,41 @@ void APDPlayerController::CloseLootInterface()
 bool APDPlayerController::IsLootInterfaceOpen() const
 {
 	return LootWidgetInstance && LootWidgetInstance->IsInViewport();
+}
+
+void APDPlayerController::ServerTakeLootSlotToInventory_Implementation(UPDLootComponent* LootComponent, int32 LootSlotIndex, int32 Quantity)
+{
+	if (!LootComponent) return;
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		LootComponent->TakeSlotToInventory(LootSlotIndex, InventoryComponent, Quantity);
+	}
+}
+
+void APDPlayerController::ServerTakeLootSlotQuantityToInventorySlot_Implementation(UPDLootComponent* LootComponent, int32 LootSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity)
+{
+	if (!LootComponent) return;
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		LootComponent->TakeSlotQuantityToInventorySlot(InventoryComponent, LootSlotIndex, TargetInventorySlotIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerStoreInventorySlotQuantityToLoot_Implementation(UPDLootComponent* LootComponent, int32 SourceSlotIndex, int32 TargetLootSlotIndex, int32 Quantity)
+{
+	if (!LootComponent) return;
+	if (UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent())
+	{
+		LootComponent->StoreInventorySlotQuantityToSlot(InventoryComponent, SourceSlotIndex, TargetLootSlotIndex, Quantity);
+	}
+}
+
+void APDPlayerController::ServerMoveLootSlotQuantity_Implementation(UPDLootComponent* LootComponent, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	if (LootComponent)
+	{
+		LootComponent->MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+	}
 }
 
 bool APDPlayerController::SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity)

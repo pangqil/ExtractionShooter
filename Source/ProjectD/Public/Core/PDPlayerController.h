@@ -44,7 +44,7 @@ enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDLootInterfaceClosedSignature, UPDLootComponent*);
-// === Source legacy: ?¸í„°?˜ì´???«í˜ ?¸ë¦¬ê²Œì´???œê·¸?ˆì²˜ ===
+// === Source legacy: ?ï¿½í„°?ï¿½ì´???ï¿½í˜ ?ï¿½ë¦¬ê²Œì´???ï¿½ê·¸?ï¿½ì²˜ ===
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDStashInterfaceClosedSignature, UPDStashComponent*);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDMarketInterfaceClosedSignature, UPDMarketComponent*);
 DECLARE_MULTICAST_DELEGATE(FPDEquipmentModificationInterfaceClosedSignature);
@@ -65,18 +65,18 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerRequestExtraction();
 
-	// ê²°ì‚° ?„ì ¯??Anim_BlackFade ì¢…ë£Œ ?œì ???¸ì¶œ. ?œë²„?ì„œ GameMode??ê²Œì´?¸ì— ACK ?±ë¡.
+	// ê²°ì‚° ?ï¿½ì ¯??Anim_BlackFade ì¢…ë£Œ ?ï¿½ì ???ï¿½ì¶œ. ?ï¿½ë²„?ï¿½ì„œ GameMode??ê²Œì´?ï¿½ì— ACK ?ï¿½ë¡.
 	UFUNCTION(Server, Reliable)
 	void Server_RequestBaseTravel();
 
-	// ?œë²„ EndRaid ê°€ ëª¨ë“  PC ??ë°œì‚¬. Modal ?ˆì´?´ì— ê²°ì‚° ?„ì ¯ push + Configure.
+	// ?ï¿½ë²„ EndRaid ê°€ ëª¨ë“  PC ??ë°œì‚¬. Modal ?ï¿½ì´?ï¿½ì— ê²°ì‚° ?ï¿½ì ¯ push + Configure.
 	UFUNCTION(Client, Reliable)
 	void Client_ShowRaidEndTransition(bool bSuccess,
 	                                  const TArray<FPDPlayerRaidEntryData>& Entries,
 	                                  float RaidDurationSeconds);
 
-	// GA_ReviveAbility ê°€ ?œë²„?ì„œ Reviver ??PC ??ë°œì‚¬. HUD CircularProgress ?œì‘/ì¢…ë£Œ.
-	// Target ?¡í„° ?„ì¹˜ë¥??°ë¼?¤ë‹ˆ???„ì ¯?´ë¼ RPC ???™ë´‰.
+	// GA_ReviveAbility ê°€ ?ï¿½ë²„?ï¿½ì„œ Reviver ??PC ??ë°œì‚¬. HUD CircularProgress ?ï¿½ì‘/ì¢…ë£Œ.
+	// Target ?ï¿½í„° ?ï¿½ì¹˜ï¿½??ï¿½ë¼?ï¿½ë‹ˆ???ï¿½ì ¯?ï¿½ë¼ RPC ???ï¿½ë´‰.
 	UFUNCTION(Client, Reliable)
 	void Client_NotifyReviveStarted(AActor* Target, float Duration);
 
@@ -105,13 +105,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	UPDStashComponent* GetActiveStashComponent() const;
 
-	// === Source legacy: ?¸í„°?˜ì´???«í˜ ?¸ë¦¬ê²Œì´??===
+	// === Source legacy: ?ï¿½í„°?ï¿½ì´???ï¿½í˜ ?ï¿½ë¦¬ê²Œì´??===
 	FPDStashInterfaceClosedSignature OnStashInterfaceClosed;
 	FPDMarketInterfaceClosedSignature OnMarketInterfaceClosed;
 	FPDEquipmentModificationInterfaceClosedSignature OnEquipmentModificationInterfaceClosed;
 
-	// ?€?€?€ LootBox ?¸í„°?˜ì´???€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
-	// Stash ?€ ?„ì „??ë¶„ë¦¬???œìŠ¤????UPDLootComponent ë°±ì—”??
+	// ?ï¿½?ï¿½?ï¿½ LootBox ?ï¿½í„°?ï¿½ì´???ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
+	// Stash ?ï¿½ ?ï¿½ì „??ë¶„ë¦¬???ï¿½ìŠ¤????UPDLootComponent ë°±ì—”??
 	FPDLootInterfaceClosedSignature OnLootInterfaceClosed;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
@@ -120,12 +120,32 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
 	void CloseLootInterface();
 
+	// ìœ„ì ¯ ìƒì„±/ì œê±°ëŠ” ì†Œìœ  í´ë¼(ë¡œì»¬ PC)ì—ì„œë§Œ ê°€ëŠ¥ â€” ì„œë²„ì—ì„œ ì›ê²© í´ë¼ ëŒ€ìƒì´ë©´ Client RPC ë¡œ ìœ„ì„.
+	UFUNCTION(Client, Reliable)
+	void ClientOpenLootInterface(UPDLootComponent* LootSource);
+
+	UFUNCTION(Client, Reliable)
+	void ClientCloseLootInterface(UPDLootComponent* LootSource);
+
+	// Loot ì»¨í…Œì´ë„ˆ ì „ì†¡(ì„œë²„ ê¶Œìœ„) â€” LootComponent ë©”ì„œë“œê°€ í´ë¼ì—ì„œ í˜¸ì¶œë˜ë©´ ì—¬ê¸°ë¡œ ë¼ìš°íŒ….
+	UFUNCTION(Server, Reliable)
+	void ServerTakeLootSlotToInventory(UPDLootComponent* LootComponent, int32 LootSlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTakeLootSlotQuantityToInventorySlot(UPDLootComponent* LootComponent, int32 LootSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerStoreInventorySlotQuantityToLoot(UPDLootComponent* LootComponent, int32 SourceSlotIndex, int32 TargetLootSlotIndex, int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerMoveLootSlotQuantity(UPDLootComponent* LootComponent, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
+
 	UFUNCTION(BlueprintPure, Category = "PD|Loot")
 	bool IsLootInterfaceOpen() const;
 
 	UFUNCTION(BlueprintPure, Category = "PD|Loot")
 	FORCEINLINE UPDLootComponent* GetActiveLootComponent() const { return ActiveLootComponent.Get(); }
-	// ?€?€?€ LootBox ?¸í„°?˜ì´?????€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+	// ?ï¿½?ï¿½?ï¿½ LootBox ?ï¿½í„°?ï¿½ì´?????ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void OpenMarketInterface(UPDMarketComponent* MarketComponent);
@@ -217,17 +237,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Quest")
 	bool IsQuestInterfaceOpen() const;
 
-	// ì£¼ì–´ì§?GameplayTag??ë§¤í•‘??InputAction????ë§¤í•‘??IMC?ì„œ ì¡°íšŒ.
-	// UIOnly ëª¨ë“œ?ì„œ ?„ì ¯??PC InputComponent ?€??ì§ì ‘ ???…ë ¥??ì²˜ë¦¬?????¬ìš©.
+	// ì£¼ì–´ï¿½?GameplayTag??ë§¤í•‘??InputAction????ë§¤í•‘??IMC?ï¿½ì„œ ì¡°íšŒ.
+	// UIOnly ëª¨ë“œ?ï¿½ì„œ ?ï¿½ì ¯??PC InputComponent ?ï¿½??ì§ì ‘ ???ï¿½ë ¥??ì²˜ë¦¬?????ï¿½ìš©.
 	TArray<FKey> GetMappedKeysForInputTag(const FGameplayTag& InputTag) const;
 
 	virtual void PlayerTick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// ?€?€?€ Spectator (Step 2-B: ?¬ë§ ??ViewTarget ?œí™˜ ê´€?? ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
-	// ?œë²„?ì„œ GameMode::OnPlayerDied ê°€ ?¸ì¶œ. ì²??ì¡´???€?ìœ¼ë¡?ê´€???œì‘.
+	// ?ï¿½?ï¿½?ï¿½ Spectator (Step 2-B: ?ï¿½ë§ ??ViewTarget ?ï¿½í™˜ ê´€?? ?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
+	// ?ï¿½ë²„?ï¿½ì„œ GameMode::OnPlayerDied ê°€ ?ï¿½ì¶œ. ï¿½??ï¿½ì¡´???ï¿½?ï¿½ìœ¼ï¿½?ê´€???ï¿½ì‘.
 	void StartSpectatingDeath(APlayerController* InitialTarget);
-	// ?œë²„?ì„œ ?¸ì¶œ. ?ì‹ ??ê´€???€?ì´ DeadPC ë©??¤ìŒ ?ì¡´?ë¡œ ?´ë™.
+	// ?ï¿½ë²„?ï¿½ì„œ ?ï¿½ì¶œ. ?ï¿½ì‹ ??ê´€???ï¿½?ï¿½ì´ DeadPC ï¿½??ï¿½ìŒ ?ï¿½ì¡´?ï¿½ë¡œ ?ï¿½ë™.
 	void CycleSpectateIfTargetIs(APlayerController* AffectedPC);
 
 	UFUNCTION(BlueprintPure, Category = "PD|Spectator")
@@ -290,11 +310,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
 
-	// ê²°ì‚° ?„ì ¯ ?´ë˜?? BP_PDPlayerController ?ì„œ WBP_PDRaidEndTransition ? ë‹¹.
+	// ê²°ì‚° ?ï¿½ì ¯ ?ï¿½ë˜?? BP_PDPlayerController ?ï¿½ì„œ WBP_PDRaidEndTransition ?ï¿½ë‹¹.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI|Transition")
 	TSubclassOf<UPDRaidEndTransitionWidget> RaidEndTransitionClass;
 
-	/** Quip(ìºë¦­??ë©˜íŠ¸) ?°ì´?? UPDQuipSubsystem??ì£¼ì…?˜ì–´ ?œê·¸?’Line ?¼ìš°?…ì— ?¬ìš©. */
+	/** Quip(ìºë¦­??ë©˜íŠ¸) ?ï¿½ì´?? UPDQuipSubsystem??ì£¼ì…?ï¿½ì–´ ?ï¿½ê·¸?ï¿½Line ?ï¿½ìš°?ï¿½ì— ?ï¿½ìš©. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSoftObjectPtr<UPDQuipDataAsset> QuipDataAsset;
 
@@ -368,7 +388,7 @@ private:
 	void CancelAbilityByInputTag(FGameplayTag InputTag);
 	void UpdateAimRotation();
 
-	// Hub ?µí•© ?”ë©´ ? ê?. Input_Inventory ?œê·¸??ë§¤í•‘?????…ë ¥ ???¸ì¶œ.
+	// Hub ?ï¿½í•© ?ï¿½ë©´ ?ï¿½ï¿½?. Input_Inventory ?ï¿½ê·¸??ë§¤í•‘?????ï¿½ë ¥ ???ï¿½ì¶œ.
 	void ToggleHub();
 
 	void TryInteract();
@@ -388,10 +408,14 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryComponent> BoundInventoryNotificationComponent;
 
+	// ì‹¤ì œ ìœ„ì ¯ ìƒì„±/ì œê±° â€” í•­ìƒ ë¡œì»¬ PC ì—ì„œ ì‹¤í–‰(ë¼ìš°íŒ…ì€ Open/CloseLootInterface ê°€ ë‹´ë‹¹).
+	void OpenLootInterfaceLocal(UPDLootComponent* LootSource);
+	void CloseLootInterfaceLocal();
+
 	UPROPERTY(Transient)
 	TObjectPtr<UPDLootWidget> LootWidgetInstance;
 
-	// OpenLootInterface ??ìºì‹œ. ë°•ìŠ¤ê°€ ?Œê´´?˜ì–´??TWeakObjectPtrê°€ ?ë™ ë¬´íš¨??
+	// OpenLootInterface ??ìºì‹œ. ë°•ìŠ¤ê°€ ?ï¿½ê´´?ï¿½ì–´??TWeakObjectPtrê°€ ?ï¿½ë™ ë¬´íš¨??
 	TWeakObjectPtr<UPDLootComponent> ActiveLootComponent;
 
 
@@ -430,7 +454,7 @@ private:
 	UFUNCTION()
 	void HandleInventoryWeightLimitExceeded(float CurrentWeight, float MaxWeight);
 
-	// ?€?€?€ Spectator internals ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+	// ?ï¿½?ï¿½?ï¿½ Spectator internals ?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
 	UFUNCTION(Server, Reliable)
 	void Server_SpectateNext();
 
@@ -440,7 +464,7 @@ private:
 	void OnSpectateNextInput();
 	void OnSpectatePrevInput();
 
-	// ?œë²„ ê¶Œí•œ ê°€?? Direction = +1(next) / -1(prev). ?„ë³´ê°€ ?†ìœ¼ë©?ê´€??ì¢…ë£Œ.
+	// ?ï¿½ë²„ ê¶Œí•œ ê°€?? Direction = +1(next) / -1(prev). ?ï¿½ë³´ê°€ ?ï¿½ìœ¼ï¿½?ê´€??ì¢…ë£Œ.
 	void CycleSpectateTargetServer(int32 Direction);
 
 	UFUNCTION()

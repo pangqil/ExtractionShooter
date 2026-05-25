@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Interfaces/PDInteractable.h"
+#include "Enemy/Types/EnemyTypes.h" // FPDLootEntry — 드랍 테이블 정의 재사용
 #include "PDLootBoxActor.generated.h"
 
 class APDPlayerController;
@@ -45,6 +46,11 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|LootBox")
 	TObjectPtr<UPDLootComponent> LootComponent;
+
+	/** 맵 파밍용 배치 시 BeginPlay 에 확률 굴려 LootComponent 를 채움.
+	 *  적 사망 스폰 박스는 비워둠(적의 DropLootOnDeath 가 직접 채우므로). 항목은 ItemID 필수. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|LootBox|Loot")
+	TArray<FPDLootEntry> LootTable;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|LootBox|Sound")
 	TObjectPtr<USoundBase> OpenSound;
@@ -106,6 +112,9 @@ private:
 	void PlayInteractSound(bool bOpen) const;
 	void BindLootClose(APDPlayerController* PlayerController);
 	void UnbindLootClose();
+
+	// LootTable 을 확률 굴려 LootComponent 에 채움. 서버 권위(채워진 LootItems 가 복제됨).
+	void GenerateLootFromTable();
 
 	// 로컬 플레이어와의 거리 기반으로 Overlay MID 파라미터 갱신.
 	void UpdateOutlineParams();
