@@ -238,7 +238,7 @@ protected:
 	 *  기본값 = DA_BodyPartConfig 등록 본(Head/Torso/Arm_L/Arm_R/Leg_L/Leg_R). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern2")
 	TArray<FName> Pattern2ImpactBones = {
-		TEXT("head"), TEXT("Torso"),
+		TEXT("neck_01"), TEXT("spine_01"),
 		TEXT("upperarm_l"), TEXT("upperarm_r"),
 		TEXT("thigh_l"), TEXT("thigh_r") };
 
