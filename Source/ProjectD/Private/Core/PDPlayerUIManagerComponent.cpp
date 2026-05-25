@@ -2,9 +2,11 @@
 
 #include "AbilitySystemComponent.h"
 #include "Blueprint/UserWidget.h"
+#include "Characters/Base/PDCharacterBase.h"
 #include "Characters/PDPlayerCharacter.h"
 #include "Components/Widget.h"
 #include "Core/PDPlayerController.h"
+#include "Core/PDPlayerState.h"
 #include "Data/PDQuestComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
@@ -99,11 +101,15 @@ void UPDPlayerUIManagerComponent::InitializeUI(APDPlayerController* InOwnerContr
 			}
 		}
 	}
+
+	EnsureRaidParticipationBinding();
 }
 
 void UPDPlayerUIManagerComponent::ShutdownUI(const EEndPlayReason::Type EndPlayReason)
 {
 	APDPlayerController* PC = GetPDController();
+
+	UnbindRaidParticipation();
 
 	CloseQuest();
 	CloseMarket();
@@ -384,6 +390,43 @@ bool UPDPlayerUIManagerComponent::IsStashOpen() const
 	return StashWidgetInstance && StashWidgetInstance->IsInViewport();
 }
 
+void UPDPlayerUIManagerComponent::OpenInventoryForLoot()
+{
+	APDPlayerController* PC = GetPDController();
+	if (!PC || !PC->IsLocalController()) return;
+	if (!InventoryWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("OpenInventoryForLoot: InventoryWidgetClass 미할당"));
+		return;
+	}
+
+	if (!InventoryWidgetInstance)
+	{
+		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(PC, InventoryWidgetClass);
+	}
+	if (InventoryWidgetInstance)
+	{
+		AddWidgetToViewportIfNeeded(InventoryWidgetInstance);
+		InventoryWidgetInstance->SetLootCompanionMode(true);
+	}
+}
+
+void UPDPlayerUIManagerComponent::CloseInventoryForLoot()
+{
+	// Loot 동행 RenderTransform 먼저 리셋 — 다른 UI 가 인벤토리 유지하면 그대로 보이므로 원위치 필요.
+	if (InventoryWidgetInstance)
+	{
+		InventoryWidgetInstance->SetLootCompanionMode(false);
+	}
+
+	// 다른 UI(Stash/Market/Equip) 가 인벤토리 유지 안 하면 제거.
+	if (InventoryWidgetInstance && !IsStashOpen() && !IsMarketOpen() && !IsEquipmentModificationOpen())
+	{
+		InventoryWidgetInstance->RemoveFromParent();
+		InventoryWidgetInstance = nullptr;
+	}
+}
+
 void UPDPlayerUIManagerComponent::OpenEquipmentModification()
 {
 	APDPlayerController* PC = GetPDController();
@@ -528,6 +571,13 @@ void UPDPlayerUIManagerComponent::ToggleHub()
 		return;
 	}
 
+<<<<<<< HEAD
+=======
+	// PS가 이제 막 도착했을 수 있으므로 매 토글마다 멱등 바인딩 보강.
+	EnsureRaidParticipationBinding();
+
+	// 페어링 컨텍스트(Stash/Market/Equip)가 열려있으면 그것부터 닫는다(2단계 close UX).
+>>>>>>> 38770d40d9a455202ce835c7763a06378389963a
 	if (IsStashOpen()) { CloseStash(); return; }
 	if (IsMarketOpen()) { CloseMarket(); return; }
 	if (IsEquipmentModificationOpen()) { CloseEquipmentModification(); return; }
@@ -557,7 +607,126 @@ void UPDPlayerUIManagerComponent::ToggleHub()
 		return;
 	}
 
+<<<<<<< HEAD
+=======
+	// 사망/Downed/관전 중에는 새로 열기 거부. 닫기는 위에서 이미 처리됨.
+	if (!CanOpenHub())
+	{
+		return;
+	}
+
+	// 마지막 탭이 없으면 빈 태그 전달 → base가 DA의 DefaultTabId로 fallback.
+>>>>>>> 38770d40d9a455202ce835c7763a06378389963a
 	UPDTabbedScreenBase::OpenAtTab(PC, HubScreenClass, LastHubTabId, EUILayer::GameMenu);
+}
+
+bool UPDPlayerUIManagerComponent::CanOpenHub() const
+{
+	const APDPlayerController* PC = GetPDController();
+	if (!PC)
+	{
+		return false;
+	}
+
+	if (PC->IsSpectating())
+	{
+		return false;
+	}
+
+	if (const APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>())
+	{
+		if (PS->IsRaidDead() || PS->IsExtracted())
+		{
+			return false;
+		}
+	}
+
+	if (const APDCharacterBase* PawnChar = Cast<APDCharacterBase>(PC->GetPawn()))
+	{
+		if (PawnChar->IsDowned() || PawnChar->IsDead() || PawnChar->IsGettingUp())
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void UPDPlayerUIManagerComponent::EnsureRaidParticipationBinding()
+{
+	const APDPlayerController* PC = GetPDController();
+	if (!PC || !PC->IsLocalController())
+	{
+		return;
+	}
+
+	APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
+	if (!PS)
+	{
+		return; // PS가 아직 도착 안 함 — 다음 ToggleHub 시 재시도.
+	}
+
+	if (BoundPlayerState.Get() == PS)
+	{
+		return; // 이미 바인딩됨.
+	}
+
+	if (APDPlayerState* Prev = BoundPlayerState.Get())
+	{
+		Prev->OnRaidParticipationChanged.RemoveDynamic(this, &UPDPlayerUIManagerComponent::HandleRaidParticipationChanged);
+	}
+
+	PS->OnRaidParticipationChanged.AddDynamic(this, &UPDPlayerUIManagerComponent::HandleRaidParticipationChanged);
+	BoundPlayerState = PS;
+}
+
+void UPDPlayerUIManagerComponent::UnbindRaidParticipation()
+{
+	if (APDPlayerState* PS = BoundPlayerState.Get())
+	{
+		PS->OnRaidParticipationChanged.RemoveDynamic(this, &UPDPlayerUIManagerComponent::HandleRaidParticipationChanged);
+	}
+	BoundPlayerState.Reset();
+}
+
+void UPDPlayerUIManagerComponent::HandleRaidParticipationChanged(bool bIsExtracted, bool bIsRaidDead)
+{
+	// Reset(둘 다 false) 시점에는 닫을 필요 없음. 사망/추출 전환 시에만 정리.
+	if (!bIsExtracted && !bIsRaidDead)
+	{
+		return;
+	}
+
+	// 페어링 컨텍스트는 base 한정이라 raid 중엔 열려있지 않을 가능성이 크지만 안전하게 모두 정리.
+	if (IsStashOpen()) { CloseStash(); }
+	if (IsMarketOpen()) { CloseMarket(); }
+	if (IsEquipmentModificationOpen()) { CloseEquipmentModification(); }
+
+	if (!IsHubOpen())
+	{
+		return;
+	}
+
+	APDPlayerController* PC = GetPDController();
+	if (!PC)
+	{
+		return;
+	}
+
+	UPDFrontendUISubsystem* Subsystem = UPDFrontendUISubsystem::Get(PC);
+	if (!Subsystem)
+	{
+		return;
+	}
+
+	if (UPDActivatableBase* Top = Subsystem->GetTopOfLayer(EUILayer::GameMenu))
+	{
+		if (const UPDTabbedScreenBase* Hub = Cast<UPDTabbedScreenBase>(Top))
+		{
+			LastHubTabId = Hub->GetActiveTabId();
+		}
+	}
+	Subsystem->PopFromLayer(EUILayer::GameMenu);
 }
 
 void UPDPlayerUIManagerComponent::ShowNotification(const FText& Message, float Duration)

@@ -5,6 +5,7 @@
 
 #include "Animation/WidgetAnimation.h"
 #include "Components/TextBlock.h"
+#include "Core/PDPlayerState.h"
 #include "TimerManager.h"
 
 void UPDPlayerRaidEntryWidget::NativeOnInitialized()
@@ -22,10 +23,18 @@ void UPDPlayerRaidEntryWidget::NativeDestruct()
 	{
 		World->GetTimerManager().ClearTimer(RevealTimerHandle);
 	}
+
+	// PS 델리게이트 구독 해제.
+	if (APDPlayerState* PS = BoundPlayerState.Get())
+	{
+		PS->OnTravelReadyChanged.RemoveDynamic(this, &UPDPlayerRaidEntryWidget::HandleTravelReadyChanged);
+	}
+	BoundPlayerState = nullptr;
+
 	Super::NativeDestruct();
 }
 
-void UPDPlayerRaidEntryWidget::Configure(const FPDPlayerRaidEntryData& Data, float StaggerStartDelay)
+void UPDPlayerRaidEntryWidget::Configure(const FPDPlayerRaidEntryData& Data, APDPlayerState* InPlayerState)
 {
 	if (Text_PlayerName)
 	{
@@ -50,10 +59,44 @@ void UPDPlayerRaidEntryWidget::Configure(const FPDPlayerRaidEntryData& Data, flo
 	{
 		Text_ItemsValue->SetText(FText::AsNumber(Data.Stats.ItemDelta));
 	}
+	if (Text_SurvivalValue)
+	{
+		Text_SurvivalValue->SetText(FormatSurvivalSeconds(Data.Stats.SurvivalSeconds));
+	}
+
+	// 새 PS 바인딩 (있다면) — 기존 구독 해제 후 재바인딩.
+	if (APDPlayerState* OldPS = BoundPlayerState.Get())
+	{
+		OldPS->OnTravelReadyChanged.RemoveDynamic(this, &UPDPlayerRaidEntryWidget::HandleTravelReadyChanged);
+	}
+	BoundPlayerState = InPlayerState;
+	if (InPlayerState)
+	{
+		InPlayerState->OnTravelReadyChanged.AddDynamic(this, &UPDPlayerRaidEntryWidget::HandleTravelReadyChanged);
+	}
+	RefreshAckStatus();
 
 	K2_OnConfigured(Data);
+}
 
-	// Stagger: 양수 delay 면 타이머로 지연, 0 이하면 즉시 reveal.
+void UPDPlayerRaidEntryWidget::HandleTravelReadyChanged(bool /*bIsTravelReady*/)
+{
+	RefreshAckStatus();
+}
+
+void UPDPlayerRaidEntryWidget::RefreshAckStatus()
+{
+	if (!Text_AckStatus) return;
+
+	const APDPlayerState* PS = BoundPlayerState.Get();
+	const bool bReady = PS && PS->IsTravelReady();
+
+	Text_AckStatus->SetText(bReady ? AckReadyText : AckPendingText);
+	Text_AckStatus->SetColorAndOpacity(FSlateColor(bReady ? AckReadyColor : AckPendingColor));
+}
+
+void UPDPlayerRaidEntryWidget::PlayRevealAfter(float StaggerStartDelay)
+{
 	UWorld* World = GetWorld();
 	if (!World) return;
 
@@ -82,4 +125,12 @@ void UPDPlayerRaidEntryWidget::PlayRevealNow()
 	{
 		PlayAnimation(Anim_Reveal);
 	}
+}
+
+FText UPDPlayerRaidEntryWidget::FormatSurvivalSeconds(float Seconds)
+{
+	const int32 TotalSeconds = FMath::Max(0, FMath::FloorToInt(Seconds));
+	const int32 Minutes = TotalSeconds / 60;
+	const int32 RemainSeconds = TotalSeconds % 60;
+	return FText::FromString(FString::Printf(TEXT("%02d:%02d"), Minutes, RemainSeconds));
 }

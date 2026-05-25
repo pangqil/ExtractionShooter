@@ -25,6 +25,13 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Loading Screen")
 	bool bShouldShowLoadingScreenInEditor = false;
 
+	/** true(디폴트): 모든 OpenLevel/Travel에 자동 표시.
+	 *  false: ArmForNextTransition()을 호출한 트래블 1회만 표시.
+	 *  Lobby/Hub 같은 가벼운 트래블에서 로딩화면이 거슬리면 false로 두고
+	 *  실제 무거운 트래블(Lobby→Base, Base→Raid 등)에만 명시적으로 arm. */
+	UPROPERTY(Config, EditAnywhere, Category = "Loading Screen")
+	bool bAutoShowOnLevelLoad = true;
+
 	UPROPERTY(Config, EditAnywhere, Category = "Loading Screen|Splash")
 	TArray<TSoftObjectPtr<UTexture2D>> SplashImagePool;
 

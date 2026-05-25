@@ -29,6 +29,7 @@ void UPDCircularProgressWidget::NativeConstruct()
 	}
 
 	RefreshCancelHint();
+	RefreshCenterKeyIcon();
 }
 
 void UPDCircularProgressWidget::NativeDestruct()
@@ -213,6 +214,32 @@ void UPDCircularProgressWidget::RefreshCancelHint()
 void UPDCircularProgressWidget::HandleControlMappingsRebuilt()
 {
 	RefreshCancelHint();
+	RefreshCenterKeyIcon();
+}
+
+void UPDCircularProgressWidget::RefreshCenterKeyIcon()
+{
+	if (!Image_CenterKeyIcon) return;
+
+	if (!CenterInputAction)
+	{
+		Image_CenterKeyIcon->SetVisibility(ESlateVisibility::Collapsed);
+		return;
+	}
+
+	UPDKeyIconDataAsset* IconMap = KeyIconMap.LoadSynchronous();
+	const FKey Key = FindKeyForAction(CenterInputAction);
+	UTexture2D* Icon = (IconMap && Key.IsValid()) ? IconMap->ResolveIcon(Key) : nullptr;
+
+	if (Icon)
+	{
+		Image_CenterKeyIcon->SetBrushFromTexture(Icon);
+		Image_CenterKeyIcon->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	else
+	{
+		Image_CenterKeyIcon->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 FKey UPDCircularProgressWidget::FindKeyForAction(const UInputAction* Action) const

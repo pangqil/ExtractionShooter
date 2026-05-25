@@ -359,6 +359,91 @@ void UPDHUDWidget::HandleConsumableUseCompleted(int32 SlotIndex, FPDItemData Ite
 	}
 }
 
+void UPDHUDWidget::StartReviveProgress(AActor* Target, float Duration)
+{
+	if (!WBP_ReviveProgress || !Target) return;
+
+	CachedReviveTarget = Target;
+	bSuppressInteractPrompt = true;
+
+	// InteractPrompt 강제 숨김 + 갱신 타이머 정지 — Revive 위젯이 자리를 차지.
+	if (WBP_InteractPrompt) WBP_InteractPrompt->Hide();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(InteractPromptUpdateTimer);
+	}
+
+	WBP_ReviveProgress->StartProgress(Duration);
+
+	UpdateReviveProgressPosition();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			ReviveProgressUpdateTimer,
+			this,
+			&UPDHUDWidget::UpdateReviveProgressPosition,
+			1.f / 60.f,
+			true);
+	}
+}
+
+void UPDHUDWidget::StopReviveProgress()
+{
+	if (WBP_ReviveProgress) WBP_ReviveProgress->StopProgress();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ReviveProgressUpdateTimer);
+	}
+	CachedReviveTarget = nullptr;
+	bSuppressInteractPrompt = false;
+	// InteractPrompt 는 다음 InteractionComponent poll 에서 자연 복귀 (대상 여전히 유효시).
+}
+
+void UPDHUDWidget::CompleteReviveProgress()
+{
+	if (WBP_ReviveProgress) WBP_ReviveProgress->CompleteProgress();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ReviveProgressUpdateTimer);
+	}
+	CachedReviveTarget = nullptr;
+	bSuppressInteractPrompt = false;
+}
+
+void UPDHUDWidget::UpdateReviveProgressPosition()
+{
+	if (!WBP_ReviveProgress) return;
+	AActor* Target = CachedReviveTarget.Get();
+	if (!Target)
+	{
+		StopReviveProgress();
+		return;
+	}
+	APlayerController* PC = GetOwningPlayer();
+	if (!PC) return;
+
+	const FVector WorldLoc = Target->GetActorLocation() + ReviveProgressWorldOffset;
+	FVector2D ScreenPos;
+	if (!PC->ProjectWorldLocationToScreen(WorldLoc, ScreenPos))
+	{
+		WBP_ReviveProgress->SetVisibility(ESlateVisibility::Hidden);
+		return;
+	}
+
+	const float ViewportScale = UWidgetLayoutLibrary::GetViewportScale(this);
+	const FVector2D LocalPos = (ViewportScale > 0.f) ? (ScreenPos / ViewportScale) : ScreenPos;
+
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(WBP_ReviveProgress->Slot))
+	{
+		CanvasSlot->SetPosition(LocalPos);
+	}
+
+	if (WBP_ReviveProgress->GetVisibility() == ESlateVisibility::Hidden)
+	{
+		WBP_ReviveProgress->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+}
+
 UPDInteractionComponent* UPDHUDWidget::FindOwningInteractionComponent() const
 {
 	if (APawn* Pawn = GetOwningPlayerPawn())
@@ -412,6 +497,14 @@ void UPDHUDWidget::HandleInteractTargetChanged(AActor* NewTarget)
 	UWorld* World = GetWorld();
 	if (!World)
 	{
+		return;
+	}
+
+	// Revive 진행 중에는 InteractPrompt 표시 억제 — ReviveProgress 위젯이 자리 차지.
+	if (bSuppressInteractPrompt)
+	{
+		WBP_InteractPrompt->Hide();
+		World->GetTimerManager().ClearTimer(InteractPromptUpdateTimer);
 		return;
 	}
 

@@ -66,6 +66,24 @@ void UPDLoadingScreenSubsystem::SetNextSplashOverride(TSoftObjectPtr<UTexture2D>
 	PendingSplashOverride = InTexture;
 }
 
+void UPDLoadingScreenSubsystem::ArmForNextTransition()
+{
+	bArmedForNextTransition = true;
+}
+
+void UPDLoadingScreenSubsystem::ShowImmediate()
+{
+	// PreLoadMap에서도 일관되게 무장 상태를 표시하기 위해 함께 set.
+	// 이미 ActiveWidget이 있어서 PreLoadMap 측 ShowLoadingScreen은 early return함.
+	bArmedForNextTransition = true;
+
+	if (!ShouldDisplayInCurrentEnvironment())
+	{
+		return;
+	}
+	ShowLoadingScreen();
+}
+
 TSoftObjectPtr<UTexture2D> UPDLoadingScreenSubsystem::ResolveSplashTexture()
 {
 	if (!PendingSplashOverride.IsNull())
@@ -102,6 +120,19 @@ void UPDLoadingScreenSubsystem::HandlePreLoadMapWithContext(const FWorldContext&
 	{
 		return;
 	}
+
+	const UPDLoadingScreenSettings* Settings = GetDefault<UPDLoadingScreenSettings>();
+	const bool bAutoShow = Settings ? Settings->bAutoShowOnLevelLoad : true;
+	const bool bShouldShow = bAutoShow || bArmedForNextTransition;
+
+	// arm 신호는 1회만 소비. 다음 트래블엔 다시 arm 필요.
+	bArmedForNextTransition = false;
+
+	if (!bShouldShow)
+	{
+		return;
+	}
+
 	ShowLoadingScreen();
 }
 

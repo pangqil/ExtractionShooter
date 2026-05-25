@@ -49,6 +49,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void SetActiveStashComponent(UPDStashComponent* InStashComponent);
 
+	// Loot 동행 모드 — 작은 사이즈로 좌측 배치. RenderTransform 으로 적용 (레이아웃 영향 없음).
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory|Layout")
+	void SetLootCompanionMode(bool bEnabled);
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
 	TObjectPtr<USoundBase> ButtonClickSound;
@@ -59,6 +63,13 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	TSubclassOf<UUserWidget> InventorySlotWidgetClass;
+
+	// Loot 동행 모드 시 적용할 RenderTransform — 좌측으로 시프트 + 축소.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Layout")
+	FVector2D LootCompanionTranslation = FVector2D(-500.f, 0.f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Layout", meta=(ClampMin="0.1"))
+	float LootCompanionScale = 0.8f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Grid", meta = (ClampMin = "1.0"))
 	float InventorySlotWidth = 52.f;

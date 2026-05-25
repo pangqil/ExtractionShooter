@@ -14,6 +14,7 @@ class UPDQuickSlotComponent;
 class UDataTable;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnRaidParticipationChanged, bool, bIsExtracted, bool, bIsRaidDead);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDOnTravelReadyChanged, bool, bIsTravelReady);
 
 UCLASS(Blueprintable)
 class PROJECTD_API APDPlayerState : public APlayerState
@@ -88,6 +89,17 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="PD|PlayerState|Raid")
 	FPDOnRaidParticipationChanged OnRaidParticipationChanged;
 
+	// 결산 위젯 ACK (좌클릭) 상태. 서버 권한, 모든 클라에 리플리케이트.
+	UFUNCTION(BlueprintPure, Category="PD|PlayerState|Raid")
+	bool IsTravelReady() const { return bIsTravelReady; }
+
+	UFUNCTION(BlueprintCallable, Category="PD|PlayerState|Raid")
+	void SetTravelReady(bool bInReady);
+
+	// 결산 위젯이 동료의 ACK 전환을 실시간으로 받기 위한 알림.
+	UPROPERTY(BlueprintAssignable, Category="PD|PlayerState|Raid")
+	FPDOnTravelReadyChanged OnTravelReadyChanged;
+
 	// ─── Step 2-C: 라이드 결산 스탯 (서버 권한, 모든 클라에 리플리케이트) ─────
 	UFUNCTION(BlueprintPure, Category="PD|PlayerState|Raid")
 	const FPDRaidStats& GetRaidStats() const { return RaidStats; }
@@ -150,6 +162,10 @@ private:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="PD|PlayerState|Raid", meta=(AllowPrivateAccess="true"))
 	FPDRaidStats RaidStats;
 
+	// 결산 위젯의 ACK 상태. 좌클릭 시 true. 전원 true 면 GameMode 가 ServerTravel.
+	UPROPERTY(ReplicatedUsing=OnRep_TravelReady, VisibleAnywhere, BlueprintReadOnly, Category="PD|PlayerState|Raid", meta=(AllowPrivateAccess="true"))
+	bool bIsTravelReady = false;
+
 	// 서버 전용 (UPROPERTY 아님 → 리플리케이트 안 됨). StartRaid 캡처 → 사망/추출 시 Delta 계산.
 	int32 RaidInitialGold = 0;
 	int32 RaidInitialItemQuantity = 0;
@@ -159,4 +175,7 @@ private:
 
 	UFUNCTION()
 	void OnRep_RaidParticipation();
+
+	UFUNCTION()
+	void OnRep_TravelReady();
 };

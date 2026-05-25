@@ -103,6 +103,8 @@ TSubclassOf<APDRangedWeaponBase> APDEliteSoldier::ResolveDesiredWeaponClass(floa
 
 void APDEliteSoldier::SpawnAndEquipRanged(TSubclassOf<APDRangedWeaponBase> WeaponClass)
 {
+	// 무기는 서버 권위 — 클라 중복 스폰 방지. 클라는 복제로 받아 OnRep 연출(부모 APDSoldier).
+	if (!HasAuthority()) return;
 	if (!WeaponClass) return;
 
 	UWorld* World = GetWorld();

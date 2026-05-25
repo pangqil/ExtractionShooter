@@ -43,7 +43,9 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void HandleDeath(AActor* Killer) override;
-	virtual bool ShouldEnterDownedStateOnLethalDamage() const override { return true; }
+	// 다른 Alive 상태 동료가 1명 이상 있을 때만 Downed 진입 (리바이브 기대 가능).
+	// 마지막 생존자가 치명피해 받으면 즉사. 구현은 cpp 참조.
+	virtual bool ShouldEnterDownedStateOnLethalDamage() const override;
 	virtual void OnLifeStateChanged(EPDLifeState OldLifeState, AActor* ContextActor) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

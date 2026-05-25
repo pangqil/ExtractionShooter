@@ -799,6 +799,20 @@ void UPDInventoryWidget::SetActiveStashComponent(UPDStashComponent* InStashCompo
 	ActiveStashComponent = InStashComponent;
 }
 
+void UPDInventoryWidget::SetLootCompanionMode(bool bEnabled)
+{
+	if (bEnabled)
+	{
+		SetRenderTranslation(LootCompanionTranslation);
+		SetRenderScale(FVector2D(LootCompanionScale, LootCompanionScale));
+	}
+	else
+	{
+		SetRenderTranslation(FVector2D::ZeroVector);
+		SetRenderScale(FVector2D(1.f, 1.f));
+	}
+}
+
 UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 {
 	if (UPDQuickSlotComponent* QuickSlot = FPDPlayerComponentResolver::ResolveQuickSlot(GetOwningPlayer()))

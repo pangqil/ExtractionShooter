@@ -22,8 +22,24 @@ struct FPDTabbedScreenEntry
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Tabbed")
 	FText Label;
 
+	/** 탭이 활성화될 때 풋터의 TXT_Description에 자동 채워진다. 비어있으면 풋터 텍스트 클리어. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Tabbed", meta = (MultiLine = "true"))
+	FText Description;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Tabbed", meta = (MustImplement = "/Script/ProjectD.PDTabbedContent"))
 	TSoftClassPtr<UUserWidget> ContentClass;
+
+	/**
+	 * 활성 탭일 때 NamedSlot_MainLeft에 동적 부착되는 좌측 패널.
+	 * nullptr이면 활성 시 NamedSlot이 명시적으로 비워짐(잔상 방지). DA가 컨텐츠를 결정.
+	 * IPDTabbedContent를 구현하면 InitializeForOwner / OnEmbeddedInHub를 받음 (라이프사이클 콜백은 메인 컨텐츠 전용).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Tabbed|Panels")
+	TSoftClassPtr<UUserWidget> LeftPanelClass;
+
+	/** 좌측 패널과 동일 규칙. NamedSlot_MainRight에 부착. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Tabbed|Panels")
+	TSoftClassPtr<UUserWidget> RightPanelClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Tabbed")
 	TSoftObjectPtr<UTexture2D> Icon;
