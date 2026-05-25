@@ -396,7 +396,7 @@ void UPDPlayerUIManagerComponent::OpenInventoryForLoot()
 	if (!PC || !PC->IsLocalController()) return;
 	if (!InventoryWidgetClass)
 	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("OpenInventoryForLoot: InventoryWidgetClass 미할??));
+		UE_LOG(LogPDCharacter, Warning, TEXT("OpenInventoryForLoot: InventoryWidgetClass is not set."));
 		return;
 	}
 
