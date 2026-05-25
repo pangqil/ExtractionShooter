@@ -44,12 +44,9 @@ public:
 protected:
 	virtual void NativeOnActivated() override;
 	virtual void NativeOnDeactivated() override;
-	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
-	/** ESC 등 닫기 키 입력 시 호출. true 반환 시 이벤트 소비. 기본은 화면 pop 후 true. */
-	UFUNCTION(BlueprintNativeEvent, Category = "PD|Screen")
-	bool HandleEscape();
-	virtual bool HandleEscape_Implementation();
+	// 모달이 떠있으면 ESC가 layer pop 대신 모달부터 닫도록 부모 HandleEscape를 확장.
+	virtual bool HandleEscape_Implementation() override;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UNamedSlot> NamedSlot_Description;

@@ -40,6 +40,7 @@
 #include "Widgets/PDRootLayout.h"
 #include "Widgets/PDNotificationWidget.h"
 #include "Widgets/Transition/PDRaidEndTransitionWidget.h"
+#include "Widgets/Transition/PDRaidStartTransitionWidget.h"
 #include "Game/PDRaidStats.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
 #include "Subsystems/PDLoadingScreenSubsystem.h"
@@ -118,6 +119,32 @@ void APDPlayerController::Client_ShowRaidEndTransition_Implementation(bool bSucc
 	}
 
 	Transition->Configure(bSuccess, Entries, RaidDurationSeconds);
+}
+
+void APDPlayerController::Client_ShowRaidStartTransition_Implementation(const FText& ZoneName)
+{
+	if (!RaidStartTransitionClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidStartTransition: RaidStartTransitionClass 미할당 (PC=%s)"), *GetName());
+		return;
+	}
+
+	UPDFrontendUISubsystem* Subsystem = UPDFrontendUISubsystem::Get(this);
+	if (!Subsystem)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidStartTransition: FrontendUISubsystem null (PC=%s)"), *GetName());
+		return;
+	}
+
+	UPDActivatableBase* Pushed = Subsystem->PushToLayer(EUILayer::Modal, RaidStartTransitionClass);
+	UPDRaidStartTransitionWidget* Transition = Cast<UPDRaidStartTransitionWidget>(Pushed);
+	if (!Transition)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidStartTransition: PushToLayer 실패 또는 캐스트 실패 (PC=%s)"), *GetName());
+		return;
+	}
+
+	Transition->Configure(ZoneName);
 }
 
 void APDPlayerController::Client_NotifyReviveStarted_Implementation(AActor* Target, float Duration)

@@ -8,6 +8,7 @@
 #include "Components/VerticalBox.h"
 #include "Core/PDGameInstance.h"
 #include "Core/PDLobbyGameState.h"
+#include "Core/PDSessionService.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Widgets/Lobby/PDLobbyPlayerEntryWidget.h"
@@ -19,6 +20,10 @@ void UPDLobbyScreenWidget::NativeOnActivated()
 	if (Button_StartGame)
 	{
 		Button_StartGame->OnClicked.AddDynamic(this, &UPDLobbyScreenWidget::HandleStartGameClicked);
+	}
+	if (Button_Leave)
+	{
+		Button_Leave->OnClicked.AddDynamic(this, &UPDLobbyScreenWidget::HandleLeaveClicked);
 	}
 
 	ApplyHostState();
@@ -41,6 +46,10 @@ void UPDLobbyScreenWidget::NativeOnDeactivated()
 	if (Button_StartGame)
 	{
 		Button_StartGame->OnClicked.RemoveDynamic(this, &UPDLobbyScreenWidget::HandleStartGameClicked);
+	}
+	if (Button_Leave)
+	{
+		Button_Leave->OnClicked.RemoveDynamic(this, &UPDLobbyScreenWidget::HandleLeaveClicked);
 	}
 
 	if (APDLobbyGameState* GS = BoundGameState.Get())
@@ -89,6 +98,22 @@ void UPDLobbyScreenWidget::HandleStartGameClicked()
 	GI->TravelToLevel(BaseLevel, /*bMarkBaseResetPending=*/false);
 }
 
+void UPDLobbyScreenWidget::HandleLeaveClicked()
+{
+	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
+	if (!GI)
+	{
+		return;
+	}
+	UPDSessionService* Service = GI->GetSessionService();
+	if (!Service)
+	{
+		return;
+	}
+
+	Service->LeaveSession(GetOwningPlayer(), GI->GetStartupLevel());
+}
+
 void UPDLobbyScreenWidget::HandleGameStateSet(AGameStateBase* NewGameState)
 {
 	if (UWorld* World = GetWorld())
@@ -134,27 +159,44 @@ void UPDLobbyScreenWidget::RefreshPlayerList()
 
 	VerticalBox_PlayerList->ClearChildren();
 
-	int32 Count = 0;
+	// 유효 참가자만 추려냄.
+	TArray<APlayerState*> ValidPlayers;
 	for (APlayerState* PS : GS->PlayerArray)
 	{
-		if (!PS || PS->IsInactive())
+		if (PS && !PS->IsInactive())
+		{
+			ValidPlayers.Add(PS);
+		}
+	}
+
+	APlayerState* HostPS = GS->GetHostPlayerState();
+
+	// 고정 MaxPlayersDisplay 슬롯: 앞쪽은 참가자, 나머지는 Empty.
+	for (int32 SlotIndex = 0; SlotIndex < MaxPlayersDisplay; ++SlotIndex)
+	{
+		UPDLobbyPlayerEntryWidget* Entry = CreateWidget<UPDLobbyPlayerEntryWidget>(this, PlayerEntryClass);
+		if (!Entry)
 		{
 			continue;
 		}
 
-		UPDLobbyPlayerEntryWidget* Entry = CreateWidget<UPDLobbyPlayerEntryWidget>(this, PlayerEntryClass);
-		if (Entry)
+		if (SlotIndex < ValidPlayers.Num())
 		{
-			Entry->SetPlayerState(PS);
-			VerticalBox_PlayerList->AddChild(Entry);
-			++Count;
+			APlayerState* PS = ValidPlayers[SlotIndex];
+			Entry->SetPlayerState(PS, /*bIsHost=*/PS == HostPS);
 		}
+		else
+		{
+			Entry->SetEmpty();
+		}
+
+		VerticalBox_PlayerList->AddChild(Entry);
 	}
 
 	if (TextBlock_PlayerCount)
 	{
 		TextBlock_PlayerCount->SetText(
-			FText::FromString(FString::Printf(TEXT("%d/%d"), Count, MaxPlayersDisplay)));
+			FText::FromString(FString::Printf(TEXT("%d/%d"), ValidPlayers.Num(), MaxPlayersDisplay)));
 	}
 }
 

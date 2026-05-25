@@ -95,6 +95,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Levels")
 	TSoftObjectPtr<UWorld> GetLobbyLevel() const { return LobbyLevel; }
 
+	UFUNCTION(BlueprintPure, Category = "PD|Levels")
+	TSoftObjectPtr<UWorld> GetStartupLevel() const { return StartupLevel; }
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Levels")
 	bool ConsumePendingResetToBase();
 
@@ -115,6 +118,10 @@ protected:
 	/** 호스트가 listen 모드로 띄울 LobbyLevel 자산. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Levels")
 	TSoftObjectPtr<UWorld> LobbyLevel;
+
+	/** 방 나가기(Leave) 시 복귀할 메인 메뉴 레벨. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Levels")
+	TSoftObjectPtr<UWorld> StartupLevel;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Session")
 	TSubclassOf<UPDSessionService> SessionServiceClass;

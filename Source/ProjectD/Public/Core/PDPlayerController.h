@@ -39,6 +39,7 @@ class UPDPingInputComponent;
 class UPDWorldMapWidget;
 class UPDQuipDataAsset;
 class UPDRaidEndTransitionWidget;
+class UPDRaidStartTransitionWidget;
 struct FPDPlayerRaidEntryData;
 enum class EWidgetInputMode : uint8;
 
@@ -82,6 +83,10 @@ public:
 
 	UFUNCTION(Client, Reliable)
 	void Client_NotifyReviveEnded(bool bCompleted);
+
+	// 서버 StartRaid 가 모든 PC 에 발사. Modal 레이어에 라이드 진입 연출 위젯 push + Configure.
+	UFUNCTION(Client, Reliable)
+	void Client_ShowRaidStartTransition(const FText& ZoneName);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void OpenStashInterface(UPDStashComponent* StashSource);
@@ -291,6 +296,10 @@ protected:
 	// 결산 위젯 클래스. BP_PDPlayerController 에서 WBP_PDRaidEndTransition 할당.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI|Transition")
 	TSubclassOf<UPDRaidEndTransitionWidget> RaidEndTransitionClass;
+
+	// 라이드 진입 연출 위젯 클래스. BP_PDPlayerController 에서 WBP_PDRaidStartTransition 할당.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI|Transition")
+	TSubclassOf<UPDRaidStartTransitionWidget> RaidStartTransitionClass;
 
 	/** Quip(캐릭터 멘트) 데이터. UPDQuipSubsystem에 주입되어 태그→Line 라우팅에 사용. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")

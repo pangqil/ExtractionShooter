@@ -4,14 +4,33 @@
 #include "Widgets/Lobby/PDLobbyPlayerEntryWidget.h"
 
 #include "Components/TextBlock.h"
+#include "Components/Widget.h"
 #include "GameFramework/PlayerState.h"
 #include "TimerManager.h"
 
-void UPDLobbyPlayerEntryWidget::SetPlayerState(APlayerState* InPlayerState)
+void UPDLobbyPlayerEntryWidget::SetPlayerState(APlayerState* InPlayerState, bool bInIsHost)
 {
 	CachedPlayerState = InPlayerState;
 	PollAttempts = 0;
+	SetHostBadgeVisible(bInIsHost);
 	RefreshName();
+}
+
+void UPDLobbyPlayerEntryWidget::SetEmpty()
+{
+	CachedPlayerState = nullptr;
+	PollAttempts = 0;
+	SetHostBadgeVisible(false);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PollTimerHandle);
+	}
+
+	if (TextBlock_PlayerName)
+	{
+		TextBlock_PlayerName->SetText(NSLOCTEXT("PDLobby", "EmptySlot", "Empty"));
+	}
 }
 
 void UPDLobbyPlayerEntryWidget::RefreshName()
@@ -50,6 +69,14 @@ void UPDLobbyPlayerEntryWidget::RefreshName()
 		{
 			World->GetTimerManager().ClearTimer(PollTimerHandle);
 		}
+	}
+}
+
+void UPDLobbyPlayerEntryWidget::SetHostBadgeVisible(bool bVisible)
+{
+	if (HostBadge)
+	{
+		HostBadge->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	}
 }
 

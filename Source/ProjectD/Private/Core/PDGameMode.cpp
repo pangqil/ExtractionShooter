@@ -107,6 +107,15 @@ void APDGameMode::StartRaid()
 
 	SetRaidState(ERaidState::InProgress);
 	UE_LOG(LogPDRaid, Log, TEXT("StartRaid: Participants=%d StartTime=%.2f"), PlayerCount, RaidStartServerTime);
+
+	// Base→Raid 진입 연출: 각 클라에 라이드 시작 트랜지션 위젯 push (각자 로컬 재생 후 self-pop).
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (APDPlayerController* PDPC = Cast<APDPlayerController>(It->Get()))
+		{
+			PDPC->Client_ShowRaidStartTransition(RaidZoneDisplayName);
+		}
+	}
 }
 
 void APDGameMode::TravelToRaidLevel(FName RaidMapName)

@@ -8,6 +8,7 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Input_Interact, "Input.Interact");
 	UE_DEFINE_GAMEPLAY_TAG(Input_Inventory, "Input.Inventory");
 	UE_DEFINE_GAMEPLAY_TAG(Input_Quest, "Input.Quest");
+	UE_DEFINE_GAMEPLAY_TAG(Input_UIBack, "Input.UIBack");
 
 
 	UE_DEFINE_GAMEPLAY_TAG(Input_Ping, "Input.Ping");

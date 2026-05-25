@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InputCoreTypes.h"
 #include "Blueprint/UserWidget.h"
 #include "PDActivatableBase.generated.h"
 
@@ -47,6 +48,19 @@ protected:
 	virtual void NativeOnDeactivated();
 
 	virtual void NativeOnFocusLost(const FFocusEvent& InFocusEvent) override;
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
+	/**
+	 * UIBack(ESC 등) 입력 시 호출. true 반환 시 이벤트 소비.
+	 * 기본 구현: this가 어느 레이어의 top이면 소비(true). bAllowEscapeDismiss면 그 레이어 pop.
+	 * → 연출 위젯(RaidTransition 등)은 bAllowEscapeDismiss=false로 두면 ESC를 막되 닫히지 않음.
+	 */
+	UFUNCTION(BlueprintNativeEvent, Category = "PD|UI")
+	bool HandleEscape();
+	virtual bool HandleEscape_Implementation();
+
+	/** Input_UIBack 매핑 키인지 동적 판정(IMC 주도). 매핑 없으면 Escape 폴백. */
+	bool IsUIBackKey(const FKey& InKey) const;
 
 	/** BP에서 위젯 활성화 시, 넣고 싶은 로직 작성 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|UI", DisplayName = "On Activated")
@@ -65,6 +79,10 @@ protected:
 	/** 포커스를 잃었을 때 위젯을 닫을지 여부 */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	bool bLightDismissable{false};
+
+	/** UIBack(ESC)로 이 위젯을 pop할 수 있는지. false면 ESC를 소비하되 닫지 않음(연출/강제 모달 보호). */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	bool bAllowEscapeDismiss{true};
 
 private:
 	void ApplyInputMode();

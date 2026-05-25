@@ -27,9 +27,16 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "PD|Lobby")
 	FPDOnLobbyPlayersChanged OnLobbyPlayersChanged;
 
+	/** 방을 연 호스트의 PlayerState. 첫 AddPlayerState로 결정. 클라이언트에도 replicate됨. */
+	UFUNCTION(BlueprintPure, Category = "PD|Lobby")
+	APlayerState* GetHostPlayerState() const { return HostPlayerState; }
+
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_LobbyVersion)
 	int32 LobbyVersion = 0;
+
+	UPROPERTY(Replicated)
+	TObjectPtr<APlayerState> HostPlayerState;
 
 	UFUNCTION()
 	void OnRep_LobbyVersion();

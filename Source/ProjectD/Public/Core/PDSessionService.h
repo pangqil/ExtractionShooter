@@ -34,6 +34,10 @@ public:
 	/** 세션 종료. */
 	virtual void DestroySession() PURE_VIRTUAL(UPDSessionService::DestroySession, );
 
+	/** 방 나가기 → FallbackLevel(메인 메뉴)로 복귀.
+	 *  호스트: 방을 닫고 FallbackLevel로. 클라: 서버 연결 끊고 자기만 FallbackLevel로. */
+	virtual void LeaveSession(APlayerController* LocalPC, TSoftObjectPtr<UWorld> FallbackLevel) PURE_VIRTUAL(UPDSessionService::LeaveSession, );
+
 	UPROPERTY(BlueprintAssignable, Category = "PD|Session")
 	FPDOnSessionOpComplete OnHostComplete;
 

@@ -60,6 +60,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Raid|Autostart", meta=(ClampMin="0.1", ForceUnits="s"))
 	float AutoStartDebounceSeconds = 3.0f;
 
+	// 라이드 진입 연출 위젯에 표시할 구역/맵 이름. 비워두면 위젯이 텍스트 숨김.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Raid")
+	FText RaidZoneDisplayName;
+
 	void SetRaidState(ERaidState NewState);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="PD|Raid")

@@ -32,6 +32,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> Button_StartGame;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_Leave;
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UVerticalBox> VerticalBox_PlayerList;
 
@@ -49,6 +52,7 @@ protected:
 
 private:
 	UFUNCTION() void HandleStartGameClicked();
+	UFUNCTION() void HandleLeaveClicked();
 	UFUNCTION() void HandleLobbyPlayersChanged();
 
 	void HandleGameStateSet(AGameStateBase* NewGameState);

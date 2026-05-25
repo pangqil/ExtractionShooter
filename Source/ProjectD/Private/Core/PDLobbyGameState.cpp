@@ -3,12 +3,14 @@
 
 #include "Core/PDLobbyGameState.h"
 
+#include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 
 void APDLobbyGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(APDLobbyGameState, LobbyVersion);
+	DOREPLIFETIME(APDLobbyGameState, HostPlayerState);
 }
 
 void APDLobbyGameState::AddPlayerState(APlayerState* PlayerState)
@@ -17,6 +19,12 @@ void APDLobbyGameState::AddPlayerState(APlayerState* PlayerState)
 
 	if (HasAuthority())
 	{
+		// 첫 유효 참가자 = 방을 연 호스트 (listen server에서 호스트 PC가 가장 먼저 PostLogin).
+		if (!HostPlayerState && PlayerState && !PlayerState->IsInactive())
+		{
+			HostPlayerState = PlayerState;
+		}
+
 		++LobbyVersion;
 		OnLobbyPlayersChanged.Broadcast();
 	}
