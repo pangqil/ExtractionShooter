@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Items/PDMarketComponent.h"
+#include "Items/Market/PDMarketComponent.h"
 #include "PDMarketQuantityPopupWidget.generated.h"
 
 class USoundBase;

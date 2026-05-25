@@ -1,11 +1,12 @@
 #include "Data/PDQuestComponent.h"
 
 #include "Core/PDGameInstance.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerState.h"
 #include "GameFramework/PlayerController.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDEquipmentComponent.h"
-#include "Items/PDStashComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Equipment/PDEquipmentComponent.h"
+#include "Items/Containers/PDStashComponent.h"
 #include "Net/UnrealNetwork.h"
 
 namespace
@@ -262,13 +263,13 @@ bool UPDQuestComponent::GiveReward(FName QuestID, UPDInventoryComponent* Invento
 
 	if (!CanReceiveQuestReward(*QuestProgress, InventoryComponent))
 	{
-		InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("보상을 받을 수 없습니다. 인벤토리 상태를 확인해주세요.")));
+		InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("Cannot receive reward. Check inventory state.")));
 		return false;
 	}
 
 	if (!RemoveQuestObjectiveItems(*QuestProgress, InventoryComponent))
 	{
-		InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("퀘스트 완료 조건 아이템이 부족합니다.")));
+		InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("?�스???�료 조건 ?�이?�이 부족합?�다.")));
 		return false;
 	}
 
@@ -554,7 +555,7 @@ int32 UPDQuestComponent::GetInventoryAndStashItemCount(FName ItemID, const UPDIn
 	const UPDInventoryComponent* SourceInventory = InventoryComponent;
 	if (!SourceInventory)
 	{
-		SourceInventory = GetOwner() ? GetOwner()->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+		SourceInventory = FPDPlayerComponentResolver::ResolveInventory(this);
 	}
 
 	if (SourceInventory)
@@ -708,7 +709,7 @@ bool UPDQuestComponent::CanReceiveQuestReward(const FPDQuestProgress& QuestProgr
 	TMap<EPDEquipmentSlotType, bool> SimulatedOccupiedEquipmentSlots;
 	float SimulatedMaxWeight = FMath::Max(0.f, InventoryComponent->BaseCarryWeight);
 
-	if (const UPDEquipmentComponent* EquipmentComponent = InventoryComponent->GetOwner() ? InventoryComponent->GetOwner()->FindComponentByClass<UPDEquipmentComponent>() : nullptr)
+	if (const UPDEquipmentComponent* EquipmentComponent = FPDPlayerComponentResolver::ResolveEquipment(InventoryComponent))
 	{
 		for (const TPair<EPDEquipmentSlotType, FPDEquippedItem>& Pair : EquipmentComponent->GetEquippedItems())
 		{

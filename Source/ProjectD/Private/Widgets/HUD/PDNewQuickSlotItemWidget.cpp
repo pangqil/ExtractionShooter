@@ -13,11 +13,12 @@
 #include "Components/Widget.h"
 #include "Animation/WidgetAnimation.h"
 #include "Materials/MaterialInterface.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDQuickSlotComponent.h"
-#include "Items/PDStashComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Containers/PDQuickSlotComponent.h"
+#include "Items/Containers/PDStashComponent.h"
 
 void UPDNewQuickSlotItemWidget::NativeOnInitialized()
 {
@@ -322,19 +323,11 @@ void UPDNewQuickSlotItemWidget::PlayCooldownReadyFlash()
 
 UPDInventoryComponent* UPDNewQuickSlotItemWidget::FindInventoryComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer()))
 	{
-		if (UPDInventoryComponent* InventoryComponent = PDController->GetPlayerInventoryComponent())
-		{
-			return InventoryComponent;
-		}
+		return Inventory;
 	}
-
-	if (APawn* Pawn = GetOwningPlayerPawn())
-	{
-		return Pawn->FindComponentByClass<UPDInventoryComponent>();
-	}
-	return nullptr;
+	return FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
 }
 
 UPDStashComponent* UPDNewQuickSlotItemWidget::FindStashComponent() const

@@ -23,6 +23,8 @@ class PROJECTD_API UPDAttributeSet : public UAttributeSet
 {
 	GENERATED_BODY()
 public:
+	UPDAttributeSet();
+
 	UPROPERTY(ReplicatedUsing=OnRep_HeadHP, BlueprintReadOnly, Category = "PD|Health")
 	FGameplayAttributeData HeadHP;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, HeadHP)
@@ -126,7 +128,7 @@ public:
 	FGameplayAttributeData Damage;
 	ATTRIBUTE_ACCESSORS(UPDAttributeSet, Damage)
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Damage")
 	TObjectPtr<UPDBodyPartConfig> BodyPartConfig;
 
 	bool bIsInitialized=false;

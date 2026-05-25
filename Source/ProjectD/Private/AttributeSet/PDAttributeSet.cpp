@@ -10,7 +10,70 @@
 #include "GameplayTag/PDGameplayTags.h"
 #include "Characters/Base/PDCharacterBase.h"
 #include "AbilitySystemComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/Character.h"
 #include "Net/UnrealNetwork.h"
+#include "UObject/ConstructorHelpers.h"
+
+namespace
+{
+EBodyPart InferBodyPartFromHitLocation(AActor* OwnerActor, const FHitResult& HitResult)
+{
+	const ACharacter* Character = Cast<ACharacter>(OwnerActor);
+	if (!Character || !Character->GetCapsuleComponent())
+	{
+		return EBodyPart::Torso;
+	}
+
+	const UCapsuleComponent* Capsule = Character->GetCapsuleComponent();
+	const float HalfHeight = FMath::Max(Capsule->GetScaledCapsuleHalfHeight(), 1.f);
+	const float Radius = FMath::Max(Capsule->GetScaledCapsuleRadius(), 1.f);
+	const FVector LocalImpact = Character->GetActorTransform().InverseTransformPosition(HitResult.ImpactPoint);
+	const float HeightAlpha = FMath::Clamp((LocalImpact.Z + HalfHeight) / (HalfHeight * 2.f), 0.f, 1.f);
+
+	if (HeightAlpha >= 0.82f)
+	{
+		return EBodyPart::Head;
+	}
+
+	if (HeightAlpha <= 0.38f)
+	{
+		return LocalImpact.Y >= 0.f ? EBodyPart::Leg_R : EBodyPart::Leg_L;
+	}
+
+	if (FMath::Abs(LocalImpact.Y) >= Radius * 0.45f && HeightAlpha >= 0.45f)
+	{
+		return LocalImpact.Y >= 0.f ? EBodyPart::Arm_R : EBodyPart::Arm_L;
+	}
+
+	return EBodyPart::Torso;
+}
+
+EBodyPart MapBodyPartFromParentBones(const USkeletalMeshComponent* Mesh, FName StartBoneName,
+	const UPDBodyPartConfig* BodyPartConfig, AActor* OwnerActor)
+{
+	if (!Mesh || !BodyPartConfig || StartBoneName.IsNone())
+	{
+		return EBodyPart::None;
+	}
+
+	FName ParentBoneName = Mesh->GetParentBone(StartBoneName);
+	while (!ParentBoneName.IsNone())
+	{
+		const EBodyPart ParentMappedPart = BodyPartConfig->GetBodyPartFromName(ParentBoneName);
+
+		if (ParentMappedPart != EBodyPart::None)
+		{
+			return ParentMappedPart;
+		}
+
+		ParentBoneName = Mesh->GetParentBone(ParentBoneName);
+	}
+
+	return EBodyPart::None;
+}
+}
 
 #define ATTRIBUTE_REPNOTIFY_IMPL(PropertyName) \
 void UPDAttributeSet::OnRep_##PropertyName(const FGameplayAttributeData& OldValue) \
@@ -45,6 +108,17 @@ ATTRIBUTE_REPNOTIFY_IMPL(BleedingResistance)
 ATTRIBUTE_REPNOTIFY_IMPL(StaminaRegenRate)
 ATTRIBUTE_REPNOTIFY_IMPL(GasMask)
 ATTRIBUTE_REPNOTIFY_IMPL(MaxGasMask)
+
+UPDAttributeSet::UPDAttributeSet()
+{
+	static ConstructorHelpers::FObjectFinder<UPDBodyPartConfig> BodyPartConfigAsset(
+		TEXT("/Game/Main/Data/DA_BodyPartConfig.DA_BodyPartConfig"));
+
+	if (BodyPartConfigAsset.Succeeded())
+	{
+		BodyPartConfig = BodyPartConfigAsset.Object;
+	}
+}
 
 void UPDAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -81,17 +155,6 @@ void UPDAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 
 void UPDAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
-	if (Attribute == GetMoveSpeedAttribute() || Attribute == GetMaxMoveSpeedAttribute())
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[PD AttrSpeed] PreAttributeChange. Owner=%s Attribute=%s CurrentMove=%.2f CurrentMax=%.2f NewValue=%.2f"),
-			*GetNameSafe(GetOwningActor()),
-			*Attribute.GetName(),
-			GetMoveSpeed(),
-			GetMaxMoveSpeed(),
-			NewValue);
-	}
-
 	Super::PreAttributeChange(Attribute, NewValue);
 	HandleAttributeClamp(Attribute, NewValue);
 }
@@ -101,20 +164,20 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 	Super::PostGameplayEffectExecute(Data);
 	AActor* OwnerActor = GetOwningActor();
 	const bool bHasAuthority = OwnerActor && OwnerActor->HasAuthority();
+	const UGameplayEffect* EffectDef = Data.EffectSpec.Def;
+	const FString EffectName = GetNameSafe(EffectDef);
 
-	if (Data.EvaluatedData.Attribute == GetMoveSpeedAttribute() ||
-		Data.EvaluatedData.Attribute == GetMaxMoveSpeedAttribute())
+	if (Data.EvaluatedData.Attribute == GetStaminaAttribute() &&
+		(EffectName.Contains(TEXT("Roll")) || EffectName.Contains(TEXT("Cost"))))
 	{
-		const UGameplayEffect* SourceGE = Data.EffectSpec.Def;
 		UE_LOG(LogTemp, Warning,
-			TEXT("[PD AttrSpeed] PostGameplayEffectExecute. Owner=%s Authority=%d Attribute=%s GE=%s Magnitude=%.2f Move=%.2f Max=%.2f"),
+			TEXT("[PD RollCostTrace] Stamina GE executed. Owner=%s Authority=%d Effect=%s Magnitude=%.2f Stamina=%.2f MaxStamina=%.2f"),
 			*GetNameSafe(OwnerActor),
-			bHasAuthority ? 1 : 0,
-			*Data.EvaluatedData.Attribute.GetName(),
-			*GetNameSafe(SourceGE),
+			bHasAuthority,
+			*EffectName,
 			Data.EvaluatedData.Magnitude,
-			GetMoveSpeed(),
-			GetMaxMoveSpeed());
+			GetStamina(),
+			GetMaxStamina());
 	}
 
 	if (Data.EvaluatedData.Attribute==GetDamageAttribute())
@@ -124,26 +187,70 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 
 		if (LocalDamage<=0.f) return;
 
+		if (APDCharacterBase* DamageOwner = Cast<APDCharacterBase>(OwnerActor))
+		{
+			if (DamageOwner->GetLifeState() == EPDLifeState::Downed && !DamageOwner->CanBeKilledWhileDownedByDamage())
+			{
+				return;
+			}
+		}
+
 		EBodyPart Part=EBodyPart::Torso;
+		bool bMappedBodyPart = false;
+
 		if (const FHitResult* HitResult=Data.EffectSpec.GetContext().GetHitResult())
 		{
+
 			if (BodyPartConfig)
 			{
 				const EBodyPart MappedPart=BodyPartConfig->GetBodyPartFromName(HitResult->BoneName);
 				if (MappedPart!=EBodyPart::None)
 				{
 					Part=MappedPart;
+					bMappedBodyPart = true;
 				}
-				else if (HitResult->BoneName.IsNone())
+				else
 				{
 					const EBodyPart MyMappedPart=BodyPartConfig->GetBodyPartFromName(HitResult->MyBoneName);
 					if (MyMappedPart!=EBodyPart::None)
 					{
 						Part=MyMappedPart;
+						bMappedBodyPart = true;
+					}
+				}
+
+				if (!bMappedBodyPart)
+				{
+					if (const USkeletalMeshComponent* HitMesh = Cast<USkeletalMeshComponent>(HitResult->GetComponent()))
+					{
+						EBodyPart ParentMappedPart = MapBodyPartFromParentBones(HitMesh, HitResult->BoneName, BodyPartConfig, OwnerActor);
+						if (ParentMappedPart == EBodyPart::None && HitResult->MyBoneName != HitResult->BoneName)
+						{
+							ParentMappedPart = MapBodyPartFromParentBones(HitMesh, HitResult->MyBoneName, BodyPartConfig, OwnerActor);
+						}
+
+						if (ParentMappedPart != EBodyPart::None)
+						{
+							Part = ParentMappedPart;
+							bMappedBodyPart = true;
+						}
 					}
 				}
 			}
+			else
+			{
+			}
+
+			if (!bMappedBodyPart)
+			{
+				Part = InferBodyPartFromHitLocation(OwnerActor, *HitResult);
+			}
 		}
+		else
+		{
+		}
+
+		const float OldHP=GetHPByPart(Part);
 		const float NewHP=FMath::Max(GetHPByPart(Part)-LocalDamage, 0.f);
 		SetHPByPart(Part, NewHP);
 

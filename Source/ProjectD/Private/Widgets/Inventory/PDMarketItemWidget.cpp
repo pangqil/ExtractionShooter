@@ -5,7 +5,7 @@
 #include "Components/Button.h"
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
-#include "Items/PDInventoryComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDMarketQuantityPopupWidget.h"
 
@@ -122,7 +122,7 @@ void UPDMarketItemWidget::RefreshVisuals()
 
 	if (TextStockWidget)
 	{
-		TextStockWidget->SetText(Entry.Stock < 0 ? FText::FromString(TEXT("∞")) : FText::AsNumber(Entry.Stock));
+		TextStockWidget->SetText(Entry.Stock < 0 ? FText::FromString(TEXT("Unlimited")) : FText::AsNumber(Entry.Stock));
 	}
 
 	if (ButtonBuyWidget)

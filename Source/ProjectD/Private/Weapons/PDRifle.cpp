@@ -1,7 +1,65 @@
 #include "Weapons/PDRifle.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Core/PDPlayerController.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/Character.h"
 #include "Net/UnrealNetwork.h"
+
+namespace
+{
+bool RefineCharacterHitToMesh(const FHitResult& SourceHit, const FVector& Start, const FVector& End,
+	const FCollisionQueryParams& QueryParams, FHitResult& OutHit)
+{
+	ACharacter* HitCharacter = Cast<ACharacter>(SourceHit.GetActor());
+	if (!HitCharacter)
+	{
+		return false;
+	}
+
+	USkeletalMeshComponent* Mesh = HitCharacter->GetMesh();
+	if (!Mesh || SourceHit.GetComponent() == Mesh)
+	{
+		return false;
+	}
+
+	FCollisionQueryParams MeshQueryParams = QueryParams;
+	MeshQueryParams.bTraceComplex = false;
+
+	FHitResult MeshHit;
+	if (!Mesh->LineTraceComponent(MeshHit, Start, End, MeshQueryParams))
+	{
+		FVector ClosestBoneLocation = FVector::ZeroVector;
+		const FName ClosestBoneName = Mesh->FindClosestBone(SourceHit.ImpactPoint, &ClosestBoneLocation, 0.f, false);
+		if (ClosestBoneName.IsNone())
+		{
+			return false;
+		}
+
+		OutHit = SourceHit;
+		OutHit.Component = Mesh;
+		OutHit.BoneName = ClosestBoneName;
+		OutHit.MyBoneName = ClosestBoneName;
+		OutHit.TraceStart = Start;
+		OutHit.TraceEnd = End;
+		return true;
+	}
+
+	OutHit = SourceHit;
+	OutHit.Component = Mesh;
+	OutHit.BoneName = MeshHit.BoneName;
+	OutHit.MyBoneName = MeshHit.MyBoneName;
+	OutHit.ImpactPoint = MeshHit.ImpactPoint;
+	OutHit.Location = MeshHit.Location;
+	OutHit.ImpactNormal = MeshHit.ImpactNormal;
+	OutHit.Normal = MeshHit.Normal;
+	OutHit.TraceStart = Start;
+	OutHit.TraceEnd = End;
+	OutHit.Distance = MeshHit.Distance;
+	OutHit.FaceIndex = MeshHit.FaceIndex;
+	OutHit.PhysMaterial = MeshHit.PhysMaterial;
+	return true;
+}
+}
 
 APDRifle::APDRifle()
 {
@@ -110,6 +168,14 @@ bool APDRifle::PerformLineTrace(FHitResult& OutHit, FVector& OutTraceEnd)
     QueryParams.bTraceComplex = true;
 
     const bool bHit = GetWorld()->LineTraceSingleByChannel(OutHit, Start, OutTraceEnd, ECC_Pawn, QueryParams);
+    if (bHit)
+    {
+        FHitResult MeshHit;
+        if (RefineCharacterHitToMesh(OutHit, Start, OutTraceEnd, QueryParams, MeshHit))
+        {
+            OutHit = MeshHit;
+        }
+    }
     if (bHit) OutTraceEnd = OutHit.ImpactPoint;
 
     return bHit;

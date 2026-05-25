@@ -80,8 +80,11 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(State_Sprinting, "State.Sprinting");
 	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_MeleeHit, "Anim.Notify.MeleeHit");
 	UE_DEFINE_GAMEPLAY_TAG(State_Reviving, "State.Reviving");
+	UE_DEFINE_GAMEPLAY_TAG(State_UsingConsumable, "State.UsingConsumable");
 	UE_DEFINE_GAMEPLAY_TAG(Event_Revive_Start, "Event.Revive.Start");
 	UE_DEFINE_GAMEPLAY_TAG(Event_Revive_Cancel, "Event.Revive.Cancel");
+	UE_DEFINE_GAMEPLAY_TAG(Event_Item_UseConsumable, "Event.Item.UseConsumable");
+	UE_DEFINE_GAMEPLAY_TAG(Event_Item_CancelConsumableUse, "Event.Item.CancelConsumableUse");
 
 
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_Fire,    "GameplayCue.Weapon.Fire");

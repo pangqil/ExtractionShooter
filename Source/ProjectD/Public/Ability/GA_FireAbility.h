@@ -1,14 +1,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Ability/PDGameplayAbilityBase.h"
+#include "Ability/GA_GameplayAbilityBase.h"
 #include "GA_FireAbility.generated.h"
 
 class APDRangedWeaponBase;
 
 
 UCLASS(Blueprintable)
-class PROJECTD_API UGA_FireAbility : public UPDGameplayAbilityBase
+class PROJECTD_API UGA_FireAbility : public UGA_GameplayAbilityBase
 {
 	GENERATED_BODY()
 

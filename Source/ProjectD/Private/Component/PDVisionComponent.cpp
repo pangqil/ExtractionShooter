@@ -23,9 +23,18 @@ UPDVisionComponent::UPDVisionComponent()
 void UPDVisionComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	LastLocation=GetOwner()->GetActorLocation();
-	LastYaw=GetOwner()->GetActorRotation().Yaw;
-	SmoothedForward=GetOwner()->GetActorForwardVector();
+	AActor* Owner = GetOwner();
+	UWorld* World = GetWorld();
+
+
+	if (!Owner)
+	{
+		return;
+	}
+
+	LastLocation=Owner->GetActorLocation();
+	LastYaw=Owner->GetActorRotation().Yaw;
+	SmoothedForward=Owner->GetActorForwardVector();
 
 	UpdateFogOfWarMPC_Transform(0.f);
 	UpdateFogOfWarMPC_Vision();
@@ -34,7 +43,11 @@ void UPDVisionComponent::BeginPlay()
 
 void UPDVisionComponent::EndPlay(EEndPlayReason::Type Reason)
 {
-	GetWorld()->GetTimerManager().ClearTimer(TimerHandle);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(TimerHandle);
+	}
 	for (AActor* Actor:VisibleActors)
 	{
 		if (IsValid(Actor)) UpdateExposure(Actor, 0.f);
@@ -45,7 +58,11 @@ void UPDVisionComponent::EndPlay(EEndPlayReason::Type Reason)
 
 void UPDVisionComponent::BindToAttributeSet(UAbilitySystemComponent* ASC)
 {
-	if (!ASC) return;
+	if (!ASC)
+	{
+		return;
+	}
+
 
 	ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetVisionRangeAttribute())
 		.AddUObject(this, &UPDVisionComponent::OnVisionRangeChanged);
@@ -63,7 +80,11 @@ void UPDVisionComponent::BindToAttributeSet(UAbilitySystemComponent* ASC)
 		if (AS->GetVisionUpdateInterval() > 0.f)
 			UpdateInterval = AS->GetVisionUpdateInterval();
 
+
 		UpdateFogOfWarMPC_Vision();
+	}
+	else
+	{
 	}
 }
 
@@ -105,7 +126,16 @@ void UPDVisionComponent::OnVisionUpdateIntervalChanged(const FOnAttributeChangeD
 void UPDVisionComponent::PerformVisionUpdate()
 {
 	AActor* Owner=GetOwner();
-	if (!IsValid(Owner)) return;
+	if (!IsValid(Owner))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
 
 	const FVector CurrentLocation=Owner->GetActorLocation();
 	const float CurrentYaw=Owner->GetActorRotation().Yaw;
@@ -128,7 +158,7 @@ void UPDVisionComponent::PerformVisionUpdate()
 
 	const float EffectiveRange = VisionRange * StaminaScale;
 
-	GetWorld()->OverlapMultiByChannel(Overlaps, CurrentLocation, FQuat::Identity,
+	World->OverlapMultiByChannel(Overlaps, CurrentLocation, FQuat::Identity,
 		ECC_Pawn, FCollisionShape::MakeSphere(EffectiveRange), Params);
 
 	TSet<AActor*> NewVisible;
@@ -197,8 +227,16 @@ void UPDVisionComponent::UpdateExposure(AActor* Target, float Exposure)
 
 void UPDVisionComponent::ScheduleNextUpdate(float Interval)
 {
-	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this,
-		&UPDVisionComponent::PerformVisionUpdate, Interval, false);
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const float SafeInterval = FMath::Max(Interval, 0.01f);
+	World->GetTimerManager().SetTimer(TimerHandle, this,
+		&UPDVisionComponent::PerformVisionUpdate, SafeInterval, false);
+
 }
 
 float UPDVisionComponent::GetEffectiveAngle() const
@@ -214,9 +252,15 @@ void UPDVisionComponent::UpdateStaminaScale(float Scale)
 
 void UPDVisionComponent::UpdateFogOfWarMPC_Transform(float DeltaTime)
 {
-	if (!FogOfWarMPC) return;
+	if (!FogOfWarMPC)
+	{
+		return;
+	}
 	AActor* Owner=GetOwner();
-	if (!IsValid(Owner)) return;
+	if (!IsValid(Owner))
+	{
+		return;
+	}
 
 	const FVector Loc=Owner->GetActorLocation();
 	const APDPlayerCharacter* PlayerOwner = Cast<APDPlayerCharacter>(Owner);
@@ -231,7 +275,10 @@ void UPDVisionComponent::UpdateFogOfWarMPC_Transform(float DeltaTime)
 
 void UPDVisionComponent::UpdateFogOfWarMPC_Vision()
 {
-	if (!FogOfWarMPC) return;
+	if (!FogOfWarMPC)
+	{
+		return;
+	}
 
 	UpdateSharedFogOfWarMPC(0.f);
 }
@@ -257,6 +304,12 @@ void UPDVisionComponent::UpdateSharedFogOfWarMPC(float DeltaTime)
 		{
 			Sources.Add(LocalVision);
 		}
+		else
+		{
+		}
+	}
+	else
+	{
 	}
 
 	for (TActorIterator<APDPlayerCharacter> It(GetWorld()); It; ++It)

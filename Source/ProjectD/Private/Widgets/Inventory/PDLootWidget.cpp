@@ -5,9 +5,11 @@
 #include "Components/SizeBoxSlot.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
+#include "Core/PDPlayerComponentResolver.h"
+#include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDLootComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Containers/PDLootComponent.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 
 void UPDLootWidget::InitializeLoot(UPDLootComponent* InLootComponent)
@@ -108,7 +110,7 @@ void UPDLootWidget::RefreshLootGrid()
 			}
 		}
 
-		// Stash 위젯과 동일하게 SizeBox 로 셀 크기 고정 — UniformGrid 가 부모 사이즈에 늘어나지 않도록.
+		// Stash ?�젯�??�일?�게 SizeBox �??� ?�기 고정 ??UniformGrid 가 부�??�이즈에 ?�어?��? ?�도�?
 		USizeBox* SlotSizeBox = WidgetTree ? WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass()) : nullptr;
 		if (SlotSizeBox)
 		{
@@ -139,12 +141,15 @@ void UPDLootWidget::HandleLootSlotLeftClicked(UPDInventorySlotWidget* /*SlotWidg
 {
 	if (!TargetLootComponent) return;
 
-	APawn* OwnerPawn = GetOwningPlayerPawn();
-	UPDInventoryComponent* Inventory = OwnerPawn ? OwnerPawn->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+	UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer());
+	if (!Inventory)
+	{
+		Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
+	}
 	if (!Inventory) return;
 
-	// 단발 정책: 좌클릭 1회 = 슬롯 전체 인벤토리로 이동.
-	// 향후 드래그앤드롭/수량 팝업 등 확장 시 HandleLootSlotLeftClicked 분기 또는 별도 핸들러 추가.
+	// ?�발 ?�책: 좌클�?1??= ?�롯 ?�체 ?�벤?�리�??�동.
+	// ?�후 ?�래그앤?�롭/?�량 ?�업 ???�장 ??HandleLootSlotLeftClicked 분기 ?�는 별도 ?�들??추�?.
 	TargetLootComponent->TakeSlotToInventory(ClickedSlotIndex, Inventory, /*Quantity=*/-1);
 }
 

@@ -1,9 +1,10 @@
 #include "Core/PDPlayerState.h"
 
 #include "Characters/PDPlayerCharacter.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDEquipmentComponent.h"
-#include "Items/PDQuickSlotComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Equipment/PDEquipmentComponent.h"
+#include "Items/Data/PDItemSlotTransfer.h"
+#include "Items/Containers/PDQuickSlotComponent.h"
 #include "Data/PDQuestComponent.h"
 #include "Engine/DataTable.h"
 #include "Net/UnrealNetwork.h"
@@ -42,6 +43,24 @@ void APDPlayerState::ApplyComponentDataDefaults()
 	}
 }
 
+
+UPDQuickSlotComponent* APDPlayerState::GetQuickSlotComponent() const
+{
+	if (QuickSlotComponent && QuickSlotComponent->GetOwner() == this && !QuickSlotComponent->IsTemplate())
+	{
+		return QuickSlotComponent;
+	}
+
+	UPDQuickSlotComponent* RuntimeQuickSlotComponent = const_cast<APDPlayerState*>(this)->FindComponentByClass<UPDQuickSlotComponent>();
+	if (RuntimeQuickSlotComponent && RuntimeQuickSlotComponent->GetOwner() == this && !RuntimeQuickSlotComponent->IsTemplate())
+	{
+		const_cast<APDPlayerState*>(this)->QuickSlotComponent = RuntimeQuickSlotComponent;
+		return RuntimeQuickSlotComponent;
+	}
+
+	return QuickSlotComponent;
+}
+
 void APDPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -75,7 +94,7 @@ void APDPlayerState::ResetRaidParticipationState()
 {
 	if (!HasAuthority()) return;
 
-	// 스탯/스냅샷도 리셋 — StartRaid 마다 새 라이드.
+	// ?�탯/?�냅?�도 리셋 ??StartRaid 마다 ???�이??
 	RaidStats = FPDRaidStats{};
 	RaidInitialGold = 0;
 	RaidInitialItemQuantity = 0;
@@ -171,6 +190,8 @@ void APDPlayerState::OnRep_PersistentData()
 void APDPlayerState::InitializePersistentData(const FPDPlayerData& InData)
 {
 	PersistentData = InData;
+	FPDItemContainerOps::EnsureInstanceIDs(PersistentData.StashItems);
+	FPDItemContainerOps::EnsureInstanceIDs(PersistentData.RaidLoadout);
 	ForceNetUpdate();
 }
 
@@ -205,10 +226,11 @@ void APDPlayerState::AddTraderReputationExp(int32 Amount)
 void APDPlayerState::ConfirmRaidLoadout(const TArray<FPDInventorySlot>& InLoadout, int32 InGold)
 {
 	PersistentData.RaidLoadout = InLoadout;
+	FPDItemContainerOps::EnsureInstanceIDs(PersistentData.RaidLoadout);
 	PersistentData.RaidGold = FMath::Max(0, InGold);
 	PersistentData.Gold = FMath::Max(0, PersistentData.Gold - PersistentData.RaidGold);
 
-	for (const FPDInventorySlot& LoadoutSlot : InLoadout)
+	for (const FPDInventorySlot& LoadoutSlot : PersistentData.RaidLoadout)
 	{
 		if (LoadoutSlot.IsEmpty())
 		{
@@ -216,8 +238,35 @@ void APDPlayerState::ConfirmRaidLoadout(const TArray<FPDInventorySlot>& InLoadou
 		}
 
 		int32 QuantityToRemove = LoadoutSlot.Quantity;
+		if (LoadoutSlot.ItemInstanceID.IsValid())
+		{
+			for (FPDInventorySlot& StashSlot : PersistentData.StashItems)
+			{
+				if (StashSlot.IsEmpty() || StashSlot.ItemInstanceID != LoadoutSlot.ItemInstanceID)
+				{
+					continue;
+				}
+
+				const int32 RemovedQuantity = FMath::Min(StashSlot.Quantity, QuantityToRemove);
+				StashSlot.Quantity -= RemovedQuantity;
+				QuantityToRemove -= RemovedQuantity;
+
+				if (StashSlot.Quantity <= 0)
+				{
+					StashSlot.Clear();
+				}
+
+				break;
+			}
+		}
+
 		for (FPDInventorySlot& StashSlot : PersistentData.StashItems)
 		{
+			if (QuantityToRemove <= 0)
+			{
+				break;
+			}
+
 			if (StashSlot.IsEmpty() || StashSlot.ItemData.ItemID != LoadoutSlot.ItemData.ItemID)
 			{
 				continue;
@@ -252,6 +301,7 @@ void APDPlayerState::ClearRaidLoadout()
 void APDPlayerState::SetPersistentStashSnapshot(const TArray<FPDInventorySlot>& InStashItems, int32 InUpgradeLevel)
 {
 	PersistentData.StashItems = InStashItems;
+	FPDItemContainerOps::EnsureInstanceIDs(PersistentData.StashItems);
 	PersistentData.StashUpgradeLevel = FMath::Max(0, InUpgradeLevel);
 	ForceNetUpdate();
 }
@@ -356,10 +406,12 @@ void APDPlayerState::TransferInventoryToPersistentStash(const UPDInventoryCompon
 		while (RemainingQuantity > 0)
 		{
 			FPDInventorySlot NewSlot;
+			NewSlot.ItemInstanceID = RaidSlot.ItemInstanceID;
 			NewSlot.ItemData = RaidSlot.ItemData;
 			NewSlot.ModificationLevel = RaidSlot.ModificationLevel;
 			NewSlot.Quantity = FMath::Min(RemainingQuantity, FMath::Max(1, RaidSlot.ItemData.MaxStack));
 			NewSlot.bIsEmpty = false;
+			NewSlot.EnsureInstanceID();
 
 			PersistentData.StashItems.Add(NewSlot);
 			RemainingQuantity -= NewSlot.Quantity;

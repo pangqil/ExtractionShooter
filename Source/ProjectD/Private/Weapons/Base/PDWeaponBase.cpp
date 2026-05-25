@@ -9,14 +9,15 @@
 #include "Components/SphereComponent.h"
 #include "Component/PDWeaponComponent.h"
 
-#include "Items/PDInventoryComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/Texture2D.h"
 
 APDWeaponBase::APDWeaponBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	SetReplicates(true);
+	bReplicates = true;
 	SetReplicateMovement(true);
 	bAlwaysRelevant = true;
 	NetDormancy = DORM_Never;
@@ -38,8 +39,6 @@ APDWeaponBase::APDWeaponBase()
 void APDWeaponBase::BeginPlay()
 {
 	Super::BeginPlay();
-	SetReplicates(true);
-	SetReplicateMovement(true);
 	bAlwaysRelevant = true;
 	SetNetDormancy(DORM_Never);
 
@@ -57,44 +56,27 @@ void APDWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(APDWeaponBase, bIsDropped);
 	DOREPLIFETIME(APDWeaponBase, WeaponOwner);
 	DOREPLIFETIME(APDWeaponBase, ItemID);
+	DOREPLIFETIME(APDWeaponBase, ItemInstanceID);
 	DOREPLIFETIME(APDWeaponBase, WeaponType);
 }
 
 void APDWeaponBase::Interact_Implementation(AActor* Interactor)
 {
-	UE_LOG(LogTemp, Warning,
-		TEXT("[PD WeaponPickup] Interact. Weapon=%s Interactor=%s Authority=%d Owner=%s ItemID=%s"),
-		*GetNameSafe(this),
-		*GetNameSafe(Interactor),
-		HasAuthority() ? 1 : 0,
-		*GetNameSafe(WeaponOwner),
-		*ItemID.ToString());
-
 	if (!HasAuthority()) return;
 
 	if (IsValid(WeaponOwner))
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[PD WeaponPickup] Failed: already has WeaponOwner. Weapon=%s Owner=%s"),
-			*GetNameSafe(this),
-			*GetNameSafe(WeaponOwner));
 		return;
 	}
 
 	APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(Interactor);
 	if (!Player)
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[PD WeaponPickup] Failed: interactor is not player character. Interactor=%s"),
-			*GetNameSafe(Interactor));
 		return;
 	}
 
 	if (ItemID.IsNone())
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[PD WeaponPickup] Failed: ItemID is None. Weapon=%s"),
-			*GetNameSafe(this));
 		OnPickupFailed();
 		return;
 	}
@@ -102,23 +84,14 @@ void APDWeaponBase::Interact_Implementation(AActor* Interactor)
 	UPDInventoryComponent* Inventory = Player->GetInventoryComponent();
 	if (!Inventory || !Inventory->AddItemByID(ItemID))
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[PD WeaponPickup] Failed: AddItemByID failed. Player=%s Inventory=%s ItemID=%s"),
-			*GetNameSafe(Player),
-			*GetNameSafe(Inventory),
-			*ItemID.ToString());
 		OnPickupFailed();
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning,
-		TEXT("[PD WeaponPickup] Succeeded. Weapon=%s Player=%s ItemID=%s"),
-		*GetNameSafe(this),
-		*GetNameSafe(Player),
-		*ItemID.ToString());
-
+	bIsDropped = false;
 	MulticastOnPickedUp();
 	ApplyPickedUpPresentation();
+	ForceNetUpdate();
 	SetLifeSpan(0.2f);
 }
 
@@ -145,6 +118,11 @@ void APDWeaponBase::MulticastOnPickedUp_Implementation()
 	ApplyPickedUpPresentation();
 }
 
+void APDWeaponBase::MulticastOnEquipped_Implementation(AActor* NewOwner, bool bShouldBeVisible)
+{
+	ApplyEquippedPresentation(NewOwner, bShouldBeVisible);
+}
+
 void APDWeaponBase::ApplyPickedUpPresentation()
 {
 	SetActorHiddenInGame(true);
@@ -161,6 +139,49 @@ void APDWeaponBase::ApplyPickedUpPresentation()
 	{
 		PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		PickupCollision->SetGenerateOverlapEvents(false);
+	}
+}
+
+void APDWeaponBase::ApplyEquippedPresentation(AActor* NewOwner, bool bShouldBeVisible)
+{
+	if (NewOwner)
+	{
+		WeaponOwner = NewOwner;
+	}
+
+	SetActorEnableCollision(false);
+
+	if (WeaponMesh)
+	{
+		WeaponMesh->SetVisibility(true, true);
+		WeaponMesh->SetSimulatePhysics(false);
+		WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	if (PickupCollision)
+	{
+		PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		PickupCollision->SetGenerateOverlapEvents(false);
+	}
+
+	if (APDCharacterBase* Character = Cast<APDCharacterBase>(NewOwner))
+	{
+		Character->AttachActorToWeaponSocket(this);
+	}
+
+	SetActorHiddenInGame(!bShouldBeVisible);
+
+	if (bShouldBeVisible && EquipSound && GetNetMode() != NM_DedicatedServer)
+	{
+		USceneComponent* AttachComponent = WeaponMesh ? Cast<USceneComponent>(WeaponMesh) : GetRootComponent();
+		if (AttachComponent)
+		{
+			UGameplayStatics::SpawnSoundAttached(EquipSound, AttachComponent);
+		}
+		else
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, EquipSound, GetActorLocation());
+		}
 	}
 }
 
@@ -215,17 +236,13 @@ void APDWeaponBase::OnEquip_Implementation(AActor* NewOwner)
 	ApplyReplicatedWeaponOwner();
 	ForceNetUpdate();
 
-
-	if (UAbilitySystemComponent* ASCComp = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(NewOwner))
+	bool bShouldBeVisible = true;
+	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(NewOwner))
 	{
-		FGameplayCueParameters Params;
-		Params.Location = WeaponMesh->GetComponentLocation();
-		Params.TargetAttachComponent = WeaponMesh;
-		Params.SourceObject = this;
-		Params.EffectCauser = this;
-		Params.Instigator = NewOwner;
-		ASCComp->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Weapon_Equip, Params);
+		bShouldBeVisible = PlayerCharacter->GetCurrentSlot() == PlayerCharacter->GetSlotForWeaponType(WeaponType);
 	}
+
+	MulticastOnEquipped(NewOwner, bShouldBeVisible);
 }
 
 void APDWeaponBase::OnUnequip_Implementation()
@@ -263,8 +280,15 @@ void APDWeaponBase::SetDropped(bool bDropped)
 	}
 	else
 	{
-		PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		WeaponMesh->SetSimulatePhysics(false);
+		if (!IsValid(WeaponOwner))
+		{
+			ApplyPickedUpPresentation();
+		}
+		else
+		{
+			PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			WeaponMesh->SetSimulatePhysics(false);
+		}
 	}
 
 	if (HasAuthority())

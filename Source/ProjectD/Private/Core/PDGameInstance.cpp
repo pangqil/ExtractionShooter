@@ -5,6 +5,7 @@
 #include "Core/PDSessionService.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "Items/Data/PDItemSlotTransfer.h"
 #include "Misc/PackageName.h"
 #include "Kismet/GameplayStatics.h"
 #include "Subsystems/PDLoadingScreenSubsystem.h"
@@ -23,6 +24,8 @@ void UPDGameInstance::Init()
 void UPDGameInstance::SetPlayerData(const FPDPlayerData& InData)
 {
 	PlayerData=InData;
+	FPDItemContainerOps::EnsureInstanceIDs(PlayerData.StashItems);
+	FPDItemContainerOps::EnsureInstanceIDs(PlayerData.RaidLoadout);
 }
 
 FString UPDGameInstance::GetSaveKeyForController(const APlayerController* PlayerController) const
@@ -53,7 +56,10 @@ FPDPlayerData UPDGameInstance::LoadPlayerDataFromDisk(const FString& SaveKey, bo
 	}
 
 	const UPDSaveGame* SaveObject = Cast<UPDSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, UPDSaveGame::UserIndex));
-	return SaveObject ? SaveObject->PlayerData : (bUseLegacyFallback ? PlayerData : FPDPlayerData());
+	FPDPlayerData LoadedData = SaveObject ? SaveObject->PlayerData : (bUseLegacyFallback ? PlayerData : FPDPlayerData());
+	FPDItemContainerOps::EnsureInstanceIDs(LoadedData.StashItems);
+	FPDItemContainerOps::EnsureInstanceIDs(LoadedData.RaidLoadout);
+	return LoadedData;
 }
 
 void UPDGameInstance::SavePlayerDataToDisk(const FString& SaveKey, const FPDPlayerData& InData) const
@@ -71,6 +77,7 @@ void UPDGameInstance::SavePlayerDataToDisk(const FString& SaveKey, const FPDPlay
 void UPDGameInstance::SetStashItems(const TArray<FPDInventorySlot>& InStashItems)
 {
 	PlayerData.StashItems=InStashItems;
+	FPDItemContainerOps::EnsureInstanceIDs(PlayerData.StashItems);
 }
 
 const TArray<FPDInventorySlot>& UPDGameInstance::GetStashItems() const
@@ -91,6 +98,7 @@ int32 UPDGameInstance::GetStashUpgradeLevel() const
 void UPDGameInstance::SetSecureContainerItems(const TArray<FPDInventorySlot>& InSecureContainerItems)
 {
 	SecureContainerItems = InSecureContainerItems;
+	FPDItemContainerOps::EnsureInstanceIDs(SecureContainerItems);
 }
 
 const TArray<FPDInventorySlot>& UPDGameInstance::GetSecureContainerItems() const
@@ -127,16 +135,31 @@ int32 UPDGameInstance::GetTraderReputationLevel() const
 void UPDGameInstance::ConfirmRaidLoadout(const TArray<FPDInventorySlot>& InLoadout, int32 InGold)
 {
 	PlayerData.RaidLoadout = InLoadout;
+	FPDItemContainerOps::EnsureInstanceIDs(PlayerData.RaidLoadout);
 	PlayerData.RaidGold    = FMath::Max(0, InGold);
 
 	PlayerData.Gold = FMath::Max(0, PlayerData.Gold - PlayerData.RaidGold);
 
-	for (const FPDInventorySlot& LoadoutSlot : InLoadout)
+	for (const FPDInventorySlot& LoadoutSlot : PlayerData.RaidLoadout)
 	{
 		if (LoadoutSlot.IsEmpty()) continue;
 		int32 ToRemove = LoadoutSlot.Quantity;
+		if (LoadoutSlot.ItemInstanceID.IsValid())
+		{
+			for (FPDInventorySlot& StashSlot : PlayerData.StashItems)
+			{
+				if (StashSlot.IsEmpty() || StashSlot.ItemInstanceID != LoadoutSlot.ItemInstanceID) continue;
+				const int32 Removed = FMath::Min(StashSlot.Quantity, ToRemove);
+				StashSlot.Quantity -= Removed;
+				if (StashSlot.Quantity <= 0) StashSlot.Clear();
+				ToRemove -= Removed;
+				break;
+			}
+		}
+
 		for (FPDInventorySlot& StashSlot : PlayerData.StashItems)
 		{
+			if (ToRemove <= 0) break;
 			if (StashSlot.IsEmpty()) continue;
 			if (StashSlot.ItemData.ItemID != LoadoutSlot.ItemData.ItemID) continue;
 			int32 Removed = FMath::Min(StashSlot.Quantity, ToRemove);
@@ -170,7 +193,9 @@ void UPDGameInstance::LoadFromDisk()
 	UPDSaveGame* SaveObject=Cast<UPDSaveGame>(UGameplayStatics::LoadGameFromSlot(UPDSaveGame::SlotName, UPDSaveGame::UserIndex));
 	if (!SaveObject) return;
 	PlayerData=SaveObject->PlayerData;
-	// SecureContainer는 세이브파일이 아닌 세션 휴대에만 존재—디스크 로드의는 리셋해서 아이템이 남아있지 않도록 함.
+	FPDItemContainerOps::EnsureInstanceIDs(PlayerData.StashItems);
+	FPDItemContainerOps::EnsureInstanceIDs(PlayerData.RaidLoadout);
+	// SecureContainer???�이브파?�이 ?�닌 ?�션 ?��??�만 존재?�디?�크 로드?�는 리셋?�서 ?�이?�이 ?�아?��? ?�도�???
 	SecureContainerItems.Reset();
 }
 

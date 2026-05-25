@@ -1,15 +1,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Ability/PDGameplayAbilityBase.h"
+#include "Ability/GA_GameplayAbilityBase.h"
 #include "GA_ReloadAbility.generated.h"
 
 class APDRangedWeaponBase;
 class APDWeaponBase;
+class APDPlayerCharacter;
+class USoundBase;
 
 
 UCLASS(Blueprintable)
-class PROJECTD_API UGA_ReloadAbility : public UPDGameplayAbilityBase
+class PROJECTD_API UGA_ReloadAbility : public UGA_GameplayAbilityBase
 {
 	GENERATED_BODY()
 
@@ -27,9 +29,14 @@ protected:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		bool bReplicateEndAbility, bool bWasCancelled) override;
 
+	UPROPERTY(EditDefaultsOnly, Category="Reload")
+	TObjectPtr<USoundBase> ReloadSound;
+
 private:
 	TWeakObjectPtr<APDRangedWeaponBase> WeaponPtr;
 
 	UFUNCTION()
 	void OnWeaponReloaded(APDWeaponBase* Weapon);
+
+	void ExecuteReloadSoundCue(APDPlayerCharacter* Character, APDRangedWeaponBase* Weapon);
 };

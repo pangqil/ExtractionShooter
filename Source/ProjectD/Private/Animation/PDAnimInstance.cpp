@@ -1,4 +1,5 @@
 #include "Animation/PDAnimInstance.h"
+
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Characters/Base/PDCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -10,71 +11,72 @@
 void UPDAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
-	// Player/Enemy 공통 베이스로 캐스팅: AnimBP를 양쪽이 공유 가능
-	OwnerCharacter=Cast<APDCharacterBase>(GetOwningActor());
+
+	OwnerCharacter = Cast<APDCharacterBase>(GetOwningActor());
 	if (IsValid(OwnerCharacter))
-		CachedASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter);
+	{
+		CachedASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter);
+	}
 }
 
 void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
-	if (!IsValid(OwnerCharacter)||!IsValid(CachedASC)) return;
+	if (!IsValid(OwnerCharacter) || !IsValid(CachedASC)) return;
 
-	const FVector Velocity=OwnerCharacter->GetCharacterMovement()->Velocity;
-	Cache.MovementSpeed=Velocity.Size2D();
+	const FVector Velocity = OwnerCharacter->GetCharacterMovement()->Velocity;
+	Cache.MovementSpeed = Velocity.Size2D();
 
-	Cache.bIsJumping=OwnerCharacter->GetCharacterMovement()->IsFalling();
-	Cache.Direction=UKismetMathLibrary::NormalizedDeltaRotator(
+	Cache.bIsJumping = OwnerCharacter->GetCharacterMovement()->IsFalling();
+	Cache.Direction = UKismetMathLibrary::NormalizedDeltaRotator(
 		UKismetMathLibrary::MakeRotFromX(Velocity),
 		OwnerCharacter->GetActorRotation()).Yaw;
 
-	Cache.bIsAiming=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Aiming);
-	Cache.AimYaw=0.f;
-	Cache.AimPitch=0.f;
-	Cache.bIsDowned=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Downed);
-	Cache.bIsSprinting=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Sprinting);
+	Cache.bIsAiming = CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Aiming);
+	Cache.AimYaw = 0.f;
+	Cache.AimPitch = 0.f;
+	Cache.bIsDowned = CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Downed);
+	Cache.bIsSprinting = CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Sprinting);
 
-	APDWeaponBase* Weapon=OwnerCharacter->GetCurrentWeapon();
-	// 베이스 캐릭터 기반이므로 무기 자체에서 타입을 읽어 player/enemy 공통 처리
-	Cache.WeaponType=Weapon ? Weapon->GetWeaponType() : EWeaponType::None;
-	Cache.bIsMeleeEquipped=Cache.WeaponType == EWeaponType::Melee;
+	APDWeaponBase* Weapon = OwnerCharacter->GetCurrentWeapon();
+	Cache.WeaponType = Weapon ? Weapon->GetWeaponType() : EWeaponType::None;
+	Cache.bIsMeleeEquipped = Cache.WeaponType == EWeaponType::Melee;
 
-	if (!IsValid(Weapon)||!IsValid(Weapon->GetWeaponMesh()))
+	if (!IsValid(Weapon) || !IsValid(Weapon->GetWeaponMesh()))
 	{
-		Cache.LeftHandIKAlpha=0.f;
+		Cache.LeftHandIKAlpha = 0.f;
 		return;
 	}
 
-	const FName GripSocket=Weapon->GetLeftHandGripSocket();
+	const FName GripSocket = Weapon->GetLeftHandGripSocket();
 	if (Weapon->GetWeaponMesh()->DoesSocketExist(GripSocket))
 	{
-		Cache.LeftHandIKTarget=Weapon->GetWeaponMesh()->GetSocketLocation(GripSocket);
-		Cache.LeftHandIKAlpha=1.f;
+		Cache.LeftHandIKTarget = Weapon->GetWeaponMesh()->GetSocketLocation(GripSocket);
+		Cache.LeftHandIKAlpha = 1.f;
 	}
 	else
-		Cache.LeftHandIKAlpha=0.f;
+	{
+		Cache.LeftHandIKAlpha = 0.f;
+	}
 }
 
 void UPDAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeThreadSafeUpdateAnimation(DeltaSeconds);
 
-	MovementSpeed=Cache.MovementSpeed;
-	bIsJumping=Cache.bIsJumping;
-	Direction=Cache.Direction;
-	bIsAiming=Cache.bIsAiming;
-	AimYaw=Cache.AimYaw;
-	AimPitch=Cache.AimPitch;
-	WeaponType=Cache.WeaponType;
-	LeftHandIKTarget=Cache.LeftHandIKTarget;
-	LeftHandIKAlpha=Cache.LeftHandIKAlpha;
-	bIsMeleeEquipped=Cache.bIsMeleeEquipped;
-	bIsDowned=Cache.bIsDowned;
-	bIsSprinting=Cache.bIsSprinting;
+	MovementSpeed = Cache.MovementSpeed;
+	bIsJumping = Cache.bIsJumping;
+	Direction = Cache.Direction;
+	bIsAiming = Cache.bIsAiming;
+	AimYaw = Cache.AimYaw;
+	AimPitch = Cache.AimPitch;
+	WeaponType = Cache.WeaponType;
+	LeftHandIKTarget = Cache.LeftHandIKTarget;
+	LeftHandIKAlpha = Cache.LeftHandIKAlpha;
+	bIsMeleeEquipped = Cache.bIsMeleeEquipped;
+	bIsDowned = Cache.bIsDowned;
+	bIsSprinting = Cache.bIsSprinting;
 }
-
-
 
 void UPDAnimInstance::OnWeaponEquipped(APDRangedWeaponBase* Weapon)
 {
@@ -86,16 +88,16 @@ void UPDAnimInstance::OnWeaponEquipped(APDRangedWeaponBase* Weapon)
 	Weapon->OnWeaponFired.AddDynamic(this, &UPDAnimInstance::HandleWeaponFired);
 	Weapon->OnWeaponReloadStarted.AddDynamic(this, &UPDAnimInstance::HandleWeaponReloadStarted);
 
-
 	Weapon->bCanFire = false;
 
 	const FPDWeaponAnimSet* Set = GetAnimSetForWeapon(Weapon);
 	if (Set && Set->EquipMontage)
 	{
 		Montage_Play(Set->EquipMontage);
-		if (Set->EquipStartSection != NAME_None)
+		if (Set->EquipStartSection != NAME_None && Set->EquipMontage->GetSectionIndex(Set->EquipStartSection) != INDEX_NONE)
+		{
 			Montage_JumpToSection(Set->EquipStartSection, Set->EquipMontage);
-
+		}
 
 		FOnMontageEnded EndDelegate;
 		EndDelegate.BindUObject(this, &UPDAnimInstance::OnEquipMontageEnded);
@@ -103,7 +105,6 @@ void UPDAnimInstance::OnWeaponEquipped(APDRangedWeaponBase* Weapon)
 	}
 	else
 	{
-
 		Weapon->bCanFire = true;
 	}
 }
@@ -111,7 +112,9 @@ void UPDAnimInstance::OnWeaponEquipped(APDRangedWeaponBase* Weapon)
 void UPDAnimInstance::OnEquipMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
 	if (BoundWeapon.IsValid())
+	{
 		BoundWeapon->bCanFire = true;
+	}
 }
 
 void UPDAnimInstance::OnWeaponUnequipped(APDRangedWeaponBase* Weapon)
@@ -127,8 +130,12 @@ void UPDAnimInstance::OnWeaponUnequipped(APDRangedWeaponBase* Weapon)
 void UPDAnimInstance::HandleWeaponFired(APDWeaponBase* Weapon)
 {
 	if (const FPDWeaponAnimSet* Set = GetAnimSetForWeapon(Weapon))
+	{
 		if (Set->FireMontage)
+		{
 			Montage_Play(Set->FireMontage);
+		}
+	}
 }
 
 void UPDAnimInstance::HandleWeaponReloadStarted(APDWeaponBase* Weapon)
@@ -138,8 +145,10 @@ void UPDAnimInstance::HandleWeaponReloadStarted(APDWeaponBase* Weapon)
 		if (Set->ReloadMontage)
 		{
 			Montage_Play(Set->ReloadMontage);
-			if (Set->ReloadStartSection != NAME_None)
+			if (Set->ReloadStartSection != NAME_None && Set->ReloadMontage->GetSectionIndex(Set->ReloadStartSection) != INDEX_NONE)
+			{
 				Montage_JumpToSection(Set->ReloadStartSection, Set->ReloadMontage);
+			}
 		}
 	}
 }
@@ -178,8 +187,6 @@ const FPDWeaponAnimSet* UPDAnimInstance::GetAnimSetForWeapon(APDWeaponBase* Weap
 	return nullptr;
 }
 
-
-
 void UPDAnimInstance::PlayHitReaction()
 {
 	TArray<UAnimMontage*, TInlineAllocator<4>> Available;
@@ -195,7 +202,10 @@ void UPDAnimInstance::PlayHitReaction()
 
 void UPDAnimInstance::PlayGetUpMontage()
 {
-	if (!GetUpMontage) return;
+	if (!GetUpMontage)
+	{
+		return;
+	}
 
 	Montage_Play(GetUpMontage);
 }

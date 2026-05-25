@@ -5,7 +5,8 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/PDAnimInstance.h"
 #include "Interfaces/PDDamageable.h"
-#include "Items/PDInventoryComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
 
 #include "AbilitySystemComponent.h"
@@ -46,7 +47,11 @@ void APDRangedWeaponBase::Fire_Implementation() {}
 
 void APDRangedWeaponBase::Reload_Implementation()
 {
-	if (!HasAuthority()) return;
+
+	if (!HasAuthority())
+	{
+		return;
+	}
 	if (!CanReload())
 	{
 		if (!bIsReloading && CurrentAmmo < GetCurrentStats().MaxAmmo && !HasAmmoToReload())
@@ -83,9 +88,8 @@ void APDRangedWeaponBase::OnEquip_Implementation(AActor* NewOwner)
 {
 	Super::OnEquip_Implementation(NewOwner);
 
-	// í’€ì¶©íƒ„ fallback ì œê±°: í˜¸ì¶œìž(TryAutoEquipWeaponSlot ë“±)ê°€ spawn ì§í›„ ëª…ì‹œì ìœ¼ë¡œ
-	// CurrentAmmoë¥¼ ì„¤ì •í•œë‹¤. BeginPlayê°€ fresh actorì˜ 0â†’Maxë¥¼ ì²˜ë¦¬í•˜ë¯€ë¡œ ì—¬ê¸°ì„  ë¶ˆí•„ìš”.
-	// ë¹ˆ ë§¤ê·¸(CurrentAmmo=0) ì˜ì†í™” ë³´ì¡´ì„ ìœ„í•´ ì´ ê²½ë¡œì—ì„œ ë®ì–´ì“°ì§€ ì•ŠìŒ.
+	// ??ÃæÅº fallback ??°Å: ??Ãâ??TryAutoEquipWeaponSlot ??°¡ spawn Á÷ÈÄ ¸í½Ã??À¸??	// CurrentAmmo????Á¤??´Ù. BeginPlay°¡ fresh actor??0??Max??Ã³¸®????????±â??ºÒÇÊ??
+	// ??¸Å±×(CurrentAmmo=0) ??¼Ó??º¸Á¸????ÇØ ??°æ·Î??¼­ ???????? ??À½.
 
 	BroadcastAmmoChanged();
 
@@ -128,14 +132,22 @@ void APDRangedWeaponBase::RefreshAmmoChanged()
 
 void APDRangedWeaponBase::ApplyDamage(AActor* HitActor, float DamageAmount, const FHitResult& HitResult)
 {
-	if (!HitActor) return;
-	if (!HitActor->Implements<UPDDamageable>()) return;
+
+	if (!HitActor)
+	{
+		return;
+	}
+	if (!HitActor->Implements<UPDDamageable>())
+	{
+		return;
+	}
 
 	FPDDamageInfo DamageInfo;
 	DamageInfo.BaseDamage = DamageAmount;
 	DamageInfo.Instigator = GetWeaponOwner();
 	DamageInfo.DamageTypeClass = nullptr;
 	DamageInfo.HitResult = HitResult;
+
 
 	IPDDamageable::Execute_ApplyDamage(HitActor, DamageInfo);
 }
@@ -196,7 +208,7 @@ void APDRangedWeaponBase::FinishReload()
 		return;
 	}
 
-	// ë¬´í•œ íƒ„ì•½: ì¸ë²¤í† ë¦¬ ë¬´ì‹œí•˜ê³  ë¬´ì¡°ê±´ í’€ì¶©.
+	// ¹«ÇÑ ??¾à: ??º¥??¸® ¹«½Ã??°í ¹«Á¶??????
 	if (bInfiniteAmmo)
 	{
 		CurrentAmmo = MaxAmmo;
@@ -250,8 +262,10 @@ void APDRangedWeaponBase::PlayWeaponMontage(UAnimMontage* Montage, FName StartSe
 	if (!AnimInst) return;
 
 	AnimInst->Montage_Play(Montage);
-	if (StartSection != NAME_None)
+	if (StartSection != NAME_None && Montage->GetSectionIndex(StartSection) != INDEX_NONE)
+	{
 		AnimInst->Montage_JumpToSection(StartSection, Montage);
+	}
 }
 
 bool APDRangedWeaponBase::IsPlayingMontage(UAnimMontage* Montage) const
@@ -418,12 +432,7 @@ APlayerController* APDRangedWeaponBase::GetOwnerPlayerController() const
 
 UPDInventoryComponent* APDRangedWeaponBase::GetOwnerInventory() const
 {
-	if (!IsValid(WeaponOwner)) return nullptr;
-	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(WeaponOwner.Get()))
-	{
-		return PlayerCharacter->GetInventoryComponent();
-	}
-	return WeaponOwner->FindComponentByClass<UPDInventoryComponent>();
+	return IsValid(WeaponOwner) ? FPDPlayerComponentResolver::ResolveInventory(WeaponOwner.Get()) : nullptr;
 }
 
 UAbilitySystemComponent* APDRangedWeaponBase::GetOwnerASC() const
@@ -440,7 +449,10 @@ bool APDRangedWeaponBase::HasAmmoToReload() const
 
 int32 APDRangedWeaponBase::GetAvailableAmmoCount() const
 {
-	if (AmmoItemID.IsNone()) return ReserveAmmo;
+	if (AmmoItemID.IsNone())
+	{
+		return ReserveAmmo;
+	}
 
 	const UPDInventoryComponent* Inv = GetOwnerInventory();
 	if (!Inv) return ReserveAmmo;

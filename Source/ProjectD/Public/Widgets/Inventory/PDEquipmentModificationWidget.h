@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Type/Types.h"
-#include "Items/PDEquipmentModificationComponent.h"
+#include "Items/Equipment/PDEquipmentModificationComponent.h"
 #include "PDEquipmentModificationWidget.generated.h"
 
 class USoundBase;
@@ -75,13 +75,13 @@ protected:
 	float InventoryGridSlotPadding = 6.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Format")
-	FText EmptySelectionText = FText::FromString(TEXT("장비를 선택하세요"));
+	FText EmptySelectionText = FText::FromString(TEXT("Select an item."));
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Format")
-	FText EmptyMaterialText = FText::FromString(TEXT("재료를 선택하세요"));
+	FText EmptyMaterialText = FText::FromString(TEXT("Select material."));
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Format")
-	FText ModifyReadyText = FText::FromString(TEXT("개조를 시도하면 결과가 표시됩니다."));
+	FText ModifyReadyText = FText::FromString(TEXT("Preview will appear after modification."));
 
 private:
 	void ResolveComponents();

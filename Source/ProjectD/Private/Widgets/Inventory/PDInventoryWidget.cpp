@@ -18,15 +18,16 @@
 #include "Components/Widget.h"
 #include "Components/PanelWidget.h"
 #include "Components/Button.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDItemSlotTransfer.h"
-#include "Items/PDQuickSlotComponent.h"
-#include "Items/PDSecureContainerComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Data/PDItemSlotTransfer.h"
+#include "Items/Containers/PDQuickSlotComponent.h"
+#include "Items/Containers/PDSecureContainerComponent.h"
 #include "Characters/PDPlayerCharacter.h"
-#include "Items/PDEquipmentComponent.h"
-#include "Items/PDStashComponent.h"
+#include "Items/Equipment/PDEquipmentComponent.h"
+#include "Items/Containers/PDStashComponent.h"
 #include "Widgets/Inventory/PDInventoryItemContextMenuWidget.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDInventoryWeightBarWidget.h"
@@ -311,19 +312,19 @@ void UPDInventoryWidget::UpdateTabButtonStyle()
 	if (Button_Equipment)
 	{
 		Button_Equipment->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Equipment ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Equipment, FText::FromString(TEXT("장비")), EquipmentUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Equipment, FText::FromString(TEXT("Equipment")), EquipmentUsedSlots, MaxSlots);
 	}
 
 	if (Button_Consumable)
 	{
 		Button_Consumable->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Consumable ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Consumable, FText::FromString(TEXT("소모")), ConsumableUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Consumable, FText::FromString(TEXT("Consumable")), ConsumableUsedSlots, MaxSlots);
 	}
 
 	if (Button_Misc)
 	{
 		Button_Misc->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Misc ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Misc, FText::FromString(TEXT("기타")), MiscUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Misc, FText::FromString(TEXT("Misc")), MiscUsedSlots, MaxSlots);
 	}
 }
 
@@ -779,21 +780,13 @@ void UPDInventoryWidget::RefreshInventoryWeightBar()
 
 UPDInventoryComponent* UPDInventoryWidget::FindInventoryComponent() const
 {
-	// 2번 구조: InventoryComponent는 PlayerState에 있으므로 PlayerController 헬퍼 사용.
-	if (APDPlayerController* PC = Cast<APDPlayerController>(GetOwningPlayer()))
+	// 2�?구조: InventoryComponent??PlayerState???�으므�?PlayerController ?�퍼 ?�용.
+	if (UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer()))
 	{
-		if (UPDInventoryComponent* Comp = PC->GetPlayerInventoryComponent())
-		{
-			return Comp;
-		}
+		return Inventory;
 	}
-	// Fallback: Pawn에 직접 붙은 경우도 원래 구조 호환.
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
-	{
-		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();
-	}
-
-	return nullptr;
+	// Fallback: Pawn??직접 붙�? 경우???�래 구조 ?�환.
+	return FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
 }
 
 UPDStashComponent* UPDInventoryWidget::FindStashComponent() const
@@ -822,24 +815,16 @@ void UPDInventoryWidget::SetLootCompanionMode(bool bEnabled)
 
 UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 {
-	if (APDPlayerController* PC = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDQuickSlotComponent* QuickSlot = FPDPlayerComponentResolver::ResolveQuickSlot(GetOwningPlayer()))
 	{
-		if (UPDQuickSlotComponent* Comp = PC->GetPlayerQuickSlotComponent())
-		{
-			return Comp;
-		}
+		return QuickSlot;
 	}
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
-	{
-		return OwningPawn->FindComponentByClass<UPDQuickSlotComponent>();
-	}
-
-	return nullptr;
+	return FPDPlayerComponentResolver::ResolveQuickSlot(GetOwningPlayerPawn());
 }
 
 UPDSecureContainerComponent* UPDInventoryWidget::FindSecureContainerComponent() const
 {
-	// SecureContainerComponent는 PlayerCharacter에 붙어있음.
+	// SecureContainerComponent??PlayerCharacter??붙어?�음.
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDSecureContainerComponent>();
@@ -850,19 +835,11 @@ UPDSecureContainerComponent* UPDInventoryWidget::FindSecureContainerComponent() 
 
 UPDEquipmentComponent* UPDInventoryWidget::FindEquipmentComponent() const
 {
-	if (APDPlayerController* PC = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDEquipmentComponent* Equipment = FPDPlayerComponentResolver::ResolveEquipment(GetOwningPlayer()))
 	{
-		if (UPDEquipmentComponent* Comp = PC->GetPlayerEquipmentComponent())
-		{
-			return Comp;
-		}
+		return Equipment;
 	}
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
-	{
-		return OwningPawn->FindComponentByClass<UPDEquipmentComponent>();
-	}
-
-	return nullptr;
+	return FPDPlayerComponentResolver::ResolveEquipment(GetOwningPlayerPawn());
 }
 
 void UPDInventoryWidget::HandleEquipmentChanged()
@@ -901,7 +878,7 @@ const FPDInventorySlot* UPDInventoryWidget::FindSourceSlot(EPDItemContainerType 
 	case EPDItemContainerType::QuickSlot:
 		if (const UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
-			return QuickSlotComponent->QuickSlotItems.IsValidIndex(SlotIndex) ? &QuickSlotComponent->QuickSlotItems[SlotIndex] : nullptr;
+			return QuickSlotComponent->GetResolvedQuickSlot(SlotIndex);
 		}
 		return nullptr;
 	case EPDItemContainerType::Equipment:
@@ -1146,12 +1123,6 @@ void UPDInventoryWidget::HandleContextMenuUseClicked(UPDInventoryItemContextMenu
 		{
 			QuickSlotComponent->UseInventoryConsumableSlot(SlotIndex);
 		}
-		return;
-	}
-
-	if (UPDInventoryComponent* InventoryComponent = FindInventoryComponent())
-	{
-		InventoryComponent->UseItemFromSlot(SlotIndex);
 	}
 }
 
@@ -1263,7 +1234,7 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 	case EPDItemContainerType::QuickSlot:
 		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
-			QuickSlotComponent->TakeQuickSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+			QuickSlotComponent->RemoveItemFromSlot(SourceSlotIndex, Quantity);
 		}
 		break;
 	case EPDItemContainerType::Equipment:

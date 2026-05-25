@@ -46,6 +46,9 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_WeaponIdentity, EditAnywhere, BlueprintReadOnly, Category="Weapon")
 	FName ItemID;
 
+	UPROPERTY(ReplicatedUsing=OnRep_WeaponIdentity, VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
+	FGuid ItemInstanceID;
+
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation")
 	TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
@@ -90,8 +93,12 @@ protected:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastOnPickedUp();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastOnEquipped(AActor* NewOwner, bool bShouldBeVisible);
+
 	void ApplyReplicatedWeaponOwner();
 	void ApplyPickedUpPresentation();
+	void ApplyEquippedPresentation(AActor* NewOwner, bool bShouldBeVisible);
 
 public:
 	UPROPERTY(BlueprintAssignable, Category="Weapon")
@@ -134,6 +141,7 @@ public:
 	FORCEINLINE TSubclassOf<UAnimInstance> GetWeaponAnimLayerClass() const { return WeaponAnimLayerClass; }
 	FORCEINLINE FName              GetLeftHandGripSocket()  const { return LeftHandGripSocket; }
 	FORCEINLINE FName              GetItemID()              const { return ItemID; }
+	FORCEINLINE FGuid             GetItemInstanceID()       const { return ItemInstanceID; }
 
 	/** UISilhouette 동기 로드. 위젯이 무기 스왑 시점에 호출. nullptr 가능. */
 	UFUNCTION(BlueprintPure, Category="Weapon|UI")
