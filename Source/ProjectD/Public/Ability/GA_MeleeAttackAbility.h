@@ -2,23 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "Ability/GA_GameplayAbilityBase.h"
-#include "GA_ReloadAbility.generated.h"
+#include "GA_MeleeAttackAbility.generated.h"
 
-class APDRangedWeaponBase;
-class APDWeaponBase;
-class APDPlayerCharacter;
-class USoundBase;
-
-
-UCLASS(Blueprintable)
-class PROJECTD_API UGA_ReloadAbility : public UGA_GameplayAbilityBase
+UCLASS()
+class PROJECTD_API UGA_MeleeAttackAbility : public UGA_GameplayAbilityBase
 {
 	GENERATED_BODY()
 
 public:
-	UGA_ReloadAbility();
+	UGA_MeleeAttackAbility();
 
-protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
@@ -29,14 +22,22 @@ protected:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		bool bReplicateEndAbility, bool bWasCancelled) override;
 
-	UPROPERTY(EditDefaultsOnly, Category="Reload")
-	TObjectPtr<USoundBase> ReloadSound;
+protected:
+	UPROPERTY(EditDefaultsOnly, Category="Melee")
+	TObjectPtr<UAnimMontage> AttackMontage;
+
+	UPROPERTY(EditDefaultsOnly, Category="Melee")
+	TArray<FName> AttackSections = {TEXT("Attack1"), TEXT("Attack2"), TEXT("Attack3"), TEXT("Attack4")};
+
 
 private:
-	TWeakObjectPtr<APDRangedWeaponBase> WeaponPtr;
+	UFUNCTION()
+	void OnMeleeHitReceived(FGameplayEventData Payload);
 
 	UFUNCTION()
-	void OnWeaponReloaded(APDWeaponBase* Weapon);
+	void OnMontageFinished();
 
-	void ExecuteReloadSoundCue(APDPlayerCharacter* Character, APDRangedWeaponBase* Weapon);
+	void PerformSweep();
+
+	TSet<AActor*> HitActors;
 };
