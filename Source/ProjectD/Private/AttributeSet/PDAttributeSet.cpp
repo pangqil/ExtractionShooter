@@ -164,20 +164,11 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 	Super::PostGameplayEffectExecute(Data);
 	AActor* OwnerActor = GetOwningActor();
 	const bool bHasAuthority = OwnerActor && OwnerActor->HasAuthority();
-	const UGameplayEffect* EffectDef = Data.EffectSpec.Def;
-	const FString EffectName = GetNameSafe(EffectDef);
 
-	if (Data.EvaluatedData.Attribute == GetStaminaAttribute() &&
-		(EffectName.Contains(TEXT("Roll")) || EffectName.Contains(TEXT("Cost"))))
+	if (Data.EvaluatedData.Attribute == GetStaminaAttribute())
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[PD RollCostTrace] Stamina GE executed. Owner=%s Authority=%d Effect=%s Magnitude=%.2f Stamina=%.2f MaxStamina=%.2f"),
-			*GetNameSafe(OwnerActor),
-			bHasAuthority,
-			*EffectName,
-			Data.EvaluatedData.Magnitude,
-			GetStamina(),
-			GetMaxStamina());
+		SetStamina(FMath::Clamp(GetStamina(), 0.f, GetMaxStamina()));
+		return;
 	}
 
 	if (Data.EvaluatedData.Attribute==GetDamageAttribute())
@@ -251,8 +242,24 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		}
 
 		const float OldHP=GetHPByPart(Part);
-		const float NewHP=FMath::Max(GetHPByPart(Part)-LocalDamage, 0.f);
+		const float DamageToPart = FMath::Min(LocalDamage, OldHP);
+		const float OverflowDamage = LocalDamage - DamageToPart;
+		const float NewHP = FMath::Max(OldHP - DamageToPart, 0.f);
 		SetHPByPart(Part, NewHP);
+
+		if (Part != EBodyPart::Torso && OverflowDamage > 0.f)
+		{
+			SetTorsoHP(FMath::Max(GetTorsoHP() - OverflowDamage, 0.f));
+		}
+
+		// 피격 부위/데미지 추적 — 어느 부위에 얼마가 들어갔는지 확인.
+		if (const UEnum* PartEnum = StaticEnum<EBodyPart>())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[PD Damage Hit] %s | Part=%s | HP %.0f -> %.0f (dmg=%.0f) | mapped=%d"),
+				*GetNameSafe(OwnerActor),
+				*PartEnum->GetNameStringByValue(static_cast<int64>(Part)),
+				OldHP, NewHP, LocalDamage, bMappedBodyPart ? 1 : 0);
+		}
 
 		if (APDCharacterBase* Owner=Cast<APDCharacterBase>(OwnerActor))
 		{

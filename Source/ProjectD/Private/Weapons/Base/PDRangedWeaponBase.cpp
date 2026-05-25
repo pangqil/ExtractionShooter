@@ -316,7 +316,16 @@ void APDRangedWeaponBase::ApplyRecoil()
 {
 
 	if (APDPlayerController* PDPC = Cast<APDPlayerController>(GetOwnerPlayerController()))
-		PDPC->AddRecoilOffset(RecoilYawPerShot);
+	{
+		if (PDPC->IsLocalController())
+		{
+			PDPC->AddRecoilOffset(RecoilYawPerShot);
+		}
+		else
+		{
+			PDPC->ClientAddRecoilOffset(RecoilYawPerShot);
+		}
+	}
 }
 
 void APDRangedWeaponBase::ExecuteFireCue(const FVector& MuzzleLoc, const FVector& TraceEnd)

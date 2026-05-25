@@ -75,6 +75,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Stamina")
 	TSubclassOf<UGameplayEffect> StaminaRegenBonusEffectClass;
 
+	UPROPERTY(EditDefaultsOnly, Category="PD|Stamina", meta=(ClampMin="0.0"))
+	float StaminaRegenMaxMoveSpeed = 300.f;
+
 	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
 	TSubclassOf<UGameplayEffect> HungerDecayEffectClass;
 
@@ -109,6 +112,10 @@ protected:
 	bool bHasReplicatedAimWorldLocation = false;
 
 	void OnStaminaChanged(const FOnAttributeChangeData& Data);
+	void OnMoveSpeedChangedForStaminaRegen(const FOnAttributeChangeData& Data);
+	void RefreshStaminaRegenEffects();
+	bool ShouldApplyStaminaRegen() const;
+	FActiveGameplayEffectHandle ApplyPlayerPersistentEffect(TSubclassOf<UGameplayEffect> GEClass);
 
 public:
 	UFUNCTION(BlueprintPure, Category="PD|Player|Weapon")
@@ -261,6 +268,8 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerDropCurrentWeapon();
 
+	FActiveGameplayEffectHandle StaminaRegenHandle;
+	FActiveGameplayEffectHandle StaminaRegenBonusHandle;
 	FActiveGameplayEffectHandle HungerDecayHandle;
 	FActiveGameplayEffectHandle ThirstDecayHandle;
 	FActiveGameplayEffectHandle GasMaskDecayHandle;

@@ -98,12 +98,11 @@ void APDEnemyBase::BeginPlay()
 	if (ASC && AttributeSet)
 	{
 		ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetTorsoHPAttribute())
-			.AddUObject(this, &APDEnemyBase::OnTorsoHPChanged);
+			.AddUObject(this, &APDEnemyBase::OnVitalHPChanged);
+		ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetHeadHPAttribute())
+			.AddUObject(this, &APDEnemyBase::OnVitalHPChanged);
 
-		if (OverheadWidget)
-		{
-			OverheadWidget->SetHealth(AttributeSet->GetTorsoHP(), AttributeSet->GetMaxTorsoHP());
-		}
+		RefreshVitalHealthBar();
 	}
 }
 
@@ -146,15 +145,36 @@ void APDEnemyBase::TickFootstep(float DeltaSeconds)
 	}
 }
 
-void APDEnemyBase::OnTorsoHPChanged(const FOnAttributeChangeData& Data)
+void APDEnemyBase::OnVitalHPChanged(const FOnAttributeChangeData& Data)
+{
+	RefreshVitalHealthBar();
+}
+
+// 사망 조건(Head 또는 Torso == 0)에 맞춰 더 위험한 치명 부위를 단일 바에 표시.
+void APDEnemyBase::RefreshVitalHealthBar()
 {
 	if (!OverheadWidget || !AttributeSet) return;
 
-	const float Max = AttributeSet->GetMaxTorsoHP();
-	OverheadWidget->SetHealth(Data.NewValue, Max);
+	const float Head     = AttributeSet->GetHeadHP();
+	const float MaxHead  = AttributeSet->GetMaxHeadHP();
+	const float Torso    = AttributeSet->GetTorsoHP();
+	const float MaxTorso = AttributeSet->GetMaxTorsoHP();
 
-	// �??�해 ??HP �??�구 ?�출. ?�트리뷰??복제�??�버/?�라 ?�쪽?�서 발화 ???�라 ?�젯??켜짐.
-	if (!bHealthBarShown && Data.NewValue < Max)
+	const float HeadPct  = MaxHead  > KINDA_SMALL_NUMBER ? Head  / MaxHead  : 1.f;
+	const float TorsoPct = MaxTorso > KINDA_SMALL_NUMBER ? Torso / MaxTorso : 1.f;
+
+	// 더 낮은 비율(위험한) 부위를 표시 -> 바가 0이 되는 순간이 곧 사망.
+	if (HeadPct <= TorsoPct)
+	{
+		OverheadWidget->SetHealth(Head, MaxHead);
+	}
+	else
+	{
+		OverheadWidget->SetHealth(Torso, MaxTorso);
+	}
+
+	// Head/Torso 중 하나라도 손상되면 바 노출 - 머리만 맞고 죽는 경우에도 표시.
+	if (!bHealthBarShown && (HeadPct < 1.f || TorsoPct < 1.f))
 	{
 		bHealthBarShown = true;
 		OverheadWidget->ShowHealth();

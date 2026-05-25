@@ -902,9 +902,27 @@ UPDMarketComponent* APDPlayerController::GetActiveMarketComponent() const
 
 void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
 {
-	if (HasAuthority() && StashSource)
+	if (!StashSource)
+	{
+		return;
+	}
+
+	if (HasAuthority())
 	{
 		StashSource->LoadFromPlayerState(GetPlayerState<APDPlayerState>());
+
+		if (IsLocalController())
+		{
+			if (UIManagerComponent)
+			{
+				UIManagerComponent->OpenStash(StashSource);
+			}
+		}
+		else
+		{
+			ClientOpenStashInterface(StashSource);
+		}
+		return;
 	}
 
 	if (UIManagerComponent)
@@ -924,11 +942,34 @@ void APDPlayerController::ClientOpenStashInterface_Implementation(UPDStashCompon
 	UIManagerComponent->OpenStash(StashSource);
 }
 
+void APDPlayerController::ClientCloseStashInterface_Implementation(UPDStashComponent* StashSource)
+{
+	if (!UIManagerComponent) return;
+	if (!StashSource || UIManagerComponent->GetActiveStashComponent() == StashSource)
+	{
+		UIManagerComponent->CloseStash();
+	}
+}
 void APDPlayerController::CloseStashInterface()
 {
+	UPDStashComponent* ClosingStash = GetActiveStashComponent();
+
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->CloseStash();
+	}
+
+	if (!HasAuthority() && ClosingStash)
+	{
+		ServerNotifyStashInterfaceClosed(ClosingStash);
+	}
+}
+
+void APDPlayerController::ServerNotifyStashInterfaceClosed_Implementation(UPDStashComponent* StashSource)
+{
+	if (StashSource)
+	{
+		OnStashInterfaceClosed.Broadcast(StashSource);
 	}
 }
 
@@ -1704,6 +1745,10 @@ void APDPlayerController::AddRecoilOffset(float YawDelta)
 		: RecoilCursorOffset.Size();
 }
 
+void APDPlayerController::ClientAddRecoilOffset_Implementation(float YawDelta)
+{
+	AddRecoilOffset(YawDelta);
+}
 void APDPlayerController::TickRecoilRecovery(float DeltaTime)
 {
 	if (RecoilCursorOffset.IsNearlyZero())

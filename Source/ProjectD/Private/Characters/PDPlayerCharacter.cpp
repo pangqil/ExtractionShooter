@@ -328,6 +328,8 @@ void APDPlayerCharacter::InitAbilitySystem()
 
 		ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetStaminaAttribute())
 			.AddUObject(this, &APDPlayerCharacter::OnStaminaChanged);
+		ASC->GetGameplayAttributeValueChangeDelegate(UPDAttributeSet::GetMoveSpeedAttribute())
+			.AddUObject(this, &APDPlayerCharacter::OnMoveSpeedChangedForStaminaRegen);
 		bPlayerAbilityDelegatesBound = true;
 	}
 
@@ -336,22 +338,11 @@ void APDPlayerCharacter::InitAbilitySystem()
 		return;
 	}
 
-	auto ApplyGE=[&](TSubclassOf<UGameplayEffect> GEClass) -> FActiveGameplayEffectHandle
-	{
-		if (!GEClass) return FActiveGameplayEffectHandle();
-		FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
-		FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(GEClass, 1.f, Context);
-		if (Spec.IsValid())
-			return ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
-		return FActiveGameplayEffectHandle();
-	};
+	RefreshStaminaRegenEffects();
 
-	ApplyGE(StaminaRegenEffectClass);
-	ApplyGE(StaminaRegenBonusEffectClass);
-
-	HungerDecayHandle  = ApplyGE(HungerDecayEffectClass);
-	ThirstDecayHandle  = ApplyGE(ThirstDecayEffectClass);
-	GasMaskDecayHandle = ApplyGE(GasMaskDecayEffectClass);
+	HungerDecayHandle  = ApplyPlayerPersistentEffect(HungerDecayEffectClass);
+	ThirstDecayHandle  = ApplyPlayerPersistentEffect(ThirstDecayEffectClass);
+	GasMaskDecayHandle = ApplyPlayerPersistentEffect(GasMaskDecayEffectClass);
 	bPlayerPersistentEffectsApplied = true;
 }
 
@@ -363,6 +354,63 @@ void APDPlayerCharacter::OnStaminaChanged(const FOnAttributeChangeData& Data)
 	VisionComponent->UpdateStaminaScale(Data.NewValue/MaxStamina);
 }
 
+
+void APDPlayerCharacter::OnMoveSpeedChangedForStaminaRegen(const FOnAttributeChangeData&)
+{
+	RefreshStaminaRegenEffects();
+}
+
+FActiveGameplayEffectHandle APDPlayerCharacter::ApplyPlayerPersistentEffect(TSubclassOf<UGameplayEffect> GEClass)
+{
+	if (!ASC || !GEClass) return FActiveGameplayEffectHandle();
+
+	FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+	FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(GEClass, 1.f, Context);
+	return Spec.IsValid() ? ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get()) : FActiveGameplayEffectHandle();
+}
+
+bool APDPlayerCharacter::ShouldApplyStaminaRegen() const
+{
+	if (!AttributeSet)
+	{
+		return false;
+	}
+
+	return AttributeSet->GetMoveSpeed() <= StaminaRegenMaxMoveSpeed;
+}
+
+void APDPlayerCharacter::RefreshStaminaRegenEffects()
+{
+	if (!HasAuthority() || !ASC)
+	{
+		return;
+	}
+
+	const bool bShouldRegen = ShouldApplyStaminaRegen();
+	if (bShouldRegen)
+	{
+		if (!StaminaRegenHandle.IsValid())
+		{
+			StaminaRegenHandle = ApplyPlayerPersistentEffect(StaminaRegenEffectClass);
+		}
+		if (!StaminaRegenBonusHandle.IsValid())
+		{
+			StaminaRegenBonusHandle = ApplyPlayerPersistentEffect(StaminaRegenBonusEffectClass);
+		}
+		return;
+	}
+
+	if (StaminaRegenHandle.IsValid())
+	{
+		ASC->RemoveActiveGameplayEffect(StaminaRegenHandle);
+		StaminaRegenHandle.Invalidate();
+	}
+	if (StaminaRegenBonusHandle.IsValid())
+	{
+		ASC->RemoveActiveGameplayEffect(StaminaRegenBonusHandle);
+		StaminaRegenBonusHandle.Invalidate();
+	}
+}
 void APDPlayerCharacter::HandleDeath(AActor* Killer)
 {
 	if (IsDead()) return;
@@ -778,6 +826,10 @@ void APDPlayerCharacter::ResetToBase()
 	if (!HasAuthority()) return;
 	if (!ASC || !AttributeSet) return;
 
+	ASC->RemoveActiveGameplayEffect(StaminaRegenHandle);
+	ASC->RemoveActiveGameplayEffect(StaminaRegenBonusHandle);
+	StaminaRegenHandle.Invalidate();
+	StaminaRegenBonusHandle.Invalidate();
 	ASC->RemoveActiveGameplayEffect(HungerDecayHandle);
 	ASC->RemoveActiveGameplayEffect(ThirstDecayHandle);
 	ASC->RemoveActiveGameplayEffect(GasMaskDecayHandle);
@@ -810,19 +862,10 @@ void APDPlayerCharacter::ResetToBase()
 	ASC->SetNumericAttributeBase(UPDAttributeSet::GetThirstAttribute(),  AttributeSet->GetMaxThirst());
 	ASC->SetNumericAttributeBase(UPDAttributeSet::GetGasMaskAttribute(), AttributeSet->GetMaxGasMask());
 
-	auto ApplyGE = [&](TSubclassOf<UGameplayEffect> GEClass) -> FActiveGameplayEffectHandle
-	{
-		if (!GEClass) return FActiveGameplayEffectHandle();
-		FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
-		FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(GEClass, 1.f, Context);
-		if (Spec.IsValid())
-			return ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
-		return FActiveGameplayEffectHandle();
-	};
-
-	HungerDecayHandle=ApplyGE(HungerDecayEffectClass);
-	ThirstDecayHandle=ApplyGE(ThirstDecayEffectClass);
-	GasMaskDecayHandle=ApplyGE(GasMaskDecayEffectClass);
+	RefreshStaminaRegenEffects();
+	HungerDecayHandle=ApplyPlayerPersistentEffect(HungerDecayEffectClass);
+	ThirstDecayHandle=ApplyPlayerPersistentEffect(ThirstDecayEffectClass);
+	GasMaskDecayHandle=ApplyPlayerPersistentEffect(GasMaskDecayEffectClass);
 
 	ResetLifeStateToAlive(this);
 }

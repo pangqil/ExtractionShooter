@@ -82,6 +82,12 @@ protected:
 	UFUNCTION()
 	void HandleContainerClosed(UPDStashComponent* ClosedStashComponent);
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastStorageOpened();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastStorageClosed();
+
 private:
 	void ApplyDoorAngle(float Angle);
 	void PlayDoorSound(bool bOpen) const;

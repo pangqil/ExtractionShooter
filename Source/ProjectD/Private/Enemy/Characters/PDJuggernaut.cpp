@@ -494,7 +494,7 @@ void APDJuggernaut::SpawnMachineGunProjectile(const FVector& MuzzleLoc)
 		MachineGunProjectileClass, MuzzleLoc, Dir.Rotation(), SpawnParams);
 	if (Projectile)
 	{
-		Projectile->InitProjectile(Pattern1DamagePerTick, this, /*bPenetrate=*/false);
+		Projectile->InitProjectile(Pattern1DamagePerTick, this, /*bPenetrate=*/false, Dir);
 	}
 }
 
@@ -724,12 +724,15 @@ void APDJuggernaut::ApplyPattern2Damage(const FVector& Center)
 		// (HitResult.BoneName → 대상 BodyPartConfig 가 부위로 라우팅. 코어 데미지 경로는 변경 없음.)
 		if (Pattern2ImpactBones.Num() > 0)
 		{
+			UE_LOG(LogTemp, Warning, TEXT("[PD Missile] ApplyPattern2Damage -> %s | bones=%d"),
+				*GetNameSafe(PlayerPawn), Pattern2ImpactBones.Num());
 			for (const FName& Bone : Pattern2ImpactBones)
 			{
 				FPDDamageInfo DamageInfo;
 				DamageInfo.BaseDamage = Pattern2Damage;
 				DamageInfo.Instigator = this;
 				DamageInfo.HitResult.BoneName = Bone;
+				UE_LOG(LogTemp, Warning, TEXT("[PD Missile]   bone=%s"), *Bone.ToString());
 				IPDDamageable::Execute_ApplyDamage(PlayerPawn, DamageInfo);
 			}
 		}

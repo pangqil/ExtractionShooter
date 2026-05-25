@@ -9,6 +9,8 @@ APDStashActor::APDStashActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
+	SetReplicates(true);
+	bAlwaysRelevant = true;
 
 	StashComponent = CreateDefaultSubobject<UPDStashComponent>(TEXT("StashComponent"));
 
@@ -19,6 +21,13 @@ APDStashActor::APDStashActor()
 void APDStashActor::BeginPlay()
 {
 	Super::BeginPlay();
+
+	SetReplicates(true);
+	bAlwaysRelevant = true;
+	if (StashComponent)
+	{
+		StashComponent->SetIsReplicated(true);
+	}
 
 	SetDoorOpen(false, true);
 }
@@ -48,8 +57,8 @@ void APDStashActor::Tick(float DeltaSeconds)
 bool APDStashActor::IsStationOpen(APDPlayerController* PlayerController) const
 {
 	return PlayerController &&
-		PlayerController->IsStashInterfaceOpen() &&
-		PlayerController->GetActiveStashComponent() == StashComponent;
+		((BoundPlayerController.Get() == PlayerController) ||
+		(PlayerController->IsStashInterfaceOpen() && PlayerController->GetActiveStashComponent() == StashComponent));
 }
 
 void APDStashActor::OpenStation(APDPlayerController* PlayerController)
@@ -62,10 +71,19 @@ void APDStashActor::OpenStation(APDPlayerController* PlayerController)
 
 void APDStashActor::CloseStation(APDPlayerController* PlayerController)
 {
-	if (PlayerController)
+	if (!PlayerController)
 	{
-		PlayerController->CloseStashInterface();
+		return;
 	}
+
+	if (HasAuthority() && !PlayerController->IsLocalController())
+	{
+		PlayerController->ClientCloseStashInterface(StashComponent);
+		HandleStationClosed();
+		return;
+	}
+
+	PlayerController->CloseStashInterface();
 }
 
 void APDStashActor::SetDoorOpen(bool bOpen, bool bInstant)
@@ -128,12 +146,35 @@ void APDStashActor::UnbindStationClose()
 
 void APDStashActor::HandleStationOpened(APDPlayerController*)
 {
+	if (HasAuthority())
+	{
+		MulticastStorageOpened();
+		return;
+	}
+
 	OnStorageOpened.Broadcast(this);
 }
 
 void APDStashActor::HandleStationClosed()
 {
 	Super::HandleStationClosed();
+
+	if (HasAuthority())
+	{
+		MulticastStorageClosed();
+		return;
+	}
+
+	OnStorageClosed.Broadcast(this);
+}
+
+void APDStashActor::MulticastStorageOpened_Implementation()
+{
+	OnStorageOpened.Broadcast(this);
+}
+
+void APDStashActor::MulticastStorageClosed_Implementation()
+{
 	OnStorageClosed.Broadcast(this);
 }
 
