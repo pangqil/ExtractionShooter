@@ -9,7 +9,7 @@
 
 namespace
 {
-	APDPlayerController* GetLocalPDPlayerController(const UObject* WorldContext)
+	APDPlayerController* GetLootBoxLocalPlayerController(const UObject* WorldContext)
 	{
 		const UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
 		return World ? Cast<APDPlayerController>(World->GetFirstPlayerController()) : nullptr;
@@ -138,7 +138,7 @@ bool UPDLootComponent::TakeSlotToInventory(int32 LootSlotIndex, UPDInventoryComp
 {
 	if (GetOwner() && !GetOwner()->HasAuthority())
 	{
-		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		if (APDPlayerController* PC = GetLootBoxLocalPlayerController(this))
 		{
 			PC->ServerTakeLootSlotToInventory(this, LootSlotIndex, Quantity);
 			return true;
@@ -176,7 +176,7 @@ bool UPDLootComponent::TakeSlotQuantityToInventorySlot(UPDInventoryComponent* Ta
 {
 	if (GetOwner() && !GetOwner()->HasAuthority())
 	{
-		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		if (APDPlayerController* PC = GetLootBoxLocalPlayerController(this))
 		{
 			PC->ServerTakeLootSlotQuantityToInventorySlot(this, LootSlotIndex, TargetInventorySlotIndex, Quantity);
 			return true;
@@ -213,7 +213,7 @@ bool UPDLootComponent::StoreInventorySlotQuantityToSlot(UPDInventoryComponent* S
 {
 	if (GetOwner() && !GetOwner()->HasAuthority())
 	{
-		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		if (APDPlayerController* PC = GetLootBoxLocalPlayerController(this))
 		{
 			PC->ServerStoreInventorySlotQuantityToLoot(this, SourceSlotIndex, TargetLootSlotIndex, Quantity);
 			return true;
@@ -243,7 +243,7 @@ bool UPDLootComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 Targe
 {
 	if (GetOwner() && !GetOwner()->HasAuthority())
 	{
-		if (APDPlayerController* PC = GetLocalPDPlayerController(this))
+		if (APDPlayerController* PC = GetLootBoxLocalPlayerController(this))
 		{
 			PC->ServerMoveLootSlotQuantity(this, SourceSlotIndex, TargetSlotIndex, Quantity);
 			return true;
