@@ -164,6 +164,21 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 	Super::PostGameplayEffectExecute(Data);
 	AActor* OwnerActor = GetOwningActor();
 	const bool bHasAuthority = OwnerActor && OwnerActor->HasAuthority();
+	const UGameplayEffect* EffectDef = Data.EffectSpec.Def;
+	const FString EffectName = GetNameSafe(EffectDef);
+
+	if (Data.EvaluatedData.Attribute == GetStaminaAttribute() &&
+		(EffectName.Contains(TEXT("Roll")) || EffectName.Contains(TEXT("Cost"))))
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PD RollCostTrace] Stamina GE executed. Owner=%s Authority=%d Effect=%s Magnitude=%.2f Stamina=%.2f MaxStamina=%.2f"),
+			*GetNameSafe(OwnerActor),
+			bHasAuthority,
+			*EffectName,
+			Data.EvaluatedData.Magnitude,
+			GetStamina(),
+			GetMaxStamina());
+	}
 
 	if (Data.EvaluatedData.Attribute==GetDamageAttribute())
 	{

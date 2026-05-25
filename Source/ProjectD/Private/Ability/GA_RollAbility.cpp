@@ -1,6 +1,8 @@
 #include "Ability/GA_RollAbility.h"
+#include "AttributeSet/PDAttributeSet.h"
 #include "Characters/Base/PDCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameplayEffect.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "TimerManager.h"
 
@@ -20,6 +22,7 @@ void UGA_RollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	APDCharacterBase* Character=GetPDCharacter();
 	UAbilitySystemComponent* ASC=GetAbilitySystemComponentFromActorInfo();
+	const UPDAttributeSet* AttributeSet = GetAttributeSet();
 
 	if (!Character || Character->IsDowned() || Character->IsGettingUp() || Character->IsDead())
 	{
@@ -27,11 +30,38 @@ void UGA_RollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
+	UE_LOG(LogTemp, Warning,
+		TEXT("[PD RollCostTrace] Activate before commit. Ability=%s Character=%s Authority=%d ASC=%s CostGE=%s Stamina=%.2f MaxStamina=%.2f"),
+		*GetNameSafe(this),
+		*GetNameSafe(Character),
+		Character ? Character->HasAuthority() : false,
+		*GetNameSafe(ASC),
+		*GetNameSafe(CostGameplayEffectClass ? CostGameplayEffectClass->GetDefaultObject<UGameplayEffect>() : nullptr),
+		AttributeSet ? AttributeSet->GetStamina() : -1.f,
+		AttributeSet ? AttributeSet->GetMaxStamina() : -1.f);
+
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PD RollCostTrace] Commit failed. Ability=%s Character=%s Authority=%d CostGE=%s Stamina=%.2f MaxStamina=%.2f"),
+			*GetNameSafe(this),
+			*GetNameSafe(Character),
+			Character ? Character->HasAuthority() : false,
+			*GetNameSafe(CostGameplayEffectClass ? CostGameplayEffectClass->GetDefaultObject<UGameplayEffect>() : nullptr),
+			AttributeSet ? AttributeSet->GetStamina() : -1.f,
+			AttributeSet ? AttributeSet->GetMaxStamina() : -1.f);
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("[PD RollCostTrace] Commit succeeded. Ability=%s Character=%s Authority=%d CostGE=%s Stamina=%.2f MaxStamina=%.2f"),
+		*GetNameSafe(this),
+		*GetNameSafe(Character),
+		Character ? Character->HasAuthority() : false,
+		*GetNameSafe(CostGameplayEffectClass ? CostGameplayEffectClass->GetDefaultObject<UGameplayEffect>() : nullptr),
+		AttributeSet ? AttributeSet->GetStamina() : -1.f,
+		AttributeSet ? AttributeSet->GetMaxStamina() : -1.f);
 
 	const FVector RollDir = GetRollDirection();
 	if (UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement())
