@@ -60,6 +60,7 @@ void UPDInventoryWidget::NativeConstruct()
 	BindEquipmentChanged();
 	BindTabButtons();
 	BindSortButtons();
+	CacheFilterTabBaseLabels();
 	SetSortOptionsVisible(false);
 	ResolveEquipmentSlotWidgets();
 	RefreshEquipmentSlots();
@@ -302,6 +303,11 @@ void UPDInventoryWidget::BindSortButtons()
 
 void UPDInventoryWidget::UpdateTabButtonStyle()
 {
+	if (FilterTabBaseLabels.IsEmpty())
+	{
+		CacheFilterTabBaseLabels();
+	}
+
 	const FLinearColor SelectedColor(0.15f, 0.85f, 0.15f, 1.0f);
 	const FLinearColor NormalColor(0.02f, 0.02f, 0.02f, 0.85f);
 
@@ -313,19 +319,19 @@ void UPDInventoryWidget::UpdateTabButtonStyle()
 	if (Button_Equipment)
 	{
 		Button_Equipment->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Equipment ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Equipment, FText::FromString(TEXT("Equipment")), EquipmentUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Equipment, GetFilterTabBaseLabel(EPDItemFilterTab::Equipment), EquipmentUsedSlots, MaxSlots);
 	}
 
 	if (Button_Consumable)
 	{
 		Button_Consumable->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Consumable ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Consumable, FText::FromString(TEXT("Consumable")), ConsumableUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Consumable, GetFilterTabBaseLabel(EPDItemFilterTab::Consumable), ConsumableUsedSlots, MaxSlots);
 	}
 
 	if (Button_Misc)
 	{
 		Button_Misc->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Misc ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Misc, FText::FromString(TEXT("Misc")), MiscUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Misc, GetFilterTabBaseLabel(EPDItemFilterTab::Misc), MiscUsedSlots, MaxSlots);
 	}
 }
 
@@ -360,6 +366,48 @@ int32 UPDInventoryWidget::GetInventoryDisplaySlotCount() const
 	return 16;
 }
 
+
+void UPDInventoryWidget::CacheFilterTabBaseLabels()
+{
+	FilterTabBaseLabels.Reset();
+	CacheFilterTabBaseLabel(EPDItemFilterTab::Equipment, Button_Equipment);
+	CacheFilterTabBaseLabel(EPDItemFilterTab::Consumable, Button_Consumable);
+	CacheFilterTabBaseLabel(EPDItemFilterTab::Misc, Button_Misc);
+}
+
+void UPDInventoryWidget::CacheFilterTabBaseLabel(EPDItemFilterTab FilterTab, UButton* TargetButton)
+{
+	if (UTextBlock* ButtonText = GetTabButtonTextBlock(TargetButton))
+	{
+		FString LabelString = ButtonText->GetText().ToString();
+		int32 CountStartIndex = INDEX_NONE;
+		if (LabelString.FindLastChar(TEXT('('), CountStartIndex))
+		{
+			LabelString = LabelString.Left(CountStartIndex).TrimEnd();
+		}
+
+		if (!LabelString.IsEmpty())
+		{
+			FilterTabBaseLabels.Add(FilterTab, FText::FromString(LabelString));
+		}
+	}
+}
+
+FText UPDInventoryWidget::GetFilterTabBaseLabel(EPDItemFilterTab FilterTab) const
+{
+	if (const FText* BaseLabel = FilterTabBaseLabels.Find(FilterTab))
+	{
+		return *BaseLabel;
+	}
+
+	return FText::GetEmpty();
+}
+
+UTextBlock* UPDInventoryWidget::GetTabButtonTextBlock(UButton* TargetButton) const
+{
+	return TargetButton ? Cast<UTextBlock>(TargetButton->GetContent()) : nullptr;
+}
+
 void UPDInventoryWidget::SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const
 {
 	if (!TargetButton)
@@ -367,7 +415,7 @@ void UPDInventoryWidget::SetTabButtonLabel(UButton* TargetButton, const FText& B
 		return;
 	}
 
-	if (UTextBlock* ButtonText = Cast<UTextBlock>(TargetButton->GetContent()))
+	if (UTextBlock* ButtonText = GetTabButtonTextBlock(TargetButton))
 	{
 		ButtonText->SetText(FText::FromString(FString::Printf(TEXT("%s (%d/%d)"), *BaseLabel.ToString(), UsedSlots, FMath::Max(1, MaxSlots))));
 	}
