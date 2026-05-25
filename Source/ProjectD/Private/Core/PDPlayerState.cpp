@@ -50,6 +50,7 @@ void APDPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(APDPlayerState, bIsExtracted);
 	DOREPLIFETIME(APDPlayerState, bIsRaidDead);
 	DOREPLIFETIME(APDPlayerState, RaidStats);
+	DOREPLIFETIME(APDPlayerState, bIsTravelReady);
 }
 
 void APDPlayerState::SetExtracted(bool bInExtracted)
@@ -78,6 +79,13 @@ void APDPlayerState::ResetRaidParticipationState()
 	RaidStats = FPDRaidStats{};
 	RaidInitialGold = 0;
 	RaidInitialItemQuantity = 0;
+
+	// 결산 ACK 도 리셋.
+	if (bIsTravelReady)
+	{
+		bIsTravelReady = false;
+		OnTravelReadyChanged.Broadcast(false);
+	}
 
 	if (!bIsExtracted && !bIsRaidDead)
 	{
@@ -135,6 +143,20 @@ void APDPlayerState::CaptureInitialRaidSnapshot(int32 InGold, int32 InItemQuanti
 void APDPlayerState::OnRep_RaidParticipation()
 {
 	OnRaidParticipationChanged.Broadcast(bIsExtracted, bIsRaidDead);
+}
+
+void APDPlayerState::SetTravelReady(bool bInReady)
+{
+	if (!HasAuthority()) return;
+	if (bIsTravelReady == bInReady) return;
+	bIsTravelReady = bInReady;
+	OnTravelReadyChanged.Broadcast(bIsTravelReady);
+	ForceNetUpdate();
+}
+
+void APDPlayerState::OnRep_TravelReady()
+{
+	OnTravelReadyChanged.Broadcast(bIsTravelReady);
 }
 
 APDPlayerCharacter* APDPlayerState::GetPDPlayerCharacter() const

@@ -25,6 +25,13 @@ public:
 	/** 컨텐츠 스폰 직후 한 번 호출. PC로부터 필요한 컴포넌트를 디스커버. */
 	virtual void InitializeForOwner(APlayerController* OwnerPC) {}
 
+	/**
+	 * 자식 위젯이 Hub(또는 다른 탭 컨테이너) 안에 임베드되었음을 알림.
+	 * InitializeForOwner 직후 한 번 호출. standalone 사용 시엔 호출되지 않음.
+	 * 임베드 컨텍스트 한정 시각 조정(자체 헤더/닫기 버튼 숨김 등)에 사용.
+	 */
+	virtual void OnEmbeddedInHub() {}
+
 	/** 탭이 활성화될 때. */
 	virtual void OnTabShown() {}
 

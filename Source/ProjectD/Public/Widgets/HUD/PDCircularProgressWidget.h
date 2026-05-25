@@ -66,11 +66,20 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_CancelLabel;
 
+	// 중앙 키 아이콘 — Revive 같이 채널링 액션 키를 중앙에 표시할 때. WBP가 슬롯 두면 자동 바인딩.
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Image_CenterKeyIcon;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|HUD|Progress")
 	FName ProgressParamName = TEXT("Progress");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|HUD|Progress|Cancel")
 	TObjectPtr<UInputAction> CancelInputAction;
+
+	// 중앙 키 아이콘에 매핑할 InputAction. 채널링 시작 트리거 키 (예: Interact).
+	// 사용자가 키를 바꾸면 EnhancedInput Subsystem 의 ControlMappingsRebuilt 이벤트로 자동 갱신.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|HUD|Progress|Center")
+	TObjectPtr<UInputAction> CenterInputAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|HUD|Progress|Cancel")
 	TObjectPtr<UInputMappingContext> InputMappingContext;
@@ -87,6 +96,7 @@ private:
 
 	void EnsureMID();
 	void RefreshCancelHint();
+	void RefreshCenterKeyIcon();
 	void SetProgressScalar(float Value);
 	void UpdateRemainingText(float RemainingSeconds);
 	FKey FindKeyForAction(const UInputAction* Action) const;

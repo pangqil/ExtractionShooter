@@ -387,7 +387,7 @@ void APDCharacterBase::HandleDeath(AActor* Killer)
 		StimuliSource->UnregisterFromPerceptionSystem();
 	}
 
-	if (APlayerController* PC=Cast<APlayerController>(GetController()))
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		if (APDGameMode* GM=GetWorld()->GetAuthGameMode<APDGameMode>())
 		{

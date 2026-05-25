@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/World.h"
 #include "GameFramework/GameModeBase.h"
 #include "Type/Types.h"
 #include "PDGameMode.generated.h"
@@ -48,6 +49,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Raid", meta=(ClampMin="1.0", ForceUnits="s"))
 	float TravelGateTimeoutSeconds = 20.f;
 
+	// 이 목록에 포함된 맵에서만 PostLogin 디바운스로 StartRaid 자동 호출.
+	// 단일 GameMode 클래스를 여러 레벨이 공유하므로 라이드 전용 맵만 골라낼 수단.
+	// 라이드 맵(Debug 포함) 을 콘텐츠 브라우저에서 픽해서 추가.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Raid|Autostart")
+	TArray<TSoftObjectPtr<UWorld>> AutoStartRaidLevels;
+
+	// 마지막 PostLogin 후 새 합류가 없을 때까지 기다리는 시간. 만료 시 StartRaid 1회 발사.
+	// PIE Listen 에서 클라가 합류할 시간을 주기 위함. 호스트 PostLogin 후 클라 합류까지 보통 1~2초.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Raid|Autostart", meta=(ClampMin="0.1", ForceUnits="s"))
+	float AutoStartDebounceSeconds = 3.0f;
+
 	void SetRaidState(ERaidState NewState);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="PD|Raid")
@@ -64,6 +76,10 @@ private:
 	void HandleSpectatorTransitionForDeath(APlayerController* DeadPC);
 	void NotifyOthersWatchingFinalized(APlayerController* AffectedPC);
 	APlayerController* FindFirstAliveSpectateTarget(APlayerController* ExcludePC) const;
+
+	// 마지막 Alive 캐릭터 사망 직후 호출. 남은 Downed 동료 전부 강제 HandleDeath.
+	// 배그식 흐름: 마지막 생존자 죽으면 BleedOut 기다리지 않고 즉시 결산으로.
+	void FinalizeStrandedDownedPlayers();
 
 	// Step 2-C: 결산 스탯 추적.
 	void CaptureInitialRaidSnapshotFor(APlayerController* PC);
@@ -101,4 +117,12 @@ private:
 	TArray<TWeakObjectPtr<APlayerController>> ReadyPlayersForTravel;
 	FTimerHandle TravelTimeoutTimerHandle;
 	bool bTravelStarted = false;
+
+	// StartRaid 재진입 방지. ServerTravel 마다 새 GameMode 인스턴스라 자연스럽게 false 로 시작.
+	bool bRaidStarted = false;
+	FTimerHandle AutoStartDebounceHandle;
+	void HandleAutoStartDebounceFired();
+
+	// 현재 맵이 AutoStartRaidLevels 화이트리스트에 있는지. PIE prefix 제거 후 비교.
+	bool IsCurrentMapAutoStartEnabled() const;
 };

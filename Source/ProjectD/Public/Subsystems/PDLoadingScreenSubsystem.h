@@ -33,6 +33,17 @@ public:
 	/** 다음 로딩 1회에만 적용되는 splash override. 풀/Static을 무시. 사용 후 자동 클리어. */
 	void SetNextSplashOverride(TSoftObjectPtr<UTexture2D> InTexture);
 
+	/** Settings.bAutoShowOnLevelLoad=false일 때, 다음 1회 트래블에만 LoadingScreen을 표시하도록 무장.
+	 *  PreLoadMap 시 소비되어 자동으로 해제됨. true일 땐 호출해도 무관. */
+	UFUNCTION(BlueprintCallable, Category = "PD|LoadingScreen")
+	void ArmForNextTransition();
+
+	/** PreLoadMap delegate 발화를 기다리지 않고 LoadingScreen을 즉시 viewport에 표시.
+	 *  명시적 트래블 진입점에서 ServerTravel/OpenLevel 호출 직전에 부르면 "버튼 누른 즉시" 화면 전환을 보장.
+	 *  HideLoadingScreen은 PostLoadMap → Hold timer 흐름으로 동일하게 처리됨. */
+	UFUNCTION(BlueprintCallable, Category = "PD|LoadingScreen")
+	void ShowImmediate();
+
 	UPROPERTY(BlueprintAssignable, Category = "PD|LoadingScreen")
 	FPDOnLoadingReasonUpdated OnLoadingReasonUpdated;
 
@@ -57,6 +68,7 @@ private:
 
 	float HoldElapsed = 0.f;
 	bool bHolding = false;
+	bool bArmedForNextTransition = false;
 
 	FText CurrentReason;
 };

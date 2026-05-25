@@ -366,6 +366,27 @@ void APDPlayerCharacter::HandleDeath(AActor* Killer)
 	Super::HandleDeath(Killer);
 }
 
+bool APDPlayerCharacter::ShouldEnterDownedStateOnLethalDamage() const
+{
+	UWorld* World = GetWorld();
+	if (!World) return false;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* OtherPC = It->Get();
+		if (!OtherPC) continue;
+
+		APDPlayerCharacter* OtherChar = Cast<APDPlayerCharacter>(OtherPC->GetPawn());
+		if (!OtherChar || OtherChar == this) continue;
+
+		if (OtherChar->GetLifeState() == EPDLifeState::Alive)
+		{
+			return true; // 다른 Alive 동료 존재 → Downed 진입 (리바이브 기대)
+		}
+	}
+	return false; // 다른 Alive 동료 없음 (Downed/Dead/Extracted 만 남음) → 즉사
+}
+
 void APDPlayerCharacter::OnLifeStateChanged(EPDLifeState OldLifeState, AActor* ContextActor)
 {
 	Super::OnLifeStateChanged(OldLifeState, ContextActor);

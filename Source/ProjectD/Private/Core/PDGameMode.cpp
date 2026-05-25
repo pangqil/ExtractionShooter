@@ -29,10 +29,63 @@ void APDGameMode::PostLogin(APlayerController* NewPlayer)
 	UE_LOG(LogPDRaid, Log, TEXT("PostLogin: PC=%s NumPlayers=%d"),
 		*GetNameSafe(NewPlayer),
 		GetWorld() ? GetWorld()->GetNumPlayerControllers() : -1);
+
+	// Auto-start: 매 PostLogin 마다 디바운스 타이머 리셋. 마지막 합류 후
+	// AutoStartDebounceSeconds 동안 새 합류가 없으면 StartRaid 1회 발사.
+	// 화이트리스트 미포함 맵 (Base/Startup 등) 에서는 발사 안 됨.
+	if (!bRaidStarted && IsCurrentMapAutoStartEnabled())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(AutoStartDebounceHandle);
+			World->GetTimerManager().SetTimer(
+				AutoStartDebounceHandle,
+				this,
+				&APDGameMode::HandleAutoStartDebounceFired,
+				AutoStartDebounceSeconds,
+				false);
+			UE_LOG(LogPDRaid, Verbose, TEXT("AutoStart: debounce armed (%.2fs) after PC=%s"),
+				AutoStartDebounceSeconds, *GetNameSafe(NewPlayer));
+		}
+	}
+}
+
+void APDGameMode::HandleAutoStartDebounceFired()
+{
+	if (bRaidStarted) return;
+	UE_LOG(LogPDRaid, Log, TEXT("AutoStart: debounce fired, calling StartRaid (NumPlayers=%d)"),
+		GetWorld() ? GetWorld()->GetNumPlayerControllers() : -1);
+	StartRaid();
+}
+
+bool APDGameMode::IsCurrentMapAutoStartEnabled() const
+{
+	UWorld* World = GetWorld();
+	if (!World) return false;
+
+	// PIE prefix (UEDPIE_N_) 제거한 long package name 으로 비교.
+	const FString CurrentMapName = UWorld::RemovePIEPrefix(World->GetOutermost()->GetName());
+
+	for (const TSoftObjectPtr<UWorld>& MapRef : AutoStartRaidLevels)
+	{
+		if (MapRef.IsNull()) continue;
+		if (CurrentMapName == MapRef.ToSoftObjectPath().GetLongPackageName())
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void APDGameMode::StartRaid()
 {
+	if (bRaidStarted)
+	{
+		UE_LOG(LogPDRaid, Verbose, TEXT("StartRaid: already started, ignored"));
+		return;
+	}
+	bRaidStarted = true;
+
 	const AGameStateBase* GS = GetGameState<AGameStateBase>();
 	RaidStartServerTime = GS ? GS->GetServerWorldTimeSeconds() : (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f);
 
@@ -64,7 +117,8 @@ void APDGameMode::TravelToRaidLevel(FName RaidMapName)
 		return;
 	}
 
-	StartRaid();
+	// StartRaid 는 트래블 후 라이드 맵 GameMode 의 PostLogin 디바운스가 자동 호출
+	// (bAutoStartRaidOnAllPlayersIn=true 인 BP). 트래블 전 호출은 GameMode/PS 폐기로 무효.
 	UE_LOG(LogPDRaid, Log, TEXT("TravelToRaidLevel: ServerTravel to %s"), *RaidMapName.ToString());
 	GetWorld()->ServerTravel(RaidMapName.ToString());
 }
@@ -134,6 +188,18 @@ void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
 		return;
 	}
 
+	// AutoStart 디바운스 도중 사망이 발생하면 디바운스 무시하고 즉시 StartRaid 강제.
+	// 사망 발생 = 게임 진행 중 = race condition. StartRaid 안 거치면 EvaluateRaidEnd 가 Idle 가드에서 막힘.
+	if (CurrentRaidState == ERaidState::Idle && !bRaidStarted)
+	{
+		UE_LOG(LogPDRaid, Log, TEXT("OnPlayerDied: state=Idle 사망 race 감지 → AutoStart 디바운스 취소 + 즉시 StartRaid."));
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(AutoStartDebounceHandle);
+		}
+		StartRaid();
+	}
+
 	APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
 	if (PS)
 	{
@@ -143,6 +209,10 @@ void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
 			return;
 		}
 		PS->SetRaidDead(true);
+	}
+	else
+	{
+		UE_LOG(LogPDRaid, Warning, TEXT("OnPlayerDied: PC=%s GetPlayerState<APDPlayerState> returned NULL"), *PC->GetName());
 	}
 
 	UE_LOG(LogPDRaid, Log, TEXT("OnPlayerDied: PC=%s Killer=%s Alive=%d Dead=%d Extracted=%d"),
@@ -160,6 +230,9 @@ void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
 	// 죽은 PC를 보고 있던 다른 관전자들은 다음 생존자로 자동 순환.
 	HandleSpectatorTransitionForDeath(PC);
 	NotifyOthersWatchingFinalized(PC);
+
+	// 배그식: 마지막 Alive 가 방금 죽었다면 남은 Downed 동료 BleedOut 기다리지 않고 즉시 처형.
+	FinalizeStrandedDownedPlayers();
 
 	EvaluateRaidEnd();
 }
@@ -212,7 +285,7 @@ void APDGameMode::EndRaid(bool bSuccess)
 {
 	if (CurrentRaidState == ERaidState::Ended)
 	{
-		UE_LOG(LogPDRaid, Verbose, TEXT("EndRaid: already Ended, ignored"));
+		UE_LOG(LogPDRaid, Log, TEXT("EndRaid: already Ended, ignored"));
 		return;
 	}
 	SetRaidState(ERaidState::Ended);
@@ -296,7 +369,7 @@ void APDGameMode::ProcessExtractionForPlayer(APlayerController* PC)
 		if (UPDSecureContainerComponent* SecureContainer = Pawn->FindComponentByClass<UPDSecureContainerComponent>())
 		{
 			SecureContainer->SaveSecureContainer();
-			UE_LOG(LogPDRaid, Verbose, TEXT("ProcessExtraction: PC=%s saved SecureContainer"), *PC->GetName());
+			UE_LOG(LogPDRaid, Log, TEXT("ProcessExtraction: PC=%s saved SecureContainer"), *PC->GetName());
 		}
 	}
 }
@@ -306,7 +379,7 @@ void APDGameMode::ProcessDeathForPlayer(APlayerController* PC)
 	if (!PC) return;
 
 	// 사망자는 이체하지 않음(인벤/RaidGold 손실). 다른 영구 데이터는 EndRaid 에서 일괄 저장.
-	UE_LOG(LogPDRaid, Verbose, TEXT("ProcessDeath: PC=%s -> raid inventory will be dropped on EndRaid"),
+	UE_LOG(LogPDRaid, Log, TEXT("ProcessDeath: PC=%s -> raid inventory will be dropped on EndRaid"),
 		*PC->GetName());
 }
 
@@ -318,7 +391,7 @@ void APDGameMode::HandleSpectatorTransitionForDeath(APlayerController* DeadPC)
 	APlayerController* InitialTarget = FindFirstAliveSpectateTarget(DeadPC);
 	if (!InitialTarget)
 	{
-		UE_LOG(LogPDRaid, Verbose, TEXT("HandleSpectatorTransitionForDeath: PC=%s no alive target, skip"),
+		UE_LOG(LogPDRaid, Log, TEXT("HandleSpectatorTransitionForDeath: PC=%s no alive target, skip"),
 			*DeadPC->GetName());
 		return;
 	}
@@ -360,6 +433,50 @@ APlayerController* APDGameMode::FindFirstAliveSpectateTarget(APlayerController* 
 	return nullptr;
 }
 
+void APDGameMode::FinalizeStrandedDownedPlayers()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	// LifeState 가 진짜 Alive 인 캐릭터를 카운트. Downed 는 따로 모음.
+	int32 AliveCount = 0;
+	TArray<APDCharacterBase*> StrandedDowned;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+		if (!PC) continue;
+		APDCharacterBase* Char = Cast<APDCharacterBase>(PC->GetPawn());
+		if (!Char) continue;
+
+		switch (Char->GetLifeState())
+		{
+		case EPDLifeState::Alive:
+			++AliveCount;
+			break;
+		case EPDLifeState::Downed:
+			StrandedDowned.Add(Char);
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (AliveCount > 0 || StrandedDowned.Num() == 0) return;
+
+	UE_LOG(LogPDRaid, Log, TEXT("FinalizeStrandedDowned: no Alive remain, forcing %d Downed pawn(s) to die"),
+		StrandedDowned.Num());
+
+	// 각 HandleDeath 가 OnPlayerDied → FinalizeStrandedDownedPlayers 재귀 가능.
+	// 이미 Dead 로 전환된 항목은 LifeState 가드로 스킵됨 (HandleDeath 내부).
+	for (APDCharacterBase* DownedChar : StrandedDowned)
+	{
+		if (DownedChar && DownedChar->GetLifeState() == EPDLifeState::Downed)
+		{
+			DownedChar->HandleDeath(nullptr);
+		}
+	}
+}
+
 float APDGameMode::GetCurrentRaidElapsedSeconds() const
 {
 	const AGameStateBase* GS = GetGameState<AGameStateBase>();
@@ -392,7 +509,7 @@ void APDGameMode::CaptureInitialRaidSnapshotFor(APlayerController* PC)
 	const int32 InitialItemQty = CountInventoryItemQuantity(Inventory);
 	PS->CaptureInitialRaidSnapshot(InitialGold, InitialItemQty);
 
-	UE_LOG(LogPDRaid, Verbose, TEXT("CaptureInitialRaidSnapshot: PC=%s Gold=%d ItemQty=%d"),
+	UE_LOG(LogPDRaid, Log, TEXT("CaptureInitialRaidSnapshot: PC=%s Gold=%d ItemQty=%d"),
 		*PC->GetName(), InitialGold, InitialItemQty);
 }
 
@@ -566,7 +683,7 @@ void APDGameMode::NotifyPlayerReadyForTravel(APlayerController* PC)
 	// 결산 위젯이 뜨기 전에 클릭으로 들어오는 ACK 차단. EndRaid 가 호출되어 Ended 상태일 때만 받음.
 	if (CurrentRaidState != ERaidState::Ended)
 	{
-		UE_LOG(LogPDRaid, Verbose, TEXT("NotifyPlayerReadyForTravel: ignored, raid not Ended (state=%d) PC=%s"),
+		UE_LOG(LogPDRaid, Log, TEXT("NotifyPlayerReadyForTravel: ignored, raid not Ended (state=%d) PC=%s"),
 			static_cast<int32>(CurrentRaidState), *PC->GetName());
 		return;
 	}
@@ -574,6 +691,12 @@ void APDGameMode::NotifyPlayerReadyForTravel(APlayerController* PC)
 	const bool bWasAdded = ReadyPlayersForTravel.AddUnique(PC) != INDEX_NONE;
 	const int32 ReadyCount = ReadyPlayersForTravel.Num();
 	const int32 TotalPlayers = GetGameState<AGameStateBase>() ? GetGameState<AGameStateBase>()->PlayerArray.Num() : 0;
+
+	// PS 측 ACK 플래그 셋팅 — 모든 클라가 위젯으로 누가 ACK 했는지 표시 가능.
+	if (APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>())
+	{
+		PS->SetTravelReady(true);
+	}
 
 	UE_LOG(LogPDRaid, Log, TEXT("NotifyPlayerReadyForTravel: PC=%s ack=%d/%d (newAck=%d)"),
 		*PC->GetName(), ReadyCount, TotalPlayers, bWasAdded ? 1 : 0);
@@ -613,7 +736,7 @@ void APDGameMode::RequestBaseTravel()
 {
 	if (bTravelStarted)
 	{
-		UE_LOG(LogPDRaid, Verbose, TEXT("RequestBaseTravel: already started, ignored"));
+		UE_LOG(LogPDRaid, Log, TEXT("RequestBaseTravel: already started, ignored"));
 		return;
 	}
 	bTravelStarted = true;

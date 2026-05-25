@@ -8,6 +8,8 @@
 #include "Data/PDTabbedScreenDataAsset.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
 #include "Components/HorizontalBox.h"
+#include "Components/NamedSlot.h"
+#include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
 #include "Engine/Texture2D.h"
 #include "Blueprint/UserWidget.h"
@@ -107,6 +109,26 @@ void UPDTabbedScreenBase::SwitchToTab(FGameplayTag TabId)
 	}
 
 	ApplyActiveTabVisualState();
+
+	// 풋터 설명 텍스트를 active entry의 Description으로 갱신. TXT_Description 미바인딩 시 무시.
+	if (TXT_Description && TabSet && TabSet->Tabs.IsValidIndex(TargetIndex))
+	{
+		TXT_Description->SetText(TabSet->Tabs[TargetIndex].Description);
+	}
+
+	// 좌/우 사이드 패널 swap. DA 주도: panel class가 있는 탭은 해당 위젯으로, 없는 탭은 명시적으로 비움(잔상 방지).
+	if (NamedSlot_MainLeft)
+	{
+		TObjectPtr<UUserWidget>* LeftPanelPtr = SpawnedLeftPanels.Find(TabId);
+		UUserWidget* LeftPanel = (LeftPanelPtr && *LeftPanelPtr) ? LeftPanelPtr->Get() : nullptr;
+		NamedSlot_MainLeft->SetContent(LeftPanel);
+	}
+	if (NamedSlot_MainRight)
+	{
+		TObjectPtr<UUserWidget>* RightPanelPtr = SpawnedRightPanels.Find(TabId);
+		UUserWidget* RightPanel = (RightPanelPtr && *RightPanelPtr) ? RightPanelPtr->Get() : nullptr;
+		NamedSlot_MainRight->SetContent(RightPanel);
+	}
 }
 
 void UPDTabbedScreenBase::CycleTab(int32 Direction)
@@ -292,14 +314,52 @@ void UPDTabbedScreenBase::RebuildTabsAndContent()
 			if (IPDTabbedContent* Iface = Cast<IPDTabbedContent>(ContentWidget))
 			{
 				Iface->InitializeForOwner(OwnerPC);
+				Iface->OnEmbeddedInHub();
 			}
 		}
+
+		// 좌/우 사이드 패널 spawn + 캐시. SwitchToTab에서 NamedSlot에 SetContent.
+		// IPDTabbedContent 구현 시 InitializeForOwner / OnEmbeddedInHub만 호출 (라이프사이클은 메인 컨텐츠 전용).
+		auto SpawnSidePanel = [this, OwnerPC](const TSoftClassPtr<UUserWidget>& PanelClassPtr,
+			const FGameplayTag& EntryTabId,
+			TMap<FGameplayTag, TObjectPtr<UUserWidget>>& OutCache)
+		{
+			if (PanelClassPtr.IsNull())
+			{
+				return;
+			}
+			UClass* PanelClass = PanelClassPtr.LoadSynchronous();
+			if (!PanelClass)
+			{
+				return;
+			}
+			UUserWidget* PanelWidget = CreateWidget<UUserWidget>(OwnerPC, PanelClass);
+			if (!PanelWidget)
+			{
+				return;
+			}
+			OutCache.Add(EntryTabId, PanelWidget);
+
+			if (PanelWidget->GetClass()->ImplementsInterface(UPDTabbedContent::StaticClass()))
+			{
+				if (IPDTabbedContent* PanelIface = Cast<IPDTabbedContent>(PanelWidget))
+				{
+					PanelIface->InitializeForOwner(OwnerPC);
+					PanelIface->OnEmbeddedInHub();
+				}
+			}
+		};
+
+		SpawnSidePanel(Entry.LeftPanelClass, Entry.TabId, SpawnedLeftPanels);
+		SpawnSidePanel(Entry.RightPanelClass, Entry.TabId, SpawnedRightPanels);
 	}
 }
 
 void UPDTabbedScreenBase::ClearTabsAndContent()
 {
 	SpawnedContents.Reset();
+	SpawnedLeftPanels.Reset();
+	SpawnedRightPanels.Reset();
 	SpawnedButtons.Reset();
 	if (HBox_TabBar)
 	{
@@ -308,6 +368,14 @@ void UPDTabbedScreenBase::ClearTabsAndContent()
 	if (Switcher_Content)
 	{
 		Switcher_Content->ClearChildren();
+	}
+	if (NamedSlot_MainLeft)
+	{
+		NamedSlot_MainLeft->SetContent(nullptr);
+	}
+	if (NamedSlot_MainRight)
+	{
+		NamedSlot_MainRight->SetContent(nullptr);
 	}
 }
 

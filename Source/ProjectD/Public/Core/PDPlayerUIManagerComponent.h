@@ -8,6 +8,7 @@
 #include "PDPlayerUIManagerComponent.generated.h"
 
 class APDPlayerController;
+class APDPlayerState;
 class APDWeaponBase;
 class UAbilitySystemComponent;
 class UPDHUDWidget;
@@ -53,10 +54,17 @@ public:
 	void RebindHUDToASC(UAbilitySystemComponent* ASC);
 	void ApplyEffectiveUIState(EWidgetInputMode Mode);
 
+	UFUNCTION(BlueprintPure, Category="PD|UI")
+	UPDHUDWidget* GetHUDInstance() const { return HUDInstance; }
+
 	void OpenStash(UPDStashComponent* StashSource);
 	void CloseStash();
 	bool IsStashOpen() const;
 	UPDStashComponent* GetActiveStashComponent() const { return ActiveStashComponent.Get(); }
+
+	// Loot 인터페이스 보조 — Stash/Market 처럼 InventoryWidget 도 같이 띄움. source 바인딩 없음.
+	void OpenInventoryForLoot();
+	void CloseInventoryForLoot();
 
 	void OpenMarket(UPDMarketComponent* MarketComponent);
 	void CloseMarket();
@@ -77,6 +85,9 @@ public:
 	void ToggleHub();
 	bool IsHubOpen() const;
 
+	// Hub를 새로 열 수 있는 상태인지 (Downed/Dead/Extracted/Spectating 이면 false).
+	bool CanOpenHub() const;
+
 	void ShowNotification(const FText& Message, float Duration = 2.f);
 	void ToggleWorldMap();
 
@@ -91,6 +102,16 @@ public:
 private:
 	APDPlayerController* GetPDController() const;
 	void AddWidgetToViewportIfNeeded(UUserWidget* Widget, int32 ZOrder = 0) const;
+
+	// 본인 PS의 OnRaidParticipationChanged 구독. PS가 valid해질 때까지 멱등.
+	void EnsureRaidParticipationBinding();
+	void UnbindRaidParticipation();
+
+	// 사망/추출 전환 시 Hub 강제 닫기.
+	UFUNCTION()
+	void HandleRaidParticipationChanged(bool bIsExtracted, bool bIsRaidDead);
+
+	TWeakObjectPtr<APDPlayerState> BoundPlayerState;
 
 	UPROPERTY(EditDefaultsOnly, Category="PD|UI")
 	TSubclassOf<UPDHUDWidget> HUDClass;

@@ -7,6 +7,8 @@
 #include "PDTabbedScreenBase.generated.h"
 
 class UHorizontalBox;
+class UNamedSlot;
+class UTextBlock;
 class UWidgetSwitcher;
 class UPDTabbedScreenDataAsset;
 class UPDTabButtonWidget;
@@ -66,6 +68,18 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UWidgetSwitcher> Switcher_Content;
 
+	/** 풋터 영역의 활성 탭 설명 텍스트. DA entry의 Description으로 자동 채움. 없으면 무시. */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TXT_Description;
+
+	/** 좌측 사이드 패널 슬롯. DA entry의 LeftPanelClass로 활성 탭마다 컨텐츠가 swap됨. 없으면 무시. */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UNamedSlot> NamedSlot_MainLeft;
+
+	/** 우측 사이드 패널 슬롯. DA entry의 RightPanelClass로 swap. 없으면 무시. */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UNamedSlot> NamedSlot_MainRight;
+
 private:
 	UFUNCTION()
 	void HandleTabButtonClicked(FGameplayTag ClickedTabId);
@@ -81,6 +95,12 @@ private:
 
 	UPROPERTY(Transient)
 	TMap<FGameplayTag, TObjectPtr<UUserWidget>> SpawnedContents;
+
+	UPROPERTY(Transient)
+	TMap<FGameplayTag, TObjectPtr<UUserWidget>> SpawnedLeftPanels;
+
+	UPROPERTY(Transient)
+	TMap<FGameplayTag, TObjectPtr<UUserWidget>> SpawnedRightPanels;
 
 	UPROPERTY(Transient)
 	TMap<FGameplayTag, TObjectPtr<UPDTabButtonWidget>> SpawnedButtons;

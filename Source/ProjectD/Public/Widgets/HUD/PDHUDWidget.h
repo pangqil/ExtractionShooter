@@ -85,6 +85,15 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDCircularProgressWidget> WBP_UseProgress;
 
+	// Revive 진행도 — 대상 위치 따라 스크린 좌표로 따라다님. WBP_UseProgress 와 별도 인스턴스.
+	// WBP 에서 작은 크기로 만들어 두면 시각적으로 차별화됨.
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDCircularProgressWidget> WBP_ReviveProgress;
+
+	// Revive 진행도 위젯이 대상 액터의 어느 위치에 표시될지. 액터 위치 + 이 오프셋 → 스크린 투영.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|HUD|Revive")
+	FVector ReviveProgressWorldOffset = FVector(0.f, 0.f, 80.f);
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDQuipToastWidget> WBP_QuipToast;
 
@@ -109,6 +118,16 @@ public:
 	void SetCrosshairVisible(bool bVisible);
 
 	FORCEINLINE UPDCrosshairWidget* GetCrosshair() const { return WBP_Crosshair; }
+
+	// Revive 진행도 — Reviver 측 PC 가 Client RPC 로 호출. Target 위치에 따라다님.
+	UFUNCTION(BlueprintCallable, Category = "PD|HUD|Revive")
+	void StartReviveProgress(AActor* Target, float Duration);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|HUD|Revive")
+	void StopReviveProgress();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|HUD|Revive")
+	void CompleteReviveProgress();
 
 private:
 	struct FBoundAttributeHandle
@@ -142,6 +161,13 @@ private:
 	void HandleArmDamaged(const FGameplayTag& Tag, int32 NewCount);
 	void HandleStarving(const FGameplayTag& Tag, int32 NewCount);
 	void HandleDehydrated(const FGameplayTag& Tag, int32 NewCount);
+
+	// Revive 진행도 위젯이 따라다닐 대상 + 타이머. 매 프레임 ScreenPos 재계산.
+	void UpdateReviveProgressPosition();
+	TWeakObjectPtr<AActor> CachedReviveTarget;
+	FTimerHandle ReviveProgressUpdateTimer;
+	// Revive 중에는 InteractPrompt 갱신 억제 — 같은 target 에 두 위젯 겹치는 거 방지.
+	bool bSuppressInteractPrompt = false;
 
 	UFUNCTION()
 	void HandleConsumableUseStarted(int32 SlotIndex, FPDItemData ItemData, float Duration);
