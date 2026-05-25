@@ -148,6 +148,9 @@ struct FPDInventorySlot
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGuid ItemInstanceID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPDItemData ItemData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -167,8 +170,22 @@ struct FPDInventorySlot
 		return bIsEmpty || Quantity <= 0 || ItemData.ItemID.IsNone();
 	}
 
+	void AssignNewInstanceID()
+	{
+		ItemInstanceID = FGuid::NewGuid();
+	}
+
+	void EnsureInstanceID()
+	{
+		if (!IsEmpty() && !ItemInstanceID.IsValid())
+		{
+			AssignNewInstanceID();
+		}
+	}
+
 	void Clear()
 	{
+		ItemInstanceID = FGuid();
 		ItemData = FPDItemData();
 		Quantity = 0;
 		bIsEmpty = true;
@@ -369,9 +386,6 @@ struct FBodyPartMapping
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FName HitBoxName;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<FName> HitBoxNames;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EBodyPart BodyPart = EBodyPart::None;

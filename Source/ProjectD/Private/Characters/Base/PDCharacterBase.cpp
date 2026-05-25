@@ -1,14 +1,13 @@
 #include "Characters/Base/PDCharacterBase.h"
-#include "Characters/PDPlayerCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Components/CapsuleComponent.h"
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
-#include "Ability/PDGameplayAbilityBase.h"
 #include "AttributeSet/PDAttributeSet.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Core/PDGameMode.h"
+#include "Data/PDBodyPartConfig.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
@@ -18,6 +17,7 @@
 #include "Perception/AISense_Hearing.h"
 #include "Net/UnrealNetwork.h"
 #include "Type/Types.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -48,6 +48,12 @@ APDCharacterBase::APDCharacterBase()
 	ASC->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 	AttributeSet=CreateDefaultSubobject<UPDAttributeSet>(TEXT("AttributeSet"));
 
+	static ConstructorHelpers::FObjectFinder<UPDBodyPartConfig> BodyPartConfigAsset(
+		TEXT("/Game/Main/Data/DA_BodyPartConfig.DA_BodyPartConfig"));
+	if (BodyPartConfigAsset.Succeeded())
+	{
+		BodyPartConfig = BodyPartConfigAsset.Object;
+	}
 
 	StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("StimuliSource"));
 	if (StimuliSource)
@@ -68,6 +74,7 @@ void APDCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(APDCharacterBase, DownedExpireServerTime);
 	DOREPLIFETIME(APDCharacterBase, ActiveReviver);
 	DOREPLIFETIME(APDCharacterBase, ReviveEndServerTime);
+	DOREPLIFETIME(APDCharacterBase, ReviveDisplayDuration);
 }
 
 void APDCharacterBase::BeginPlay()
@@ -106,6 +113,10 @@ void APDCharacterBase::InitAbilitySystem()
 {
 	if (!ASC) return;
 	ASC->InitAbilityActorInfo(this, this);
+	if (AttributeSet && BodyPartConfig)
+	{
+		AttributeSet->BodyPartConfig = BodyPartConfig;
+	}
 
 	if (!bAbilitySystemDelegatesBound)
 	{
@@ -179,15 +190,25 @@ void APDCharacterBase::GiveActiveAbilities()
 
 void APDCharacterBase::ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo)
 {
-	if (!HasAuthority()) return;
-	if (!ASC) return;
+
+	if (!HasAuthority())
+	{
+		return;
+	}
+	if (!ASC)
+	{
+		return;
+	}
 
 	FGameplayEffectContextHandle Context=ASC->MakeEffectContext();
 	Context.AddHitResult(DamageInfo.HitResult);
 	Context.AddInstigator(DamageInfo.Instigator.Get(), DamageInfo.Instigator.Get());
 
 	FGameplayEffectSpecHandle Spec=ASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
-	if (!Spec.IsValid()) return;
+	if (!Spec.IsValid())
+	{
+		return;
+	}
 
 	Spec.Data->SetSetByCallerMagnitude(PDGameplayTags::Data_Damage, DamageInfo.BaseDamage);
 	ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
@@ -240,7 +261,7 @@ float APDCharacterBase::GetReviveRemainingTime() const
 
 float APDCharacterBase::GetReviveProgress() const
 {
-	const float Duration = FMath::Max(0.f, ReviveTime);
+	const float Duration = FMath::Max(0.f, ReviveDisplayDuration);
 	if (Duration <= KINDA_SMALL_NUMBER || !IsBeingRevived())
 	{
 		return 0.f;
@@ -256,7 +277,7 @@ bool APDCharacterBase::CanBeKilledWhileDownedByDamage() const
 		return false;
 	}
 
-	const float GracePeriod = FMath::Max(0.f, DownedDamageGracePeriod);
+	const float GracePeriod = GetDownedDamageGracePeriod();
 	if (GracePeriod <= KINDA_SMALL_NUMBER)
 	{
 		return true;
@@ -272,54 +293,33 @@ bool APDCharacterBase::CanBeKilledWhileDownedByDamage() const
 void APDCharacterBase::Interact_Implementation(AActor* Interactor)
 {
 	if (!HasAuthority()) return;
-	if (LifeState != EPDLifeState::Downed)
-	{
-		return;
-	}
-	if (SendReviveGameplayEvent(Interactor, this, PDGameplayTags::Event_Revive_Start) <= 0)
-	{
-		BeginReviveInteraction(Interactor);
-	}
+	if (LifeState != EPDLifeState::Downed) return;
+
+	SendReviveGameplayEvent(Interactor, this, PDGameplayTags::Event_Revive_Start);
 }
 
-bool APDCharacterBase::BeginReviveInteraction(AActor* Reviver)
+void APDCharacterBase::BeginReviveDisplay(AActor* Reviver, float Duration)
 {
-	if (!HasAuthority()) return false;
-	if (!IsValidReviver(Reviver)) return false;
+	if (!HasAuthority()) return;
+	if (LifeState != EPDLifeState::Downed) return;
 
-	if (ActiveReviver.Get() && ActiveReviver.Get() != Reviver)
-	{
-		return false;
-	}
-
-	const float Duration = FMath::Max(0.1f, ReviveTime);
 	ActiveReviver = Reviver;
-	ReviveStartLocation = Reviver->GetActorLocation();
 
 	const AGameStateBase* GameState = GetWorld() ? GetWorld()->GetGameState() : nullptr;
 	const float CurrentServerTime = GameState ? GameState->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
-	ReviveEndServerTime = CurrentServerTime + Duration;
-
+	ReviveDisplayDuration = FMath::Max(0.f, Duration);
+	ReviveEndServerTime = CurrentServerTime + ReviveDisplayDuration;
 	ForceNetUpdate();
-
-	GetWorldTimerManager().SetTimer(
-		ReviveTimerHandle,
-		this,
-		&APDCharacterBase::TickReviveInteraction,
-		FMath::Max(0.01f, ReviveValidationInterval),
-		true);
-
-	return true;
 }
 
-void APDCharacterBase::CancelReviveInteraction(AActor* Reviver)
+void APDCharacterBase::ClearReviveDisplay()
 {
 	if (!HasAuthority()) return;
-	if (!ActiveReviver.Get()) return;
-	if (Reviver && ActiveReviver.Get() != Reviver) return;
 
-	SendReviveGameplayEvent(ActiveReviver.Get(), this, PDGameplayTags::Event_Revive_Cancel);
-	ClearReviveInteraction(true);
+	ActiveReviver = nullptr;
+	ReviveEndServerTime = 0.f;
+	ReviveDisplayDuration = 0.f;
+	ForceNetUpdate();
 }
 
 void APDCharacterBase::SetLifeState(EPDLifeState NewLifeState, AActor* ContextActor)
@@ -336,12 +336,9 @@ void APDCharacterBase::SetLifeState(EPDLifeState NewLifeState, AActor* ContextAc
 void APDCharacterBase::HandleDowned(AActor* InstigatorActor)
 {
 	if (!HasAuthority()) return;
-	if (LifeState != EPDLifeState::Alive)
-	{
-		return;
-	}
+	if (LifeState != EPDLifeState::Alive) return;
 
-	ClearReviveInteraction(false);
+	ClearReviveDisplay();
 	PendingGetUpContext = nullptr;
 	if (ASC)
 	{
@@ -353,6 +350,7 @@ void APDCharacterBase::HandleDowned(AActor* InstigatorActor)
 			ASC->RemoveLooseGameplayTag(PDGameplayTags::State_Debuff_Bleeding);
 		}
 	}
+
 	SetLifeState(EPDLifeState::Downed, InstigatorActor);
 	const AGameStateBase* GameState = GetWorld() ? GetWorld()->GetGameState() : nullptr;
 	DownedEnteredServerTime = GameState ? GameState->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
@@ -364,45 +362,38 @@ void APDCharacterBase::HandleDeath(AActor* Killer)
 	if (!HasAuthority()) return;
 	if (LifeState == EPDLifeState::Dead) return;
 
-	ClearReviveInteraction(false);
+	ClearReviveDisplay();
 	ClearDownedDeathTimer();
 	PendingGetUpContext = nullptr;
 	DownedEnteredServerTime = 0.f;
 
 	SetLifeState(EPDLifeState::Dead, Killer);
 
-
 	if (StimuliSource)
 	{
 		StimuliSource->UnregisterFromPerceptionSystem();
 	}
 
-	if (APlayerController* PC=Cast<APlayerController>(GetController()))
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
-		if (APDGameMode* GM=GetWorld()->GetAuthGameMode<APDGameMode>())
+		if (APDGameMode* GM = GetWorld()->GetAuthGameMode<APDGameMode>())
 		{
 			GM->OnPlayerDied(PC, Killer);
 		}
 	}
 }
 
-void APDCharacterBase::Revive(AActor* Reviver)
+void APDCharacterBase::BeginGettingUp(AActor* Reviver)
 {
 	if (!HasAuthority()) return;
 	if (LifeState != EPDLifeState::Downed) return;
 	if (!Reviver || Reviver == this) return;
-	if (!IsValidReviver(Reviver)) return;
 
-	ClearReviveInteraction(false);
+	ClearReviveDisplay();
 	ClearDownedDeathTimer();
 	PendingGetUpContext = nullptr;
 	DownedEnteredServerTime = 0.f;
-	ApplyReviveHealth(Reviver);
-	if (AttributeSet && (AttributeSet->GetHeadHP() <= 0.f || AttributeSet->GetTorsoHP() <= 0.f))
-	{
-		StartDownedDeathTimer();
-		return;
-	}
+
 	PendingGetUpContext = Reviver;
 	SetLifeState(EPDLifeState::GettingUp, Reviver);
 }
@@ -421,7 +412,7 @@ void APDCharacterBase::ResetLifeStateToAlive(AActor* ContextActor)
 {
 	if (!HasAuthority()) return;
 
-	ClearReviveInteraction(false);
+	ClearReviveDisplay();
 	ClearDownedDeathTimer();
 	PendingGetUpContext = nullptr;
 	DownedEnteredServerTime = 0.f;
@@ -555,24 +546,6 @@ void APDCharacterBase::ApplyLifeStateMovement()
 	}
 }
 
-void APDCharacterBase::ApplyReviveHealth(AActor* Reviver)
-{
-	if (!HasAuthority() || !ASC || !AttributeSet) return;
-
-	if (!ReviveEffectClass)
-	{
-		return;
-	}
-
-	FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
-	Context.AddInstigator(Reviver, Reviver);
-	FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(ReviveEffectClass, 1.f, Context);
-	if (Spec.IsValid())
-	{
-		ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
-	}
-}
-
 void APDCharacterBase::StartDownedDeathTimer()
 {
 	if (!HasAuthority()) return;
@@ -609,107 +582,18 @@ void APDCharacterBase::ClearDownedDeathTimer()
 void APDCharacterBase::HandleDownedExpired()
 {
 	if (!HasAuthority()) return;
-	if (LifeState != EPDLifeState::Downed) return;
-
-	HandleDeath(nullptr);
-}
-
-void APDCharacterBase::CompleteReviveInteraction()
-{
-	if (!HasAuthority()) return;
-
-	AActor* Reviver = ActiveReviver.Get();
-	if (!IsValidReviver(Reviver))
+	if (LifeState == EPDLifeState::Downed)
 	{
-		ClearReviveInteraction(true);
-		return;
+		HandleDeath(nullptr);
 	}
-
-	GetWorldTimerManager().ClearTimer(ReviveTimerHandle);
-	ActiveReviver = nullptr;
-	ReviveEndServerTime = 0.f;
-	ForceNetUpdate();
-	Revive(Reviver);
-}
-
-void APDCharacterBase::TickReviveInteraction()
-{
-	if (!HasAuthority()) return;
-
-	AActor* Reviver = ActiveReviver.Get();
-	if (!IsValidReviver(Reviver))
-	{
-		ClearReviveInteraction(true);
-		return;
-	}
-
-	const float MoveTolerance = FMath::Max(0.f, ReviveCancelMoveTolerance);
-	if (MoveTolerance > 0.f &&
-		FVector::DistSquared2D(Reviver->GetActorLocation(), ReviveStartLocation) > FMath::Square(MoveTolerance))
-	{
-		ClearReviveInteraction(true);
-		return;
-	}
-
-	if (GetReviveRemainingTime() <= KINDA_SMALL_NUMBER)
-	{
-		CompleteReviveInteraction();
-	}
-}
-
-void APDCharacterBase::ClearReviveInteraction(bool)
-{
-	if (GetWorld())
-	{
-		GetWorldTimerManager().ClearTimer(ReviveTimerHandle);
-	}
-
-	ActiveReviver = nullptr;
-	ReviveEndServerTime = 0.f;
-	ReviveStartLocation = FVector::ZeroVector;
-
-	ForceNetUpdate();
-}
-
-bool APDCharacterBase::IsValidReviver(AActor* Reviver) const
-{
-	if (LifeState != EPDLifeState::Downed)
-	{
-		return false;
-	}
-	if (!Reviver || Reviver == this)
-	{
-		return false;
-	}
-
-	const APDCharacterBase* ReviverCharacter = Cast<APDCharacterBase>(Reviver);
-	if (!ReviverCharacter || ReviverCharacter->LifeState != EPDLifeState::Alive)
-	{
-		return false;
-	}
-
-	const APDPlayerCharacter* ReviverPlayerCharacter = Cast<APDPlayerCharacter>(Reviver);
-	if (!ReviverPlayerCharacter || !ReviverPlayerCharacter->IsInteractingWith(this))
-	{
-		return false;
-	}
-
-	const float MaxDistance = FMath::Max(0.f, ReviveInteractDistance);
-	if (FVector::DistSquared(GetActorLocation(), Reviver->GetActorLocation()) > FMath::Square(MaxDistance))
-	{
-		return false;
-	}
-
-	return true;
 }
 
 void APDCharacterBase::AttachActorToWeaponSocket(AActor* ActorToAttach)
 {
-	if (!ActorToAttach) return;
+	if (!ActorToAttach || !GetMesh()) return;
 
 	ActorToAttach->AttachToComponent(
 		GetMesh(),
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-		WeaponSocketName
-	);
+		WeaponSocketName);
 }

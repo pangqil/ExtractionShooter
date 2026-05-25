@@ -10,11 +10,11 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
-#include "Items/PDQuickSlotComponent.h"
-#include "Items/PDEquipmentComponent.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDEquipmentModificationComponent.h"
-#include "Items/PDSecureContainerComponent.h"
+#include "Items/Containers/PDQuickSlotComponent.h"
+#include "Items/Equipment/PDEquipmentComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Equipment/PDEquipmentModificationComponent.h"
+#include "Items/Containers/PDSecureContainerComponent.h"
 #include "Interfaces/PDInteractable.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
@@ -42,6 +42,20 @@ namespace
 
 		const FBox Bounds = TargetActor->GetComponentsBoundingBox(true);
 		return Bounds.IsValid && Bounds.ComputeSquaredDistanceToPoint(InteractorLocation) <= MaxDistanceSq;
+	}
+
+	void SendReviveCancelEvent(UAbilitySystemComponent* AbilitySystemComponent, AActor* Reviver, AActor* TargetActor)
+	{
+		if (!AbilitySystemComponent || !TargetActor)
+		{
+			return;
+		}
+
+		FGameplayEventData EventData;
+		EventData.EventTag = PDGameplayTags::Event_Revive_Cancel;
+		EventData.Instigator = Reviver;
+		EventData.Target = TargetActor;
+		AbilitySystemComponent->HandleGameplayEvent(PDGameplayTags::Event_Revive_Cancel, &EventData);
 	}
 }
 
@@ -230,6 +244,7 @@ void APDPlayerCharacter::OnRep_ReplicatedWeaponType()
 {
 	SyncWeaponTypeTags(ReplicatedWeaponType);
 	SyncWeaponPresentation();
+	OnWeaponSwapped.Broadcast(GetCurrentWeapon(), CurrentSlot);
 }
 
 void APDPlayerCharacter::SyncWeaponPresentation()
@@ -272,6 +287,12 @@ void APDPlayerCharacter::SyncWeaponPresentation()
 	if (CurrentWeapon)
 	{
 		AttachActorToWeaponSocket(CurrentWeapon);
+		if (USkeletalMeshComponent* WeaponMesh = CurrentWeapon->GetWeaponMesh())
+		{
+			WeaponMesh->SetVisibility(true, true);
+			WeaponMesh->SetHiddenInGame(false);
+			WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
 		CurrentWeapon->SetActorHiddenInGame(false);
 		ApplyWeaponAnimationLayer(CurrentWeapon);
 		if (AnimInst)
@@ -570,6 +591,7 @@ bool APDPlayerCharacter::TryAutoEquipWeaponItem(const FPDItemData& ItemData)
 	TempSlot.Quantity = 1;
 	TempSlot.bIsEmpty = false;
 	TempSlot.ModificationLevel = 0;
+	TempSlot.EnsureInstanceID();
 	return TryAutoEquipWeaponSlot(TempSlot);
 }
 
@@ -599,6 +621,7 @@ bool APDPlayerCharacter::TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot
 	if (!SpawnedWeapon) return false;
 
 	SpawnedWeapon->ItemID = ItemData.ItemID;
+	SpawnedWeapon->ItemInstanceID = ItemSlot.ItemInstanceID;
 	if (SpawnedWeapon->WeaponType == EWeaponType::None)
 	{
 		SpawnedWeapon->WeaponType = ItemData.WeaponType;
@@ -606,8 +629,8 @@ bool APDPlayerCharacter::TryAutoEquipWeaponSlot(const FPDInventorySlot& ItemSlot
 
 	SpawnedWeapon->SetLevel(FMath::Max(1, ItemSlot.ModificationLevel + 1));
 
-	// ???�속?�된 ?�탄??PickupWeapon ?�출 ?�에 ?�용 ??PickupWeapon ?��???SwitchToSlot??	//    OnWeaponSwapped�?broadcast?�기 ?�에 actor??CurrentAmmo가 ?�확??값이?�야
-	//    UI가 �??�시부???�바�??�탄??보임.
+	// ???�속?�된 ?�탄??PickupWeapon ?�출 ?�에 ?�용 ??PickupWeapon ?��???SwitchToSlot??	//    OnWeaponSwapped�?broadcast?�기 ?�에 actor??CurrentAmmo가 ?�확??값이?�야
+	//    UI가 �??�시부???�바�??�탄??보임.
 	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(SpawnedWeapon))
 	{
 		if (ItemSlot.WeaponState.HasPersistedAmmo())
@@ -629,6 +652,12 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItem(const FPDItemData& ItemData, b
 	return RemoveEquippedWeaponItemPreservingState(ItemData, Discarded, bDestroyWeaponActor);
 }
 
+bool APDPlayerCharacter::RemoveEquippedWeaponItemByInstanceID(const FGuid& ItemInstanceID, bool bDestroyWeaponActor)
+{
+	FPDWeaponInstanceState Discarded;
+	return RemoveEquippedWeaponItemByInstanceIDPreservingState(ItemInstanceID, Discarded, bDestroyWeaponActor);
+}
+
 bool APDPlayerCharacter::RemoveEquippedWeaponItemPreservingState(const FPDItemData& ItemData,
                                                                   FPDWeaponInstanceState& OutState,
                                                                   bool bDestroyWeaponActor)
@@ -636,7 +665,38 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItemPreservingState(const FPDItemDa
 	if (!HasAuthority()) return false;
 
 	const EWeaponSlot TargetSlot = GetSlotForWeaponType(ItemData.WeaponType);
-	if (TargetSlot == EWeaponSlot::None)
+	return RemoveEquippedWeaponInSlotPreservingState(TargetSlot, OutState, bDestroyWeaponActor);
+}
+
+bool APDPlayerCharacter::RemoveEquippedWeaponItemByInstanceIDPreservingState(const FGuid& ItemInstanceID,
+                                                                             FPDWeaponInstanceState& OutState,
+                                                                             bool bDestroyWeaponActor)
+{
+	if (!HasAuthority() || !ItemInstanceID.IsValid())
+	{
+		return false;
+	}
+
+	for (int32 SlotIndex = 0; SlotIndex < WeaponSlots.Num(); ++SlotIndex)
+	{
+		APDWeaponBase* Weapon = WeaponSlots[SlotIndex].Get();
+		if (Weapon && Weapon->GetItemInstanceID() == ItemInstanceID)
+		{
+			return RemoveEquippedWeaponInSlotPreservingState(
+				static_cast<EWeaponSlot>(SlotIndex),
+				OutState,
+				bDestroyWeaponActor);
+		}
+	}
+
+	return false;
+}
+
+bool APDPlayerCharacter::RemoveEquippedWeaponInSlotPreservingState(EWeaponSlot TargetSlot,
+                                                                    FPDWeaponInstanceState& OutState,
+                                                                    bool bDestroyWeaponActor)
+{
+	if (!HasAuthority() || TargetSlot == EWeaponSlot::None)
 	{
 		return false;
 	}
@@ -683,7 +743,7 @@ bool APDPlayerCharacter::RemoveEquippedWeaponItemPreservingState(const FPDItemDa
 		WeaponToRemove->Destroy();
 	}
 
-	// 메인 무기가 비워�??�실??UI/Anim???�림. ?�왑 ?�름???��??�면 Apply가 �???무기�??�시 broadcast??
+	// 메인 무기가 비워�??�실??UI/Anim???�림. ?�왑 ?�름???��??�면 Apply가 �???무기�??�시 broadcast??
 	if (bWasCurrent)
 	{
 		OnWeaponSwapped.Broadcast(nullptr, EWeaponSlot::None);
@@ -791,7 +851,8 @@ void APDPlayerCharacter::StopInteract()
 
 	if (APDCharacterBase* DownedCharacter = Cast<APDCharacterBase>(TargetActor))
 	{
-		DownedCharacter->CancelReviveInteraction(this);
+		SendReviveCancelEvent(ASC, this, DownedCharacter);
+
 	}
 }
 
@@ -841,7 +902,8 @@ void APDPlayerCharacter::ServerStopInteract_Implementation(AActor* TargetActor)
 {
 	if (APDCharacterBase* DownedCharacter = Cast<APDCharacterBase>(TargetActor))
 	{
-		DownedCharacter->CancelReviveInteraction(this);
+		SendReviveCancelEvent(ASC, this, DownedCharacter);
+
 	}
 }
 
@@ -895,7 +957,11 @@ void APDPlayerCharacter::ApplyWeaponAnimationLayer(APDWeaponBase* Weapon)
 	}
 
 	TSubclassOf<UAnimInstance> LayerClass=Weapon->GetWeaponAnimLayerClass();
-	if (!LayerClass) { LinkDefaultAnimLayer(); return; }
+	if (!LayerClass)
+	{
+		ApplyWeaponAnimationLayerForType(Weapon->GetWeaponType());
+		return;
+	}
 	if (USkeletalMeshComponent* SkelMesh=GetMesh())
 		SkelMesh->LinkAnimClassLayers(LayerClass);
 }
@@ -1013,6 +1079,7 @@ void APDPlayerCharacter::LinkDownedAnimLayer()
 
 void APDPlayerCharacter::BeginGettingUpPresentation()
 {
+
 	if (GetWorld())
 	{
 		GetWorldTimerManager().ClearTimer(GetUpTimerHandle);
@@ -1023,6 +1090,9 @@ void APDPlayerCharacter::BeginGettingUpPresentation()
 	{
 		AnimInst->PlayGetUpMontage();
 		GetUpDuration = AnimInst->GetGetUpMontageDuration();
+	}
+	else
+	{
 	}
 
 	if (HasAuthority())
@@ -1039,6 +1109,7 @@ void APDPlayerCharacter::BeginGettingUpPresentation()
 			&APDPlayerCharacter::FinishGettingUpFromTimer,
 			GetUpDuration,
 			false);
+
 	}
 }
 

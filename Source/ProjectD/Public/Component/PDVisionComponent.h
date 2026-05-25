@@ -8,6 +8,7 @@
 #include "PDVisionComponent.generated.h"
 
 class UAbilitySystemComponent;
+class UMaterialParameterCollection;
 
 namespace EEndPlayReason
 {

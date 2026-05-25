@@ -12,6 +12,7 @@
 #include "PDCharacterBase.generated.h"
 
 class UPDAttributeSet;
+class UPDBodyPartConfig;
 class UGameplayAbility;
 class UAIPerceptionStimuliSourceComponent;
 class FLifetimeProperty;
@@ -49,6 +50,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|GAS")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Damage")
+	TObjectPtr<UPDBodyPartConfig> BodyPartConfig;
+
 	UPROPERTY(EditAnywhere, Category = "PD|GAS")
 	TArray<TSubclassOf<UGameplayAbility>> StartupAbilities;
 
@@ -80,23 +84,7 @@ protected:
 	float DownedLifeSpan = 20.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Downed", meta=(ClampMin="0.0", ForceUnits="s"))
-	float DownedDamageGracePeriod = 0.5f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Revive", meta=(ClampMin="0.0"))
-	float ReviveTime = 3.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Revive", meta=(ClampMin="0.0"))
-	float ReviveInteractDistance = 300.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Revive", meta=(ClampMin="0.01"))
-	float ReviveValidationInterval = 0.1f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Revive", meta=(ClampMin="0.0"))
-	float ReviveCancelMoveTolerance = 25.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Revive")
-	TSubclassOf<UGameplayEffect> ReviveEffectClass;
-
+	float DownedDamageGracePeriod = 3.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|AI")
 	uint8 TeamID = FGenericTeamId::NoTeam;
@@ -174,8 +162,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Damage")
 	FORCEINLINE float GetDownedLifeSpan() const { return DownedLifeSpan; }
 
-	UFUNCTION(BlueprintPure, Category = "PD|Revive")
-	FORCEINLINE float GetReviveTime() const { return ReviveTime; }
+	UFUNCTION(BlueprintPure, Category = "PD|Damage")
+	FORCEINLINE float GetDownedDamageGracePeriod() const { return FMath::Max(3.f, DownedDamageGracePeriod); }
 
 	UFUNCTION(BlueprintPure, Category = "PD|Revive")
 	float GetReviveRemainingTime() const;
@@ -190,17 +178,19 @@ public:
 	FORCEINLINE AActor* GetActiveReviver() const { return ActiveReviver.Get(); }
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Revive")
-	bool BeginReviveInteraction(AActor* Reviver);
+	void BeginReviveDisplay(AActor* Reviver, float Duration);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Revive")
-	void CancelReviveInteraction(AActor* Reviver);
+	void ClearReviveDisplay();
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Revive")
 	void FinishGettingUp();
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Revive")
+	void BeginGettingUp(AActor* Reviver);
+
 	virtual void HandleDeath(AActor* Killer);
 	virtual void HandleDowned(AActor* InstigatorActor);
-	virtual void Revive(AActor* Reviver);
 	virtual bool ShouldEnterDownedStateOnLethalDamage() const { return false; }
 	bool CanBeKilledWhileDownedByDamage() const;
 
@@ -219,6 +209,9 @@ protected:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category="PD|Revive")
 	float ReviveEndServerTime = 0.f;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category="PD|Revive")
+	float ReviveDisplayDuration = 0.f;
 
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> ASC;
@@ -242,14 +235,9 @@ private:
 	void SyncLifeStateTags();
 	void ApplyLifeStateMovement();
 	void RestoreAliveCollisionAndInput();
-	void ApplyReviveHealth(AActor* Reviver);
 	void StartDownedDeathTimer();
 	void ClearDownedDeathTimer();
 	void HandleDownedExpired();
-	void CompleteReviveInteraction();
-	void TickReviveInteraction();
-	void ClearReviveInteraction(bool bCancelled);
-	bool IsValidReviver(AActor* Reviver) const;
 
 	bool bAbilitySystemDelegatesBound = false;
 	bool bAttributesInitialized = false;
@@ -257,8 +245,6 @@ private:
 	bool bActiveAbilitiesGiven = false;
 
 	FTimerHandle DownedDeathTimerHandle;
-	FTimerHandle ReviveTimerHandle;
-	FVector ReviveStartLocation = FVector::ZeroVector;
 	float DownedEnteredServerTime = 0.f;
 	TWeakObjectPtr<AActor> PendingGetUpContext;
 };
