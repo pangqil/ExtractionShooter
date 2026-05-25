@@ -75,8 +75,8 @@ public:
 	                                  const TArray<FPDPlayerRaidEntryData>& Entries,
 	                                  float RaidDurationSeconds);
 
-	// PDReviveAbility 가 서버에서 Reviver 의 PC 에 발사. HUD CircularProgress 시작/종료.
-	// Target 액터 위치를 따라다니는 위젯이라 RPC 에 동봉.
+	// GA_ReviveAbility 가 ?�버?�서 Reviver ??PC ??발사. HUD CircularProgress ?�작/종료.
+	// Target ?�터 ?�치�??�라?�니???�젯?�라 RPC ???�봉.
 	UFUNCTION(Client, Reliable)
 	void Client_NotifyReviveStarted(AActor* Target, float Duration);
 

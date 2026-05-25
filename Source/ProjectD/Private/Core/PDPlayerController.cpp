@@ -548,19 +548,18 @@ void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-<<<<<<< HEAD
 void APDPlayerController::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	BindInventoryNotifications();
-=======
+}
+
 void APDPlayerController::PreClientTravel(const FString& PendingURL, ETravelType TravelType, bool bIsSeamlessTravel)
 {
 	Super::PreClientTravel(PendingURL, TravelType, bIsSeamlessTravel);
 
-	// 클라이언트 머신의 PC만 이 hook으로 LoadingScreen을 띄움.
-	// 호스트(=Authority)는 자기 트래블 시 TravelToLevel에서 이미 ShowImmediate 호출하므로 제외 —
-	// 그렇지 않으면 새 클라이언트 join처럼 호스트 측에 PreClientTravel이 어떤 경로로든 trigger될 때 중복 표시됨.
+	// ?�라?�언??머신??PC�???hook?�로 LoadingScreen???��?.
+	// ?�스??=Authority)???�기 ?�래�???TravelToLevel?�서 ?��? ShowImmediate ?�출?��?�??�외 ??	// 그렇지 ?�으�????�라?�언??join처럼 ?�스??측에 PreClientTravel???�떤 경로로든 trigger????중복 ?�시??
 	if (!IsLocalController() || HasAuthority())
 	{
 		return;
@@ -573,7 +572,6 @@ void APDPlayerController::PreClientTravel(const FString& PendingURL, ETravelType
 			LSS->ShowImmediate();
 		}
 	}
->>>>>>> 38770d40d9a455202ce835c7763a06378389963a
 }
 
 void APDPlayerController::OnPossess(APawn* InPawn)
@@ -923,7 +921,7 @@ void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
 		LootWidgetInstance->InitializeLoot(LootSource);
 	}
 
-	// Stash/Market 처럼 InventoryWidget 도 같이 띄움 — Loot 와 인벤 간 드래그/비교 가능.
+	// Stash/Market 처럼 InventoryWidget ??같이 ?��? ??Loot ?� ?�벤 �??�래�?비교 가??
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->OpenInventoryForLoot();
@@ -943,7 +941,7 @@ void APDPlayerController::CloseLootInterface()
 	LootWidgetInstance = nullptr;
 	ActiveLootComponent.Reset();
 
-	// Loot 위젯과 함께 띄웠던 InventoryWidget 도 해제 (다른 UI 가 유지 안 할 때).
+	// Loot ?�젯�??�께 ?�웠??InventoryWidget ???�제 (?�른 UI 가 ?��? ??????.
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->CloseInventoryForLoot();

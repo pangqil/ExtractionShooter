@@ -7,7 +7,7 @@
 
 namespace
 {
-bool RefineCharacterHitToMesh(const FHitResult& SourceHit, const FVector& Start, const FVector& End,
+bool RefineShotgunCharacterHitToMesh(const FHitResult& SourceHit, const FVector& Start, const FVector& End,
     const FCollisionQueryParams& QueryParams, FHitResult& OutHit)
 {
     ACharacter* HitCharacter = Cast<ACharacter>(SourceHit.GetActor());
@@ -169,7 +169,7 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
         if (bHit)
         {
             FHitResult MeshHit;
-            if (RefineCharacterHitToMesh(Hit, Start, End, Params, MeshHit))
+            if (RefineShotgunCharacterHitToMesh(Hit, Start, End, Params, MeshHit))
             {
                 Hit = MeshHit;
             }
