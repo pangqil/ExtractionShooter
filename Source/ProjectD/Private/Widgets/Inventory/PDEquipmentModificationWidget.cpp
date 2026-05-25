@@ -10,10 +10,10 @@
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
-#include "Core/PDPlayerController.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "GameFramework/Pawn.h"
-#include "Items/PDEquipmentModificationComponent.h"
-#include "Items/PDInventoryComponent.h"
+#include "Items/Equipment/PDEquipmentModificationComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
 #include "Widgets/Inventory/PDEquipmentListItemWidget.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDInventoryDragDropOperation.h"
@@ -37,13 +37,12 @@ void UPDEquipmentModificationWidget::NativeDestruct()
 void UPDEquipmentModificationWidget::ResolveComponents()
 {
 	APawn* OwningPawn = GetOwningPlayerPawn();
-	APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer());
 
-	// 2번 구조: InventoryComponent는 PlayerState에 존재, ModificationComponent는 PlayerCharacter(=Pawn)에 존재.
-	InventoryComponent = PDController ? PDController->GetPlayerInventoryComponent() : nullptr;
-	if (!InventoryComponent && OwningPawn)
+	// 2�?구조: InventoryComponent??PlayerState??존재, ModificationComponent??PlayerCharacter(=Pawn)??존재.
+	InventoryComponent = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer());
+	if (!InventoryComponent)
 	{
-		InventoryComponent = OwningPawn->FindComponentByClass<UPDInventoryComponent>();
+		InventoryComponent = FPDPlayerComponentResolver::ResolveInventory(OwningPawn);
 	}
 	ModificationComponent = OwningPawn ? OwningPawn->FindComponentByClass<UPDEquipmentModificationComponent>() : nullptr;
 
@@ -383,7 +382,7 @@ void UPDEquipmentModificationWidget::RefreshSelectedSlots()
 {
 	SetSlotWidgetData(EquipmentSlotWidget, SelectedSlotIndex, EmptySelectionText);
 	SetSlotWidgetData(MaterialSlotWidget, SelectedMaterialSlotIndex, EmptyMaterialText);
-	SetSlotWidgetData(BoostSlotWidget, SelectedBoostSlotIndex, FText::FromString(TEXT("부스트 재료를 선택하세요")));
+	SetSlotWidgetData(BoostSlotWidget, SelectedBoostSlotIndex, FText::FromString(TEXT("Select boost material.")));
 }
 
 void UPDEquipmentModificationWidget::RefreshPreview()
@@ -477,12 +476,12 @@ void UPDEquipmentModificationWidget::ApplyPreview(const FPDModificationPreview& 
 
 	if (Preview.AttackBonus > 0.f)
 	{
-		SetText(Text_StatType, FText::FromString(TEXT("공격력")));
+		SetText(Text_StatType, FText::FromString(TEXT("Attack")));
 		SetText(Text_StatPreview, FText::FromString(FString::Printf(TEXT("+%.1f"), Preview.AttackBonus)));
 	}
 	else if (Preview.DefenseBonus > 0.f)
 	{
-		SetText(Text_StatType, FText::FromString(TEXT("방어력")));
+		SetText(Text_StatType, FText::FromString(TEXT("Defense")));
 		SetText(Text_StatPreview, FText::FromString(FString::Printf(TEXT("+%.1f"), Preview.DefenseBonus)));
 	}
 	else
@@ -887,29 +886,29 @@ FText UPDEquipmentModificationWidget::GetResultText(EPDModificationResult Result
 {
 	if (Result == EPDModificationResult::Success && bSuccess)
 	{
-		return FText::FromString(TEXT("개조 성공"));
+		return FText::FromString(TEXT("Modification success."));
 	}
 
 	switch (Result)
 	{
 	case EPDModificationResult::FailedByChance:
-		return FText::FromString(TEXT("개조 실패"));
+		return FText::FromString(TEXT("Modification failed."));
 	case EPDModificationResult::InvalidInventory:
-		return FText::FromString(TEXT("인벤토리 오류"));
+		return FText::FromString(TEXT("Inventory error."));
 	case EPDModificationResult::InvalidSlot:
-		return FText::FromString(TEXT("장비를 선택하세요"));
+		return FText::FromString(TEXT("Select equipment."));
 	case EPDModificationResult::NotEquipment:
-		return FText::FromString(TEXT("장비만 개조할 수 있습니다"));
+		return FText::FromString(TEXT("Only equipment can be modified."));
 	case EPDModificationResult::AlreadyMaxLevel:
-		return FText::FromString(TEXT("최대 개조 단계입니다"));
+		return FText::FromString(TEXT("Already max level."));
 	case EPDModificationResult::MissingCurveTable:
-		return FText::FromString(TEXT("개조 데이터가 없습니다"));
+		return FText::FromString(TEXT("Modification data is missing."));
 	case EPDModificationResult::NotEnoughGold:
-		return FText::FromString(TEXT("골드가 부족합니다"));
+		return FText::FromString(TEXT("Not enough gold."));
 	case EPDModificationResult::NotEnoughMaterials:
-		return FText::FromString(TEXT("재료가 부족합니다"));
+		return FText::FromString(TEXT("Not enough materials."));
 	default:
-		return FText::FromString(TEXT("개조 실패"));
+		return FText::FromString(TEXT("Modification failed."));
 	}
 }
 

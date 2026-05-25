@@ -6,10 +6,11 @@
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "Components/Widget.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDSecureContainerComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Containers/PDSecureContainerComponent.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 
 void UPDSecureContainerWidget::NativeConstruct()
@@ -184,20 +185,11 @@ void UPDSecureContainerWidget::UnbindSecureContainerChanged()
 
 UPDInventoryComponent* UPDSecureContainerWidget::FindInventoryComponent() const
 {
-	// 2번 구조: InventoryComponent는 PlayerState에 존재.
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer()))
 	{
-		if (UPDInventoryComponent* InventoryComponent = PDController->GetPlayerInventoryComponent())
-		{
-			return InventoryComponent;
-		}
+		return Inventory;
 	}
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
-	{
-		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();
-	}
-
-	return nullptr;
+	return FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
 }
 
 UPDSecureContainerComponent* UPDSecureContainerWidget::FindSecureContainerComponent() const

@@ -9,10 +9,15 @@
 
 UPDActivatableBase* UPDWidgetStack::Push(TSubclassOf<UPDActivatableBase> ScreenClass)
 {
-	if (!ScreenClass || !ContentRoot) return nullptr;
+
+	if (!ScreenClass || !ContentRoot)
+	{
+		return nullptr;
+	}
 
 	if (UPDActivatableBase* PrevTop = GetTop())
 	{
+
 		if (PrevTop->IsActivated())
 		{
 			PrevTop->Deactivate();
@@ -21,16 +26,23 @@ UPDActivatableBase* UPDWidgetStack::Push(TSubclassOf<UPDActivatableBase> ScreenC
 	}
 
 	UPDActivatableBase* NewScreen = CreateWidget<UPDActivatableBase>(GetOwningPlayer(), ScreenClass);
-	if (!NewScreen) return nullptr;
+	if (!NewScreen)
+	{
+		return nullptr;
+	}
 
 	if (UOverlaySlot* OverlaySlot = ContentRoot->AddChildToOverlay(NewScreen))
 	{
 		OverlaySlot->SetHorizontalAlignment(HAlign_Fill);
 		OverlaySlot->SetVerticalAlignment(VAlign_Fill);
 	}
+	else
+	{
+	}
 	NewScreen->SetVisibility(ESlateVisibility::Visible);
 	NewScreen->Activate();
 	Stack.Add(NewScreen);
+
 
 	OnStackChanged.Broadcast(this);
 	return NewScreen;
@@ -38,11 +50,13 @@ UPDActivatableBase* UPDWidgetStack::Push(TSubclassOf<UPDActivatableBase> ScreenC
 
 void UPDWidgetStack::Pop()
 {
+
 	if (Stack.Num() == 0) return;
 
 	UPDActivatableBase* Top = Stack.Pop();
 	if (Top)
 	{
+
 		if (Top->IsActivated())
 		{
 			Top->Deactivate();
@@ -56,11 +70,13 @@ void UPDWidgetStack::Pop()
 		NewTop->Activate();
 	}
 
+
 	OnStackChanged.Broadcast(this);
 }
 
 void UPDWidgetStack::Clear()
 {
+
 	if (Stack.Num() == 0) return;
 
 	for (int32 i = Stack.Num() - 1; i >= 0; --i)
@@ -75,6 +91,7 @@ void UPDWidgetStack::Clear()
 		}
 	}
 	Stack.Reset();
+
 
 	OnStackChanged.Broadcast(this);
 }

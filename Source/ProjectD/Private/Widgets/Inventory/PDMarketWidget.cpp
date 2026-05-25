@@ -3,10 +3,11 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDMarketComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Market/PDMarketComponent.h"
 #include "Widgets/Inventory/PDMarketItemWidget.h"
 
 void UPDMarketWidget::NativeConstruct()
@@ -171,17 +172,9 @@ FText UPDMarketWidget::MakeGoldText(int32 Gold) const
 
 UPDInventoryComponent* UPDMarketWidget::FindInventoryComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer()))
 	{
-		if (UPDInventoryComponent* InventoryComponent = PDController->GetPlayerInventoryComponent())
-		{
-			return InventoryComponent;
-		}
+		return Inventory;
 	}
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
-	{
-		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();
-	}
-
-	return nullptr;
+	return FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
 }

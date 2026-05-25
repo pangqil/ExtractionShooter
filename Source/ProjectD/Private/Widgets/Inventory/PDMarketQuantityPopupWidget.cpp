@@ -7,7 +7,7 @@
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "InputCoreTypes.h"
-#include "Items/PDInventoryComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 
 void UPDMarketQuantityPopupWidget::NativeOnInitialized()
@@ -191,7 +191,7 @@ void UPDMarketQuantityPopupWidget::RefreshVisuals()
 
 	if (TextTitleWidget)
 	{
-		TextTitleWidget->SetText(NSLOCTEXT("PDMarket", "BuyPopupTitle", "구매하기"));
+		TextTitleWidget->SetText(NSLOCTEXT("PDMarket", "BuyPopupTitle", "구매?�기"));
 	}
 
 	if (TextItemNameWidget)
@@ -244,7 +244,7 @@ void UPDMarketQuantityPopupWidget::RefreshBuyState()
 
 	if (TextHaveCountWidget)
 	{
-		TextHaveCountWidget->SetText(FText::Format(NSLOCTEXT("PDMarket", "HaveCountFormat", "보유: {0}개"), FText::AsNumber(GetCurrentOwnedCount())));
+		TextHaveCountWidget->SetText(FText::Format(NSLOCTEXT("PDMarket", "HaveCountFormat", "Owned: {0}"), FText::AsNumber(GetCurrentOwnedCount())));
 	}
 
 	if (TextTotalPriceWidget)

@@ -44,7 +44,7 @@ enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDLootInterfaceClosedSignature, UPDLootComponent*);
-// === Source legacy: 인터페이스 닫힘 델리게이트 시그니처 ===
+// === Source legacy: ?�터?�이???�힘 ?�리게이???�그?�처 ===
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDStashInterfaceClosedSignature, UPDStashComponent*);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDMarketInterfaceClosedSignature, UPDMarketComponent*);
 DECLARE_MULTICAST_DELEGATE(FPDEquipmentModificationInterfaceClosedSignature);
@@ -65,11 +65,11 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerRequestExtraction();
 
-	// 결산 위젯의 Anim_BlackFade 종료 시점에 호출. 서버에서 GameMode의 게이트에 ACK 등록.
+	// 결산 ?�젯??Anim_BlackFade 종료 ?�점???�출. ?�버?�서 GameMode??게이?�에 ACK ?�록.
 	UFUNCTION(Server, Reliable)
 	void Server_RequestBaseTravel();
 
-	// 서버 EndRaid 가 모든 PC 에 발사. Modal 레이어에 결산 위젯 push + Configure.
+	// ?�버 EndRaid 가 모든 PC ??발사. Modal ?�이?�에 결산 ?�젯 push + Configure.
 	UFUNCTION(Client, Reliable)
 	void Client_ShowRaidEndTransition(bool bSuccess,
 	                                  const TArray<FPDPlayerRaidEntryData>& Entries,
@@ -91,13 +91,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	UPDStashComponent* GetActiveStashComponent() const;
 
-	// === Source legacy: 인터페이스 닫힘 델리게이트 ===
+	// === Source legacy: ?�터?�이???�힘 ?�리게이??===
 	FPDStashInterfaceClosedSignature OnStashInterfaceClosed;
 	FPDMarketInterfaceClosedSignature OnMarketInterfaceClosed;
 	FPDEquipmentModificationInterfaceClosedSignature OnEquipmentModificationInterfaceClosed;
 
-	// ─── LootBox 인터페이스 ──────────────────────────────────────────────
-	// Stash 와 완전히 분리된 시스템 — UPDLootComponent 백엔드.
+	// ?�?�?� LootBox ?�터?�이???�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
+	// Stash ?� ?�전??분리???�스????UPDLootComponent 백엔??
 	FPDLootInterfaceClosedSignature OnLootInterfaceClosed;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
@@ -111,7 +111,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Loot")
 	FORCEINLINE UPDLootComponent* GetActiveLootComponent() const { return ActiveLootComponent.Get(); }
-	// ─── LootBox 인터페이스 끝 ────────────────────────────────────────────
+	// ?�?�?� LootBox ?�터?�이?????�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void OpenMarketInterface(UPDMarketComponent* MarketComponent);
@@ -162,9 +162,6 @@ public:
 	void ServerMoveQuickSlotQuantity(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 
 	UFUNCTION(Server, Reliable)
-	void ServerTakeQuickSlotQuantityToInventorySlot(int32 QuickSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity);
-
-	UFUNCTION(Server, Reliable)
 	void ServerEquipInventoryWeaponSlot(int32 InventorySlotIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
@@ -206,17 +203,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Quest")
 	bool IsQuestInterfaceOpen() const;
 
-	// 주어진 GameplayTag에 매핑된 InputAction의 키 매핑을 IMC에서 조회.
-	// UIOnly 모드에서 위젯이 PC InputComponent 대신 직접 키 입력을 처리할 때 사용.
+	// 주어�?GameplayTag??매핑??InputAction????매핑??IMC?�서 조회.
+	// UIOnly 모드?�서 ?�젯??PC InputComponent ?�??직접 ???�력??처리?????�용.
 	TArray<FKey> GetMappedKeysForInputTag(const FGameplayTag& InputTag) const;
 
 	virtual void PlayerTick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// ─── Spectator (Step 2-B: 사망 후 ViewTarget 순환 관전) ─────────────────
-	// 서버에서 GameMode::OnPlayerDied 가 호출. 첫 생존자 대상으로 관전 시작.
+	// ?�?�?� Spectator (Step 2-B: ?�망 ??ViewTarget ?�환 관?? ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
+	// ?�버?�서 GameMode::OnPlayerDied 가 ?�출. �??�존???�?�으�?관???�작.
 	void StartSpectatingDeath(APlayerController* InitialTarget);
-	// 서버에서 호출. 자신의 관전 대상이 DeadPC 면 다음 생존자로 이동.
+	// ?�버?�서 ?�출. ?�신??관???�?�이 DeadPC �??�음 ?�존?�로 ?�동.
 	void CycleSpectateIfTargetIs(APlayerController* AffectedPC);
 
 	UFUNCTION(BlueprintPure, Category = "PD|Spectator")
@@ -260,8 +257,7 @@ protected:
 	TSubclassOf<UPDStashWidget> StashWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
-	TSubclassOf<UPDLootWidget> LootWidgetClass; // LootBox용
-
+	TSubclassOf<UPDLootWidget> LootWidgetClass; // LootBox??
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
 
@@ -280,17 +276,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
 
-	// 결산 위젯 클래스. BP_PDPlayerController 에서 WBP_PDRaidEndTransition 할당.
+	// 결산 ?�젯 ?�래?? BP_PDPlayerController ?�서 WBP_PDRaidEndTransition ?�당.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI|Transition")
 	TSubclassOf<UPDRaidEndTransitionWidget> RaidEndTransitionClass;
 
-	/** Quip(캐릭터 멘트) 데이터. UPDQuipSubsystem에 주입되어 태그→Line 라우팅에 사용. */
+	/** Quip(캐릭??멘트) ?�이?? UPDQuipSubsystem??주입?�어 ?�그?�Line ?�우?�에 ?�용. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSoftObjectPtr<UPDQuipDataAsset> QuipDataAsset;
 
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void OnRep_PlayerState() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 
@@ -353,7 +350,7 @@ private:
 	void CancelAbilityByInputTag(FGameplayTag InputTag);
 	void UpdateAimRotation();
 
-	// Hub 통합 화면 토글. Input_Inventory 태그에 매핑된 키 입력 시 호출.
+	// Hub ?�합 ?�면 ?��?. Input_Inventory ?�그??매핑?????�력 ???�출.
 	void ToggleHub();
 
 	void TryInteract();
@@ -376,7 +373,7 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDLootWidget> LootWidgetInstance;
 
-	// OpenLootInterface 시 캐시. 박스가 파괴되어도 TWeakObjectPtr가 자동 무효화.
+	// OpenLootInterface ??캐시. 박스가 ?�괴?�어??TWeakObjectPtr가 ?�동 무효??
 	TWeakObjectPtr<UPDLootComponent> ActiveLootComponent;
 
 
@@ -412,7 +409,10 @@ private:
 	UFUNCTION()
 	void HandleInventoryMessage(const FText& Message);
 
-	// ─── Spectator internals ──────────────────────────────────────────────
+	UFUNCTION()
+	void HandleInventoryWeightLimitExceeded(float CurrentWeight, float MaxWeight);
+
+	// ?�?�?� Spectator internals ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
 	UFUNCTION(Server, Reliable)
 	void Server_SpectateNext();
 
@@ -422,7 +422,7 @@ private:
 	void OnSpectateNextInput();
 	void OnSpectatePrevInput();
 
-	// 서버 권한 가정. Direction = +1(next) / -1(prev). 후보가 없으면 관전 종료.
+	// ?�버 권한 가?? Direction = +1(next) / -1(prev). ?�보가 ?�으�?관??종료.
 	void CycleSpectateTargetServer(int32 Direction);
 
 	UFUNCTION()

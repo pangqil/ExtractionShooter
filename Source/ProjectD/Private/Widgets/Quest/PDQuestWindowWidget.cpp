@@ -7,10 +7,11 @@
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
 #include "Data/PDQuestComponent.h"
 #include "GameFramework/Pawn.h"
-#include "Items/PDInventoryComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
 #include "Widgets/Quest/PDQuestListItemWidget.h"
 
 void UPDQuestWindowWidget::InitializeForOwner(APlayerController* /*OwnerPC*/)
@@ -145,12 +146,12 @@ void UPDQuestWindowWidget::RefreshQuestDetail()
 		VB_Rewards->ClearChildren();
 		if (QuestData.Reward.RewardGold > 0)
 		{
-			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("골드 +%d"), QuestData.Reward.RewardGold)));
+			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("Gold +%d"), QuestData.Reward.RewardGold)));
 		}
 
 		if (QuestData.Reward.RewardTraderReputationExp > 0)
 		{
-			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("마켓 경험치 +%d"), QuestData.Reward.RewardTraderReputationExp)));
+			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("Market EXP +%d"), QuestData.Reward.RewardTraderReputationExp)));
 		}
 
 		for (const FPDQuestRewardItem& RewardItem : QuestData.Reward.RewardItems)
@@ -308,12 +309,12 @@ void UPDQuestWindowWidget::ClearDetail()
 {
 	if (TXT_QuestTitle)
 	{
-		TXT_QuestTitle->SetText(FText::FromString(TEXT("퀘스트 선택")));
+		TXT_QuestTitle->SetText(FText::FromString(TEXT("Select Quest")));
 	}
 
 	if (TXT_QuestDescription)
 	{
-		TXT_QuestDescription->SetText(FText::FromString(TEXT("좌측에서 퀘스트를 선택하세요.")));
+		TXT_QuestDescription->SetText(FText::FromString(TEXT("Select a quest from the left.")));
 	}
 
 	if (VB_Objectives)
@@ -328,7 +329,7 @@ void UPDQuestWindowWidget::ClearDetail()
 
 	if (TXT_ActionButton)
 	{
-		TXT_ActionButton->SetText(FText::FromString(TEXT("수락하기")));
+		TXT_ActionButton->SetText(FText::FromString(TEXT("Accept")));
 	}
 
 	if (BTN_Action)
@@ -367,30 +368,20 @@ bool UPDQuestWindowWidget::GetSelectedQuestData(FPDQuestData& OutQuestData, FPDQ
 
 UPDQuestComponent* UPDQuestWindowWidget::FindQuestComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDQuestComponent* Quest = FPDPlayerComponentResolver::ResolveQuest(GetOwningPlayer()))
 	{
-		if (UPDQuestComponent* PlayerQuestComponent = PDController->GetPlayerQuestComponent())
-		{
-			return PlayerQuestComponent;
-		}
+		return Quest;
 	}
-
-	APawn* Pawn = GetOwningPlayerPawn();
-	return Pawn ? Pawn->FindComponentByClass<UPDQuestComponent>() : nullptr;
+	return FPDPlayerComponentResolver::ResolveQuest(GetOwningPlayerPawn());
 }
 
 UPDInventoryComponent* UPDQuestWindowWidget::FindInventoryComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer()))
 	{
-		if (UPDInventoryComponent* PlayerInventoryComponent = PDController->GetPlayerInventoryComponent())
-		{
-			return PlayerInventoryComponent;
-		}
+		return Inventory;
 	}
-
-	APawn* Pawn = GetOwningPlayerPawn();
-	return Pawn ? Pawn->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+	return FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
 }
 
 void UPDQuestWindowWidget::AddDetailLine(UVerticalBox* TargetBox, const FText& Text) const
@@ -432,7 +423,7 @@ FText UPDQuestWindowWidget::MakeProgressText(const FPDQuestData& QuestData, cons
 {
 	if (QuestProgress && QuestProgress->State == EPDQuestState::Rewarded)
 	{
-		return FText::FromString(TEXT("완료"));
+		return FText::FromString(TEXT("Completed"));
 	}
 
 	int32 Current = 0;
@@ -441,7 +432,7 @@ FText UPDQuestWindowWidget::MakeProgressText(const FPDQuestData& QuestData, cons
 
 	if (Required <= 0)
 	{
-		return QuestProgress && QuestProgress->State == EPDQuestState::Completed ? FText::FromString(TEXT("완료")) : FText::FromString(TEXT("0 / 0"));
+		return QuestProgress && QuestProgress->State == EPDQuestState::Completed ? FText::FromString(TEXT("Completed")) : FText::FromString(TEXT("0 / 0"));
 	}
 
 	return FText::FromString(FString::Printf(TEXT("%d / %d"), Current, Required));
@@ -466,13 +457,13 @@ FText UPDQuestWindowWidget::GetActionButtonText(EPDQuestState State) const
 	switch (State)
 	{
 	case EPDQuestState::Inactive:
-		return FText::FromString(TEXT("수락하기"));
+		return FText::FromString(TEXT("Accept"));
 	case EPDQuestState::Active:
-		return FText::FromString(TEXT("진행 중"));
+		return FText::FromString(TEXT("In Progress"));
 	case EPDQuestState::Completed:
-		return FText::FromString(TEXT("보상 받기"));
+		return FText::FromString(TEXT("Claim Reward"));
 	case EPDQuestState::Rewarded:
-		return FText::FromString(TEXT("완료됨"));
+		return FText::FromString(TEXT("Completed"));
 	default:
 		return FText::GetEmpty();
 	}

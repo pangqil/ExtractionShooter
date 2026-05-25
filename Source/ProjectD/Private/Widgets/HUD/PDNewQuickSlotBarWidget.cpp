@@ -3,11 +3,13 @@
 #include "Data/PDKeyIconDataAsset.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
+#include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
-#include "Items/PDQuickSlotComponent.h"
+#include "Items/Containers/PDQuickSlotComponent.h"
 #include "TimerManager.h"
 #include "Widgets/HUD/PDNewQuickSlotItemWidget.h"
 
@@ -61,6 +63,7 @@ void UPDNewQuickSlotBarWidget::NativeDestruct()
 
 void UPDNewQuickSlotBarWidget::BindQuickSlotComponent(UPDQuickSlotComponent* InQuickSlotComponent)
 {
+
 	if (BoundQuickSlotComponent == InQuickSlotComponent)
 	{
 		RefreshSlots();
@@ -82,10 +85,14 @@ void UPDNewQuickSlotBarWidget::BindQuickSlotComponent(UPDQuickSlotComponent* InQ
 
 	if (BoundQuickSlotComponent)
 	{
-		BoundQuickSlotComponent->GridColumns = 6;
-		BoundQuickSlotComponent->GridRows = 1;
-		BoundQuickSlotComponent->SetWeaponSlotCount(WeaponSlotCount);
-		BoundQuickSlotComponent->InitializeQuickSlots();
+		if (AActor* QuickSlotOwner = BoundQuickSlotComponent->GetOwner(); QuickSlotOwner && QuickSlotOwner->HasAuthority())
+		{
+			BoundQuickSlotComponent->GridColumns = 6;
+			BoundQuickSlotComponent->GridRows = 1;
+			BoundQuickSlotComponent->SetWeaponSlotCount(WeaponSlotCount);
+			BoundQuickSlotComponent->InitializeQuickSlots();
+		}
+
 		BoundQuickSlotComponent->OnQuickSlotsChanged.AddUniqueDynamic(this, &UPDNewQuickSlotBarWidget::HandleQuickSlotsChanged);
 		BoundQuickSlotComponent->OnSelectionChanged.AddUniqueDynamic(this, &UPDNewQuickSlotBarWidget::HandleSelectionChanged);
 		BoundQuickSlotComponent->OnConsumableUseStarted.AddUniqueDynamic(this, &UPDNewQuickSlotBarWidget::HandleConsumableUseStarted);
@@ -97,6 +104,15 @@ void UPDNewQuickSlotBarWidget::BindQuickSlotComponent(UPDQuickSlotComponent* InQ
 
 	CollectSlotWidgets();
 	RefreshSlots();
+	UpdateWeaponCooldownUI();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			RefreshSlots();
+		}));
+	}
 }
 
 void UPDNewQuickSlotBarWidget::CollectSlotWidgets()
@@ -114,6 +130,7 @@ void UPDNewQuickSlotBarWidget::CollectSlotWidgets()
 
 void UPDNewQuickSlotBarWidget::RefreshSlots()
 {
+
 	if (SlotWidgets.Num() == 0)
 	{
 		CollectSlotWidgets();
@@ -129,9 +146,10 @@ void UPDNewQuickSlotBarWidget::RefreshSlots()
 
 		SlotWidget->InitializeQuickSlot(BoundQuickSlotComponent, Index);
 
-		if (BoundQuickSlotComponent && BoundQuickSlotComponent->QuickSlotItems.IsValidIndex(Index))
+		FPDInventorySlot DisplaySlot;
+		if (BoundQuickSlotComponent && BoundQuickSlotComponent->GetQuickSlotDisplayData(Index, DisplaySlot))
 		{
-			SlotWidget->SetSlotData(BoundQuickSlotComponent->QuickSlotItems[Index]);
+			SlotWidget->SetSlotData(DisplaySlot);
 		}
 		else
 		{
@@ -332,17 +350,9 @@ void UPDNewQuickSlotBarWidget::HandleControlMappingsRebuilt()
 
 UPDQuickSlotComponent* UPDNewQuickSlotBarWidget::FindQuickSlotComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDQuickSlotComponent* QuickSlot = FPDPlayerComponentResolver::ResolveQuickSlot(GetOwningPlayer()))
 	{
-		if (UPDQuickSlotComponent* QuickSlotComponent = PDController->GetPlayerQuickSlotComponent())
-		{
-			return QuickSlotComponent;
-		}
+		return QuickSlot;
 	}
-
-	if (APawn* Pawn = GetOwningPlayerPawn())
-	{
-		return Pawn->FindComponentByClass<UPDQuickSlotComponent>();
-	}
-	return nullptr;
+	return FPDPlayerComponentResolver::ResolveQuickSlot(GetOwningPlayerPawn());
 }

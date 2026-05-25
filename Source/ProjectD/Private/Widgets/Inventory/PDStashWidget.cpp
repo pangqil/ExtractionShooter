@@ -7,6 +7,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Characters/PDPlayerCharacter.h"
 #include "Components/Button.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
@@ -15,10 +16,10 @@
 #include "Components/SizeBoxSlot.h"
 #include "Components/UniformGridSlot.h"
 #include "GameFramework/Pawn.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDItemSlotTransfer.h"
-#include "Items/PDQuickSlotComponent.h"
-#include "Items/PDStashComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Data/PDItemSlotTransfer.h"
+#include "Items/Containers/PDQuickSlotComponent.h"
+#include "Items/Containers/PDStashComponent.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
@@ -254,19 +255,19 @@ void UPDStashWidget::UpdateTabButtonStyle()
 	if (Button_Equipment)
 	{
 		Button_Equipment->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Equipment ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Equipment, FText::FromString(TEXT("장비")), EquipmentUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Equipment, FText::FromString(TEXT("?�비")), EquipmentUsedSlots, MaxSlots);
 	}
 
 	if (Button_Consumable)
 	{
 		Button_Consumable->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Consumable ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Consumable, FText::FromString(TEXT("소모")), ConsumableUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Consumable, FText::FromString(TEXT("?�모")), ConsumableUsedSlots, MaxSlots);
 	}
 
 	if (Button_Misc)
 	{
 		Button_Misc->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Misc ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Misc, FText::FromString(TEXT("기타")), MiscUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Misc, FText::FromString(TEXT("Misc")), MiscUsedSlots, MaxSlots);
 	}
 }
 
@@ -520,38 +521,20 @@ UPDStashComponent* UPDStashWidget::FindStashComponent() const
 
 UPDInventoryComponent* UPDStashWidget::FindInventoryComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer()))
 	{
-		if (UPDInventoryComponent* InventoryComponent = PDController->GetPlayerInventoryComponent())
-		{
-			return InventoryComponent;
-		}
+		return Inventory;
 	}
-
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
-	{
-		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();
-	}
-
-	return nullptr;
+	return FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
 }
 
 UPDQuickSlotComponent* UPDStashWidget::FindQuickSlotComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDQuickSlotComponent* QuickSlot = FPDPlayerComponentResolver::ResolveQuickSlot(GetOwningPlayer()))
 	{
-		if (UPDQuickSlotComponent* QuickSlotComponent = PDController->GetPlayerQuickSlotComponent())
-		{
-			return QuickSlotComponent;
-		}
+		return QuickSlot;
 	}
-
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
-	{
-		return OwningPawn->FindComponentByClass<UPDQuickSlotComponent>();
-	}
-
-	return nullptr;
+	return FPDPlayerComponentResolver::ResolveQuickSlot(GetOwningPlayerPawn());
 }
 
 const FPDInventorySlot* UPDStashWidget::FindStashSlot(int32 SlotIndex) const
@@ -575,7 +558,7 @@ const FPDInventorySlot* UPDStashWidget::FindSourceSlot(EPDItemContainerType Sour
 	case EPDItemContainerType::QuickSlot:
 		if (const UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
-			return QuickSlotComponent->QuickSlotItems.IsValidIndex(SlotIndex) ? &QuickSlotComponent->QuickSlotItems[SlotIndex] : nullptr;
+			return QuickSlotComponent->GetResolvedQuickSlot(SlotIndex);
 		}
 		return nullptr;
 	default:

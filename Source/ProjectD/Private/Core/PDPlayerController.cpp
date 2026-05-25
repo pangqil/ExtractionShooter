@@ -5,6 +5,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
+#include "Engine/EngineTypes.h"
 #include "Net/UnrealNetwork.h"
 
 #include "GameplayTag/PDGameplayTags.h"
@@ -15,9 +16,10 @@
 #include "Core/PDPlayerState.h"
 #include "Core/PDPlayerUIManagerComponent.h"
 #include "Engine/LocalPlayer.h"
+#include "TimerManager.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "Ability/PDGameplayAbilityBase.h"
-#include "Ability/PDSprintAbility.h"
+#include "Ability/GA_GameplayAbilityBase.h"
+#include "Ability/GA_SprintAbility.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Input/PDInputComponent.h"
@@ -26,15 +28,15 @@
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
 #include "Widgets/Inventory/PDLootWidget.h"
-#include "Items/PDLootComponent.h"
+#include "Items/Containers/PDLootComponent.h"
 #include "Widgets/Inventory/PDMarketWidget.h"
 #include "Widgets/Quest/PDQuestWindowWidget.h"
-#include "Items/PDMarketComponent.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDEquipmentComponent.h"
-#include "Items/PDQuickSlotComponent.h"
+#include "Items/Market/PDMarketComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Equipment/PDEquipmentComponent.h"
+#include "Items/Containers/PDQuickSlotComponent.h"
 #include "Data/PDQuestComponent.h"
-#include "Items/PDStashComponent.h"
+#include "Items/Containers/PDStashComponent.h"
 #include "Widgets/HUD/PDHUDWidget.h"
 #include "Widgets/PDActivatableBase.h"
 #include "Widgets/PDRootLayout.h"
@@ -97,7 +99,7 @@ void APDPlayerController::Client_ShowRaidEndTransition_Implementation(bool bSucc
 {
 	if (!RaidEndTransitionClass)
 	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidEndTransition: RaidEndTransitionClass 미할당 (PC=%s)"), *GetName());
+		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidEndTransition: RaidEndTransitionClass 미할??(PC=%s)"), *GetName());
 		return;
 	}
 
@@ -112,7 +114,7 @@ void APDPlayerController::Client_ShowRaidEndTransition_Implementation(bool bSucc
 	UPDRaidEndTransitionWidget* Transition = Cast<UPDRaidEndTransitionWidget>(Pushed);
 	if (!Transition)
 	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidEndTransition: PushToLayer 실패 또는 캐스트 실패 (PC=%s)"), *GetName());
+		UE_LOG(LogPDCharacter, Warning, TEXT("Client_ShowRaidEndTransition: PushToLayer ?�패 ?�는 캐스???�패 (PC=%s)"), *GetName());
 		return;
 	}
 
@@ -136,7 +138,7 @@ void APDPlayerController::StartSpectatingDeath(APlayerController* InitialTarget)
 	SpectateTargetPC = InitialTarget;
 	SetViewTargetWithBlend(InitialTarget->GetPawn(), 0.5f);
 
-	// Listen-server host(서버=로컬)에서는 OnRep 이 자동 발화하지 않으므로 수동 브로드캐스트.
+	// Listen-server host(?�버=로컬)?�서??OnRep ???�동 발화?��? ?�으므�??�동 브로?�캐?�트.
 	if (IsLocalController())
 	{
 		OnRep_SpectateState();
@@ -176,9 +178,8 @@ void APDPlayerController::CycleSpectateTargetServer(int32 Direction)
 
 	if (Candidates.Num() == 0)
 	{
-		// 더 이상 살아있는 관전 대상이 없음. 자기 자신 시점으로 스냅하면 죽은 자기 몸으로 컷이 튀어
-		// 부자연스러우므로 마지막으로 보던 폰(방금 죽거나 추출한 대상)의 시점을 그대로 유지.
-		// EndRaid 가 곧 결산 위젯을 띄우므로 카메라 상태는 거기서 덮임.
+		// ???�상 ?�아?�는 관???�?�이 ?�음. ?�기 ?�신 ?�점?�로 ?�냅?�면 죽�? ?�기 몸으�?컷이 ?�??		// 부?�연?�러?��?�?마�?막으�?보던 ??방금 죽거??추출???�?????�점??그�?�??��?.
+		// EndRaid 가 �?결산 ?�젯???�우므�?카메???�태??거기????��.
 		UE_LOG(LogPDCharacter, Log, TEXT("CycleSpectate: %s -> no candidates, keep current view target"), *GetName());
 		return;
 	}
@@ -434,7 +435,7 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Map,
 		ETriggerEvent::Started, this, &APDPlayerController::OnToggleWorldMap);
 
-	// Step 2-B: 관전 다음/이전 (사망 후에만 활성화 — 핸들러에서 bIsSpectating 체크).
+	// Step 2-B: 관???�음/?�전 (?�망 ?�에�??�성?????�들?�에??bIsSpectating 체크).
 	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_SpectateNext))
 	{
 		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SpectateNext,
@@ -460,8 +461,8 @@ void APDPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 멀티: 입력모드/HUD/RootLayout/Subsystem 등록은 로컬 PC에서만 의미가 있음.
-	// 서버에 있는 원격 클라이언트의 PC 인스턴스가 여기 들어오면 GI 단일 RootLayout을 마지막 호출이 덮어쓰는 사고가 남.
+	// 멀?? ?�력모드/HUD/RootLayout/Subsystem ?�록?� 로컬 PC?�서�??��?가 ?�음.
+	// ?�버???�는 ?�격 ?�라?�언?�의 PC ?�스?�스가 ?�기 ?�어?�면 GI ?�일 RootLayout??마�?�??�출????��?�는 ?�고가 ??
 	if (!IsLocalController())
 	{
 		return;
@@ -523,12 +524,18 @@ void APDPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+void APDPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	BindInventoryNotifications();
+}
+
 void APDPlayerController::OnPossess(APawn* InPawn)
 {
 	UnbindInventoryNotifications();
 	Super::OnPossess(InPawn);
 
-	// Step 2-B 후속: 새 폰 빙의 → 관전 상태 carry-over 차단. HUD "Spectating: ..." 잔존 방지.
+	// Step 2-B ?�속: ????빙의 ??관???�태 carry-over 차단. HUD "Spectating: ..." ?�존 방�?.
 	if (HasAuthority() && (bIsSpectating || SpectateTargetPC))
 	{
 		bIsSpectating = false;
@@ -545,6 +552,7 @@ void APDPlayerController::OnPossess(APawn* InPawn)
 			? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InPawn)
 			: nullptr;
 		UIManagerComponent->RebindHUDToASC(ASC);
+		UIManagerComponent->RefreshNewQuickSlots();
 	}
 
 	if (IsLocalController())
@@ -632,6 +640,10 @@ void APDPlayerController::OnJump()
 
 void APDPlayerController::OnAbilityInputPressed(FGameplayTag InputTag)
 {
+	if (InputTag == PDGameplayTags::Input_Interact)
+	{
+		return;
+	}
 	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
 	{
 		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
@@ -703,7 +715,7 @@ void APDPlayerController::CancelAbilityByInputTag(FGameplayTag InputTag)
 			Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag);
 		const bool bIsSprintAbility =
 			InputTag == PDGameplayTags::Input_Sprint &&
-			Spec.Ability->IsA<UPDSprintAbility>();
+			Spec.Ability->IsA<UGA_SprintAbility>();
 
 		if (bMatchesInputTag || bIsSprintAbility)
 		{
@@ -719,6 +731,10 @@ void APDPlayerController::CancelAbilityByInputTag(FGameplayTag InputTag)
 
 void APDPlayerController::ServerTryActivateAbilityByTag_Implementation(FGameplayTag InputTag)
 {
+	if (InputTag == PDGameplayTags::Input_Interact)
+	{
+		return;
+	}
 	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
 	{
 		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
@@ -831,9 +847,8 @@ UPDStashComponent* APDPlayerController::GetActiveStashComponent() const
 	return UIManagerComponent ? UIManagerComponent->GetActiveStashComponent() : nullptr;
 }
 
-// ─── LootBox 인터페이스 ──────────────────────────────────────────────
-// codex 브랜치는 InventoryWidget 라이프사이클을 UIManager 로 위임하므로 develop 구현을 단순화 —
-// LootWidget 만 PlayerController 가 직접 다루고, 입력 차단은 기존 헬퍼 재사용.
+// ?�?�?� LootBox ?�터?�이???�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
+// codex 브랜치는 InventoryWidget ?�이?�사?�클??UIManager �??�임?��?�?develop 구현???�순????// LootWidget �?PlayerController 가 직접 ?�루�? ?�력 차단?� 기존 ?�퍼 ?�사??
 void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
 {
 	if (!LootWidgetClass || !LootSource)
@@ -842,7 +857,7 @@ void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
 		return;
 	}
 
-	// 다른 모달 UI 가 같은 viewport 영역을 점유하므로 먼저 닫음.
+	// ?�른 모달 UI 가 같�? viewport ?�역???�유?��?�?먼�? ?�음.
 	if (IsStashInterfaceOpen())  CloseStashInterface();
 	if (IsMarketInterfaceOpen()) CloseMarketInterface();
 
@@ -1034,16 +1049,6 @@ void APDPlayerController::ServerMoveQuickSlotQuantity_Implementation(int32 Sourc
 	}
 }
 
-void APDPlayerController::ServerTakeQuickSlotQuantityToInventorySlot_Implementation(int32 QuickSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity)
-{
-	UPDInventoryComponent* InventoryComponent = GetPlayerInventoryComponent();
-	UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent();
-	if (InventoryComponent && QuickSlotComponent)
-	{
-		QuickSlotComponent->TakeQuickSlotQuantityToInventorySlot(InventoryComponent, QuickSlotIndex, TargetInventorySlotIndex, Quantity);
-	}
-}
-
 void APDPlayerController::ServerEquipInventoryWeaponSlot_Implementation(int32 InventorySlotIndex)
 {
 	if (UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent())
@@ -1086,6 +1091,7 @@ void APDPlayerController::BindInventoryNotifications()
 
 	BoundInventoryNotificationComponent = InventoryComponent;
 	BoundInventoryNotificationComponent->OnInventoryMessage.AddUniqueDynamic(this, &APDPlayerController::HandleInventoryMessage);
+	BoundInventoryNotificationComponent->OnInventoryWeightLimitExceeded.AddUniqueDynamic(this, &APDPlayerController::HandleInventoryWeightLimitExceeded);
 }
 
 void APDPlayerController::UnbindInventoryNotifications()
@@ -1093,12 +1099,27 @@ void APDPlayerController::UnbindInventoryNotifications()
 	if (BoundInventoryNotificationComponent)
 	{
 		BoundInventoryNotificationComponent->OnInventoryMessage.RemoveDynamic(this, &APDPlayerController::HandleInventoryMessage);
+		BoundInventoryNotificationComponent->OnInventoryWeightLimitExceeded.RemoveDynamic(this, &APDPlayerController::HandleInventoryWeightLimitExceeded);
 		BoundInventoryNotificationComponent = nullptr;
 	}
 }
 
 void APDPlayerController::HandleInventoryMessage(const FText& Message)
 {
+	if (Message.EqualTo(FText::FromString(TEXT("Weight limit exceeded."))))
+	{
+		return;
+	}
+
+	ShowNotification(Message);
+}
+
+void APDPlayerController::HandleInventoryWeightLimitExceeded(float CurrentWeight, float MaxWeight)
+{
+	const FText Message = FText::Format(
+		NSLOCTEXT("PDInventory", "WeightLimitExceededFormat", "Weight limit exceeded. {0} / {1}kg"),
+		FText::AsNumber(CurrentWeight),
+		FText::AsNumber(MaxWeight));
 	ShowNotification(Message);
 }
 
@@ -1213,14 +1234,29 @@ void APDPlayerController::UpdateAimRotation()
 		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
 	}
 
-	FHitResult AimHit;
-	if (!GetHitResultUnderCursor(ECC_Visibility, true, AimHit)) return;
+	FHitResult VisibilityAimHit;
+	if (!GetHitResultUnderCursor(ECC_Visibility, true, VisibilityAimHit)) return;
 
-	FHitResult FireAimHit;
-	if (!GetRecoiledHitResult(ECC_Visibility, true, FireAimHit))
+	const TArray<TEnumAsByte<EObjectTypeQuery>> PawnObjectTypes = { UEngineTypes::ConvertToObjectType(ECC_Pawn) };
+	FHitResult PawnAimHit;
+	const bool bPawnAimHit = GetHitResultUnderCursorForObjects(PawnObjectTypes, true, PawnAimHit)
+		&& PawnAimHit.GetActor()
+		&& PawnAimHit.GetActor() != ControlledPawn;
+
+	FHitResult RecoiledVisibilityHit;
+	if (!GetRecoiledHitResult(ECC_Visibility, true, RecoiledVisibilityHit))
 	{
-		FireAimHit = AimHit;
+		RecoiledVisibilityHit = VisibilityAimHit;
 	}
+
+	FHitResult RecoiledPawnHit;
+	const bool bRecoiledPawnHit = GetRecoiledHitResultForObjects(PawnObjectTypes, true, RecoiledPawnHit)
+		&& RecoiledPawnHit.GetActor()
+		&& RecoiledPawnHit.GetActor() != ControlledPawn;
+
+	const FHitResult& AimHit = bPawnAimHit ? PawnAimHit : VisibilityAimHit;
+	const FHitResult& FireAimHit = bRecoiledPawnHit ? RecoiledPawnHit : RecoiledVisibilityHit;
+
 
 	CachedAimWorldLocation = FireAimHit.Location;
 	bHasCachedAimWorldLocation = true;
@@ -1234,6 +1270,7 @@ void APDPlayerController::UpdateAimRotation()
 	}
 
 	FVector AimDirection=AimHit.Location-ControlledPawn->GetActorLocation();
+
 	AimDirection.Z=0.f;
 
 	if (!AimDirection.IsNearlyZero())
@@ -1242,6 +1279,7 @@ void APDPlayerController::UpdateAimRotation()
 		SetControlRotation(AimRot);
 		ControlledPawn->SetActorRotation(AimRot);
 	}
+
 }
 
 void APDPlayerController::OnSwitchSlot1()
@@ -1376,6 +1414,7 @@ void APDPlayerController::OnDropWeapon()
 
 void APDPlayerController::UseQuickSlot(int32 SlotIndex)
 {
+
 	if (IsGameplayInputBlockedByModalUI())
 	{
 		return;
@@ -1383,16 +1422,22 @@ void APDPlayerController::UseQuickSlot(int32 SlotIndex)
 
 	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
 	{
-		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
+		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead())
+		{
+			return;
+		}
 	}
 
 	if (UPDQuickSlotComponent* QuickSlotComponent = GetPlayerQuickSlotComponent())
 	{
-		if (QuickSlotComponent->UseQuickSlot(SlotIndex) && UIManagerComponent)
+		const bool bUsed = QuickSlotComponent->UseQuickSlot(SlotIndex);
+		if (bUsed && UIManagerComponent)
 		{
 			UIManagerComponent->RefreshNewQuickSlots();
 		}
+		return;
 	}
+
 }
 
 void APDPlayerController::OnInteract()
@@ -1483,6 +1528,7 @@ void APDPlayerController::OnFireReleased()
 
 void APDPlayerController::OnReload()
 {
+
 	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
 	{
 		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead())
@@ -1625,6 +1671,7 @@ void APDPlayerController::ServerSetAimWorldLocation_Implementation(FVector AimLo
 {
 	CachedAimWorldLocation = FireAimLocation;
 	bHasCachedAimWorldLocation = true;
+
 	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
 	{
 		if (PlayerCharacter->IsDead()) return;

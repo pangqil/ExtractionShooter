@@ -6,6 +6,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AttributeSet/PDAttributeSet.h"
+#include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayTag/PDGameplayTags.h"
@@ -22,7 +23,7 @@
 #include "Widgets/Crosshair/PDCrosshairWidget.h"
 #include "Component/PDInteractionComponent.h"
 #include "Interfaces/PDInteractable.h"
-#include "Items/PDQuickSlotComponent.h"
+#include "Items/Containers/PDQuickSlotComponent.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/TextBlock.h"
@@ -296,19 +297,11 @@ void UPDHUDWidget::RefreshNewQuickSlots()
 
 UPDQuickSlotComponent* UPDHUDWidget::FindOwningQuickSlotComponent() const
 {
-	if (const APDPlayerController* PDController = Cast<APDPlayerController>(GetOwningPlayer()))
+	if (UPDQuickSlotComponent* QuickSlot = FPDPlayerComponentResolver::ResolveQuickSlot(GetOwningPlayer()))
 	{
-		if (UPDQuickSlotComponent* QuickSlotComponent = PDController->GetPlayerQuickSlotComponent())
-		{
-			return QuickSlotComponent;
-		}
+		return QuickSlot;
 	}
-
-	if (APawn* Pawn = GetOwningPlayerPawn())
-	{
-		return Pawn->FindComponentByClass<UPDQuickSlotComponent>();
-	}
-	return nullptr;
+	return FPDPlayerComponentResolver::ResolveQuickSlot(GetOwningPlayerPawn());
 }
 
 void UPDHUDWidget::RefreshUseProgressBinding(UPDQuickSlotComponent* NewComponent)
@@ -427,7 +420,7 @@ void UPDHUDWidget::HandleInteractTargetChanged(AActor* NewTarget)
 		const FText Display = IPDInteractable::Execute_GetInteractDisplayText(NewTarget);
 		WBP_InteractPrompt->Show(Display);
 
-		// 카메라 회전에 따라 매 프레임 위치 갱신.
+		// 카메???�전???�라 �??�레???�치 갱신.
 		UpdateInteractPromptPosition();
 		World->GetTimerManager().SetTimer(
 			InteractPromptUpdateTimer,
@@ -483,7 +476,7 @@ void UPDHUDWidget::UpdateInteractPromptPosition()
 		return;
 	}
 
-	// 캔버스 슬롯은 슬레이트 단위(DPI 스케일 적용). 픽셀 좌표를 스케일로 나눠 변환.
+	// 캔버???�롯?� ?�레?�트 ?�위(DPI ?��????�용). ?��? 좌표�??��??�로 ?�눠 변??
 	const float ViewportScale = UWidgetLayoutLibrary::GetViewportScale(this);
 	const FVector2D LocalPos = (ViewportScale > 0.f) ? (ScreenPos / ViewportScale) : ScreenPos;
 
@@ -492,7 +485,7 @@ void UPDHUDWidget::UpdateInteractPromptPosition()
 		CanvasSlot->SetPosition(LocalPos);
 	}
 
-	// 첫 갱신에서 Hide된 상태일 수 있으므로 보장.
+	// �?갱신?�서 Hide???�태?????�으므�?보장.
 	if (WBP_InteractPrompt->GetVisibility() == ESlateVisibility::Collapsed
 		|| WBP_InteractPrompt->GetVisibility() == ESlateVisibility::Hidden)
 	{
@@ -546,4 +539,3 @@ void UPDHUDWidget::RefreshSpectateDisplay()
 	Text_SpectateTarget->SetText(FText::FromString(FString::Printf(TEXT("Spectating: %s"), *TargetName)));
 	Text_SpectateTarget->SetVisibility(ESlateVisibility::HitTestInvisible);
 }
-

@@ -32,7 +32,7 @@ public:
 	UPDEquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent; }
 
 	UFUNCTION(BlueprintPure, Category="PD|PlayerState")
-	UPDQuickSlotComponent* GetQuickSlotComponent() const { return QuickSlotComponent; }
+	UPDQuickSlotComponent* GetQuickSlotComponent() const;
 
 	UFUNCTION(BlueprintPure, Category="PD|PlayerState")
 	UPDQuestComponent* GetQuestComponent() const { return QuestComponent; }
