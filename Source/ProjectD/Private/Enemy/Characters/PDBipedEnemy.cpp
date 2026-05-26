@@ -41,7 +41,6 @@ APDBipedEnemy::APDBipedEnemy()
 
 		// PIE 중엔 spline 라인 숨김 — 디자인 시간에만 보이도록.
 		PatrolRouteSpline->bDrawDebug = true;
-		PatrolRouteSpline->bShouldVisualizeScale = false;
 	}
 }
 
