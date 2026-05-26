@@ -17,6 +17,7 @@ class UPDQuantityPopupWidget;
 class UButton;
 class UWidget;
 class USizeBox;
+class UTextBlock;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDStashWidget : public UPDActivatableBase
@@ -151,6 +152,10 @@ private:
 	void UpdateTabButtonStyle();
 	int32 CountOccupiedStashSlotsByType(EPDItemType ItemType) const;
 	int32 GetStashDisplaySlotCount() const;
+	void CacheFilterTabBaseLabels();
+	void CacheFilterTabBaseLabel(EPDItemFilterTab FilterTab, UButton* TargetButton);
+	FText GetFilterTabBaseLabel(EPDItemFilterTab FilterTab) const;
+	UTextBlock* GetTabButtonTextBlock(UButton* TargetButton) const;
 	void SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const;
 	bool DoesSlotMatchCurrentFilter(const FPDInventorySlot& StashSlotData) const;
 	bool DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const;
@@ -188,6 +193,8 @@ private:
 	int32 PendingTransferTargetSlotIndex = INDEX_NONE;
 
 	EPDItemFilterTab CurrentFilterTab = EPDItemFilterTab::Equipment;
+
+	TMap<EPDItemFilterTab, FText> FilterTabBaseLabels;
 	EPDItemSortMode CurrentSortMode = EPDItemSortMode::None;
 
 	int32 PendingSlotIndex = INDEX_NONE;

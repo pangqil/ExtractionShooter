@@ -185,7 +185,7 @@ void UPDEquipmentModificationWidget::RefreshAll()
 	RefreshSelectedSlots();
 	RefreshInventoryGrid();
 	RefreshPreview();
-	SetText(Text_PlayerGold, FText::FromString(FString::Printf(TEXT("Inventory Gold : %d"), InventoryComponent ? InventoryComponent->GetGold() : 0)));
+	SetText(Text_PlayerGold, FormatGoldAmount(InventoryComponent ? InventoryComponent->GetGold() : 0));
 }
 
 void UPDEquipmentModificationWidget::RefreshEquipmentList()
@@ -490,8 +490,8 @@ void UPDEquipmentModificationWidget::ApplyPreview(const FPDModificationPreview& 
 		SetText(Text_StatPreview, FText::FromString(TEXT("-")));
 	}
 
-	SetText(Text_GoldCost, FText::FromString(FString::Printf(TEXT("%d / %d"), InventoryComponent ? InventoryComponent->GetGold() : 0, Preview.GoldCost)));
-	SetText(Text_RequiredGold, FText::FromString(FString::Printf(TEXT("%d"), Preview.GoldCost)));
+	SetText(Text_GoldCost, FText::Format(NSLOCTEXT("PDEquipmentModification", "GoldCostFormat", "{0} / {1}"), FormatGoldAmount(InventoryComponent ? InventoryComponent->GetGold() : 0), FormatGoldAmount(Preview.GoldCost)));
+	SetText(Text_RequiredGold, FormatGoldAmount(Preview.GoldCost));
 	SetText(Text_SuccessRate, FormatPercent(Preview.SuccessRate));
 	SetText(Text_BaseSuccessRate, FormatPercent(Preview.BaseSuccessRate));
 	SetText(Text_BoostSuccessRate, FText::FromString(FString::Printf(TEXT("+%s"), *FormatPercent(Preview.BoostSuccessRate).ToString())));
@@ -921,3 +921,12 @@ FText UPDEquipmentModificationWidget::FormatLevelText(int32 Level) const
 {
 	return FText::FromString(FString::Printf(TEXT("+%d"), FMath::Max(0, Level)));
 }
+
+FText UPDEquipmentModificationWidget::FormatGoldAmount(int32 Gold) const
+{
+	FNumberFormattingOptions Options;
+	Options.UseGrouping = true;
+	Options.MinimumIntegralDigits = 1;
+	return FText::AsNumber(FMath::Max(0, Gold), &Options);
+}
+

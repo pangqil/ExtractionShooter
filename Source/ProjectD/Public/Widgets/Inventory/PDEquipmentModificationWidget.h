@@ -105,6 +105,7 @@ private:
 	FText GetResultText(EPDModificationResult Result, bool bSuccess) const;
 	FText FormatPercent(float Rate) const;
 	FText FormatLevelText(int32 Level) const;
+	FText FormatGoldAmount(int32 Gold) const;
 
 	UFUNCTION()
 	void HandleInventoryChanged();

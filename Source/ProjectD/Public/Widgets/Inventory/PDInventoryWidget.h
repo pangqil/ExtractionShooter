@@ -219,6 +219,10 @@ private:
 	FText GetEquipmentSlotLabel(EPDEquipmentSlotType SlotType) const;
 	int32 CountOccupiedInventorySlotsByType(EPDItemType ItemType) const;
 	int32 GetInventoryDisplaySlotCount() const;
+	void CacheFilterTabBaseLabels();
+	void CacheFilterTabBaseLabel(EPDItemFilterTab FilterTab, UButton* TargetButton);
+	FText GetFilterTabBaseLabel(EPDItemFilterTab FilterTab) const;
+	UTextBlock* GetTabButtonTextBlock(UButton* TargetButton) const;
 	void SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const;
 	bool DoesSlotMatchCurrentFilter(const FPDInventorySlot& InventorySlotData) const;
 	bool DoesItemTypeMatchCurrentFilter(EPDItemType ItemType) const;
@@ -266,6 +270,8 @@ private:
 	TObjectPtr<UPDEquipmentComponent> BoundEquipmentComponent;
 
 	TMap<EPDEquipmentSlotType, TWeakObjectPtr<UPDInventorySlotWidget>> EquipmentSlotWidgets;
+
+	TMap<EPDItemFilterTab, FText> FilterTabBaseLabels;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDStashComponent> ActiveStashComponent;
