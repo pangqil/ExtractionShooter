@@ -145,7 +145,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern1", meta = (ClampMin = "0.0"))
 	float Pattern1DamagePerTick = 6.f;
 
-	/** 머신건 머즐 소켓들(MachineGunMesh 기준). 발사 틱마다 번갈아 사용. */
+	/** 머신건 머즐 소켓들(MachineGunMesh 기준). 발사 틱마다 번갈아 사용. */s
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Boss|Pattern1")
 	TArray<FName> Pattern1MuzzleSockets = { TEXT("MGMuzzle1"), TEXT("MGMuzzle2") };
 
