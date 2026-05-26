@@ -269,7 +269,7 @@ bool UPDQuestComponent::GiveReward(FName QuestID, UPDInventoryComponent* Invento
 
 	if (!RemoveQuestObjectiveItems(*QuestProgress, InventoryComponent))
 	{
-		InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("?�스???�료 조건 ?�이?�이 부족합?�다.")));
+		InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("퀘스트 완료 조건 아이템이 부족합니다.")));
 		return false;
 	}
 
