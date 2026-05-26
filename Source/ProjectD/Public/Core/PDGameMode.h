@@ -52,6 +52,11 @@ public:
 	// 모든 PC가 ACK하거나 TravelGateTimeoutSeconds 경과 시 ServerTravel 발동.
 	void NotifyPlayerReadyForTravel(APlayerController* PC);
 
+	// 존(Portal/Extraction) 액터가 overlap begin/end 시 호출(서버 전용).
+	// 점유 인원 절반 이상 → 카운트다운 시작, 전원 → 단축, 만료 시 트래블/추출.
+	// RaidEntry 는 진입할 레이드 레벨 에셋을 함께 전달.
+	void NotifyZoneOccupancy(EPDZoneTravelType ZoneType, APlayerController* PC, bool bEntered, TSoftObjectPtr<UWorld> RaidLevel = nullptr);
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Raid")
 	ERaidState CurrentRaidState=ERaidState::Idle;
@@ -144,4 +149,24 @@ private:
 
 	// 현재 맵이 AutoStartRaidLevels 화이트리스트에 있는지. PIE prefix 제거 후 비교.
 	bool IsCurrentMapAutoStartEnabled() const;
+
+	// ─── 존 점유 카운트다운 ──────────────────────────────────────────────
+	// 점유 변경 시 재평가: 절반 이상이면 시작/유지, 전원이면 3초로 단축, 미만이면 취소.
+	void EvaluateZoneCountdown();
+	// 타이머 만료 → 트래블(RaidEntry) 또는 존 안 인원 추출(Extraction).
+	void OnZoneCountdownFired();
+	class APDGameState* GetPDGameState() const;
+
+	TSet<TWeakObjectPtr<APlayerController>> ZoneOccupants;
+	EPDZoneTravelType CurrentZoneType = EPDZoneTravelType::None;
+	TSoftObjectPtr<UWorld> PendingRaidLevel;
+	float ZoneEndServerTime = -1.f;
+	bool bZoneFinalCountdownActive = false;
+	FTimerHandle ZoneCountdownTimerHandle;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Zone", meta=(ClampMin="1.0", ForceUnits="s", AllowPrivateAccess="true"))
+	float ZoneCountdownSeconds = 20.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Zone", meta=(ClampMin="0.5", ForceUnits="s", AllowPrivateAccess="true"))
+	float ZoneFinalCountdownSeconds = 3.f;
 };
