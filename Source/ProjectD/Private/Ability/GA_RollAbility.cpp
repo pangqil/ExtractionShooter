@@ -2,11 +2,13 @@
 #include "Characters/Base/PDCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
+#include "TimerManager.h"
 
 UGA_RollAbility::UGA_RollAbility()
 {
 	InstancingPolicy=EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy=EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+	ActivationOwnedTags.AddTag(PDGameplayTags::State_Rolling);
 	ActivationBlockedTags.AddTag(PDGameplayTags::State_Rolling);
 }
 
@@ -53,6 +55,17 @@ void UGA_RollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		ASC->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Character_Roll, Params);
 	}
 
+	if (UWorld* World = Character->GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AutoFinishRollTimerHandle);
+		World->GetTimerManager().SetTimer(
+			AutoFinishRollTimerHandle,
+			this,
+			&UGA_RollAbility::AutoFinishRoll,
+			MaxRollDuration,
+			false);
+	}
+
 	BP_OnActivate(RollDir);
 }
 
@@ -61,6 +74,14 @@ void UGA_RollAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (const APDCharacterBase* Character = GetPDCharacter())
+	{
+		if (UWorld* World = Character->GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(AutoFinishRollTimerHandle);
+		}
+	}
+
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
@@ -68,6 +89,12 @@ void UGA_RollAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 void UGA_RollAbility::FinishRoll()
 {
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+
+void UGA_RollAbility::AutoFinishRoll()
+{
+	FinishRoll();
 }
 
 
