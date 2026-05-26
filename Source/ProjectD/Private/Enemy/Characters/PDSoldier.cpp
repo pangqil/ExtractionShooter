@@ -133,6 +133,14 @@ void APDSoldier::OnEnterState_Dead()
 
 	if (!EquippedWeapon) return;
 
+	// 사망 시 무기 AnimLayer 해제 + Default 복귀 — 서버/스탠드얼론은 OnRep_EquippedWeapon 이
+	// 안 불려 무기 레이어가 사망 몽타주를 덮어쓰므로 직접 끊는다. (PDPlayerCharacter::HandleDeath 와 동일)
+	if (UPDAnimInstance* AnimInst = GetMesh() ? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr)
+	{
+		AnimInst->OnWeaponUnequipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
+	}
+	LinkDefaultAnimLayer();
+
 	EquippedWeapon->OnUnequip();
 	EquippedWeapon->Destroy();
 	EquippedWeapon = nullptr;
