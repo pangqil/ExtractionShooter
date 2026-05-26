@@ -603,7 +603,8 @@ void APDJuggernaut::Pattern2LaunchMissile(int32 HatchIndex)
 		: GetActorLocation() + GetActorForwardVector() * (Pattern1MaxRange + Pattern2ScatterRadius);
 
 	// 이미 예약된 착탄과 떨어지도록 분산 선정 — 한곳에 뭉쳐 AoE 가 겹치는 문제 완화.
-	const FVector Impact = PickScatterImpactLocation(Center);
+	// 플레이어 위치는 캡슐 중심(바닥 위)이라 그대로 쓰면 공중에서 터짐 → 바닥으로 Z 스냅.
+	const FVector Impact = SnapImpactToGround(PickScatterImpactLocation(Center));
 
 	// 지정 해치 소켓에서 발사.
 	FName Hatch = NAME_None;
@@ -671,6 +672,21 @@ FVector APDJuggernaut::PickScatterImpactLocation(const FVector& Center) const
 		}
 	}
 	return BestPoint;
+}
+
+FVector APDJuggernaut::SnapImpactToGround(const FVector& In) const
+{
+	const UWorld* World = GetWorld();
+	if (!World) return In;
+
+	// 후보 XY 에서 위→아래 라인트레이스로 바닥 Z 확정. 미검출 시 원본 유지.
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(JuggernautImpactGround), /*bTraceComplex=*/false, this);
+	if (World->LineTraceSingleByChannel(Hit, In + FVector(0.f, 0.f, 1000.f), In - FVector(0.f, 0.f, 5000.f), ECC_WorldStatic, Params))
+	{
+		return Hit.ImpactPoint;
+	}
+	return In;
 }
 
 void APDJuggernaut::TickPattern2Impacts()

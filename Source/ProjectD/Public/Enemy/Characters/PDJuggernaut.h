@@ -337,6 +337,7 @@ private:
 	void TickPattern2Impacts();         // world-time 기준 착탄 처리(Tick에서 호출)
 	void ApplyPattern2Damage(const FVector& Center);
 	FVector PickScatterImpactLocation(const FVector& Center) const; // 기존 착탄과 떨어지도록 best-candidate 분산
+	FVector SnapImpactToGround(const FVector& In) const;            // 착탄 Z를 실제 바닥으로 스냅(데미지는 2D라 무관, 연출 위치 정상화)
 
 	// 패턴 중 플레이어를 향해 yaw 회전(BT/focus 무관, 매 프레임).
 	void FacePatternTarget(float DeltaSeconds);
