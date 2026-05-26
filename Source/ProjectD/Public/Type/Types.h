@@ -409,6 +409,15 @@ enum class ERaidState : uint8
 	Ended
 };
 
+// 존 점유 기반 트래블 카운트다운의 종류. None = 비활성.
+UENUM(BlueprintType)
+enum class EPDZoneTravelType : uint8
+{
+	None       UMETA(DisplayName = "None"),
+	RaidEntry  UMETA(DisplayName = "Raid Entry"),   // Base → Raid
+	Extraction UMETA(DisplayName = "Extraction")    // Raid → Base
+};
+
 
 UENUM(BlueprintType)
 enum class EWeaponSlot : uint8
