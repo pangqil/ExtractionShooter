@@ -21,4 +21,5 @@ public:
 	virtual void HostSession(int32 MaxPlayers, TSoftObjectPtr<UWorld> LobbyLevel) override;
 	virtual void JoinSession(APlayerController* LocalPC) override;
 	virtual void DestroySession() override;
+	virtual void LeaveSession(APlayerController* LocalPC, TSoftObjectPtr<UWorld> FallbackLevel) override;
 };

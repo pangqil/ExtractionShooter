@@ -15,9 +15,11 @@ class AGameStateBase;
 
 
 /**
- * LobbyLevel(=호스트가 연 방)의 메인 화면.
- * 메뉴 단계(NewGame/Continue/Settings/Quit)는 메인 메뉴(WBP_PDMainMenuScreen)로 분리됨.
- * 이 화면은 방 안 상태 표시 + 호스트의 게임 시작 트리거 전담.
+ * 방(Room) 화면. 흐름상 MainMenu → PlayModeSelect → LobbyScreen 의 마지막 단계.
+ * 모인 참가자 리스트 + 호스트의 게임 시작 트리거 담당.
+ *   - StartGame: 호스트만. BaseLevel로 ServerTravel(전원 동반).
+ *   - Leave: PlayModeSelect로 돌아가기(레이어 pop).
+ *   - 클라: StartGame 비활성 + "Waiting for host...".
  */
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
 class PROJECTD_API UPDLobbyScreenWidget : public UPDActivatableBase
@@ -31,6 +33,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> Button_StartGame;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_Leave;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UVerticalBox> VerticalBox_PlayerList;
@@ -49,9 +54,11 @@ protected:
 
 private:
 	UFUNCTION() void HandleStartGameClicked();
+	UFUNCTION() void HandleLeaveClicked();
 	UFUNCTION() void HandleLobbyPlayersChanged();
 
 	void HandleGameStateSet(AGameStateBase* NewGameState);
+	void AttemptBindGameState();
 	void BindToLobbyGameState(APDLobbyGameState* LobbyGS);
 	void RefreshPlayerList();
 	void ApplyHostState();
@@ -59,4 +66,5 @@ private:
 
 	TWeakObjectPtr<APDLobbyGameState> BoundGameState;
 	FDelegateHandle GameStateSetHandle;
+	FTimerHandle BindRetryHandle;
 };

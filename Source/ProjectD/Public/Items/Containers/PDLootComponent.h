@@ -36,8 +36,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Loot", meta = (ClampMin = "1"))
 	int32 GridColumns = 5;
 
+	// bAutoSizeRows 가 true 면 GridRows 는 "최소 행 수"로 동작(콘텐츠가 많으면 자동 확장).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Loot", meta = (ClampMin = "1"))
 	int32 GridRows = 4;
+
+	/** true 면 아이템 추가 시 행(Row)을 자동 확장 — Columns 고정. 드랍 수가 많아도 잘리지 않고 다 담김(예: 7개 → 2행). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Loot")
+	bool bAutoSizeRows = true;
 
 	UPROPERTY(BlueprintAssignable, Category = "PD|Loot")
 	FPDOnLootChanged OnLootChanged;
@@ -56,9 +61,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
 	int32 AddItemPartial(const FPDItemData& ItemData, int32 Quantity = 1);
 
-	/** Loot 슬롯의 아이템을 플레이어 인벤토리로 이동. Quantity=-1 이면 전체. */
+	/** Loot 슬롯의 아이템을 플레이어 인벤토리로 이동. Quantity=-1 이면 전체. (좌클릭 take) */
 	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
 	bool TakeSlotToInventory(int32 LootSlotIndex, UPDInventoryComponent* TargetInventory, int32 Quantity = -1);
+
+	// ─── 드래그앤드롭 전송 (서버 권위 — 클라 호출 시 PC Server RPC 로 라우팅) ───
+	/** Loot → 인벤토리 특정 슬롯(꺼내기). */
+	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
+	bool TakeSlotQuantityToInventorySlot(UPDInventoryComponent* TargetInventory, int32 LootSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity);
+
+	/** 인벤토리 → Loot 특정 슬롯(박스에 넣기). */
+	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
+	bool StoreInventorySlotQuantityToSlot(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 TargetLootSlotIndex, int32 Quantity);
+
+	/** Loot 내부 슬롯 간 이동/스왑(박스 안 재배치). */
+	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
+	bool MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 
 protected:
 	UFUNCTION()

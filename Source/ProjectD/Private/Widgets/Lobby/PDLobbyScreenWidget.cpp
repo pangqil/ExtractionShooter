@@ -8,8 +8,11 @@
 #include "Components/VerticalBox.h"
 #include "Core/PDGameInstance.h"
 #include "Core/PDLobbyGameState.h"
+#include "Core/PDLobbyPlayerController.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "Subsystems/PDFrontendUISubsystem.h"
+#include "Type/Types.h"
 #include "Widgets/Lobby/PDLobbyPlayerEntryWidget.h"
 
 void UPDLobbyScreenWidget::NativeOnActivated()
@@ -20,27 +23,66 @@ void UPDLobbyScreenWidget::NativeOnActivated()
 	{
 		Button_StartGame->OnClicked.AddDynamic(this, &UPDLobbyScreenWidget::HandleStartGameClicked);
 	}
+	if (Button_Leave)
+	{
+		Button_Leave->OnClicked.AddDynamic(this, &UPDLobbyScreenWidget::HandleLeaveClicked);
+	}
 
 	ApplyHostState();
 
-	if (UWorld* World = GetWorld())
+	AttemptBindGameState();
+
+	// 방 화면에 진입 → 서버에 입장 등록 (PlayerArray=연결된 전원과 구분되는 "입장" 상태).
+	if (APDLobbyPlayerController* LPC = Cast<APDLobbyPlayerController>(GetOwningPlayer()))
 	{
-		if (AGameStateBase* GS = World->GetGameState())
-		{
-			BindToLobbyGameState(Cast<APDLobbyGameState>(GS));
-		}
-		else
-		{
-			GameStateSetHandle = World->GameStateSetEvent.AddUObject(this, &UPDLobbyScreenWidget::HandleGameStateSet);
-		}
+		LPC->Server_SetRoomJoined(true);
 	}
+}
+
+void UPDLobbyScreenWidget::AttemptBindGameState()
+{
+	if (BoundGameState.IsValid())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// 클라이언트에서 GameState가 늦게 도착하거나(=null) 막 도착해 타입 매칭이 될 때까지 재시도.
+	if (APDLobbyGameState* LobbyGS = World->GetGameState<APDLobbyGameState>())
+	{
+		BindToLobbyGameState(LobbyGS);
+		return;
+	}
+
+	// GameStateSetEvent(아직 set 전) + 폴링(이미 set됐으나 타입/타이밍 어긋남) 양쪽 대비.
+	if (!GameStateSetHandle.IsValid())
+	{
+		GameStateSetHandle = World->GameStateSetEvent.AddUObject(this, &UPDLobbyScreenWidget::HandleGameStateSet);
+	}
+	World->GetTimerManager().SetTimer(
+		BindRetryHandle, this, &UPDLobbyScreenWidget::AttemptBindGameState, 0.25f, false);
 }
 
 void UPDLobbyScreenWidget::NativeOnDeactivated()
 {
+	// 방 화면 이탈 → 서버에 입장 해제.
+	if (APDLobbyPlayerController* LPC = Cast<APDLobbyPlayerController>(GetOwningPlayer()))
+	{
+		LPC->Server_SetRoomJoined(false);
+	}
+
 	if (Button_StartGame)
 	{
 		Button_StartGame->OnClicked.RemoveDynamic(this, &UPDLobbyScreenWidget::HandleStartGameClicked);
+	}
+	if (Button_Leave)
+	{
+		Button_Leave->OnClicked.RemoveDynamic(this, &UPDLobbyScreenWidget::HandleLeaveClicked);
 	}
 
 	if (APDLobbyGameState* GS = BoundGameState.Get())
@@ -56,6 +98,7 @@ void UPDLobbyScreenWidget::NativeOnDeactivated()
 			World->GameStateSetEvent.Remove(GameStateSetHandle);
 			GameStateSetHandle.Reset();
 		}
+		World->GetTimerManager().ClearTimer(BindRetryHandle);
 	}
 
 	Super::NativeOnDeactivated();
@@ -89,6 +132,15 @@ void UPDLobbyScreenWidget::HandleStartGameClicked()
 	GI->TravelToLevel(BaseLevel, /*bMarkBaseResetPending=*/false);
 }
 
+void UPDLobbyScreenWidget::HandleLeaveClicked()
+{
+	// 방에서 나가 PlayModeSelect로 복귀(레이어 pop).
+	if (UPDFrontendUISubsystem* Sub = UPDFrontendUISubsystem::Get(this))
+	{
+		Sub->PopFromLayer(EUILayer::Frontend);
+	}
+}
+
 void UPDLobbyScreenWidget::HandleGameStateSet(AGameStateBase* NewGameState)
 {
 	if (UWorld* World = GetWorld())
@@ -111,6 +163,18 @@ void UPDLobbyScreenWidget::BindToLobbyGameState(APDLobbyGameState* LobbyGS)
 
 	BoundGameState = LobbyGS;
 	LobbyGS->OnLobbyPlayersChanged.AddDynamic(this, &UPDLobbyScreenWidget::HandleLobbyPlayersChanged);
+
+	// 바인딩 성공 → 재시도 타이머/GameStateSet 폴백 정리.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BindRetryHandle);
+		if (GameStateSetHandle.IsValid())
+		{
+			World->GameStateSetEvent.Remove(GameStateSetHandle);
+			GameStateSetHandle.Reset();
+		}
+	}
+
 	RefreshPlayerList();
 }
 
@@ -134,27 +198,44 @@ void UPDLobbyScreenWidget::RefreshPlayerList()
 
 	VerticalBox_PlayerList->ClearChildren();
 
-	int32 Count = 0;
-	for (APlayerState* PS : GS->PlayerArray)
+	// 연결된 전원(PlayerArray)이 아니라 방에 "입장한" 플레이어만 표시.
+	TArray<APlayerState*> ValidPlayers;
+	for (const TObjectPtr<APlayerState>& PS : GS->GetJoinedPlayers())
 	{
-		if (!PS || PS->IsInactive())
+		if (PS && !PS->IsInactive())
+		{
+			ValidPlayers.Add(PS);
+		}
+	}
+
+	APlayerState* HostPS = GS->GetHostPlayerState();
+
+	// 고정 MaxPlayersDisplay 슬롯: 앞쪽은 참가자, 나머지는 Empty.
+	for (int32 SlotIndex = 0; SlotIndex < MaxPlayersDisplay; ++SlotIndex)
+	{
+		UPDLobbyPlayerEntryWidget* Entry = CreateWidget<UPDLobbyPlayerEntryWidget>(this, PlayerEntryClass);
+		if (!Entry)
 		{
 			continue;
 		}
 
-		UPDLobbyPlayerEntryWidget* Entry = CreateWidget<UPDLobbyPlayerEntryWidget>(this, PlayerEntryClass);
-		if (Entry)
+		if (SlotIndex < ValidPlayers.Num())
 		{
-			Entry->SetPlayerState(PS);
-			VerticalBox_PlayerList->AddChild(Entry);
-			++Count;
+			APlayerState* PS = ValidPlayers[SlotIndex];
+			Entry->SetPlayerState(PS, /*bIsHost=*/PS == HostPS);
 		}
+		else
+		{
+			Entry->SetEmpty();
+		}
+
+		VerticalBox_PlayerList->AddChild(Entry);
 	}
 
 	if (TextBlock_PlayerCount)
 	{
 		TextBlock_PlayerCount->SetText(
-			FText::FromString(FString::Printf(TEXT("%d/%d"), Count, MaxPlayersDisplay)));
+			FText::FromString(FString::Printf(TEXT("%d/%d"), ValidPlayers.Num(), MaxPlayersDisplay)));
 	}
 }
 

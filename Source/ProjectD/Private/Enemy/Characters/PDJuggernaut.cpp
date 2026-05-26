@@ -379,7 +379,6 @@ void APDJuggernaut::TryStartPattern()
 
 	default:
 		// 조건에 맞는 (구현된) 패턴 없음 — 일반공격 유지하며 다음 쿨다운 재시도.
-		// TODO: Pattern3(Extinction/추적 미사일) 구현 후 분기 추가.
 		ScheduleNextPattern();
 		break;
 	}
@@ -494,7 +493,7 @@ void APDJuggernaut::SpawnMachineGunProjectile(const FVector& MuzzleLoc)
 		MachineGunProjectileClass, MuzzleLoc, Dir.Rotation(), SpawnParams);
 	if (Projectile)
 	{
-		Projectile->InitProjectile(Pattern1DamagePerTick, this, /*bPenetrate=*/false);
+		Projectile->InitProjectile(Pattern1DamagePerTick, this, /*bPenetrate=*/false, Dir);
 	}
 }
 
@@ -724,12 +723,19 @@ void APDJuggernaut::ApplyPattern2Damage(const FVector& Center)
 		// (HitResult.BoneName → 대상 BodyPartConfig 가 부위로 라우팅. 코어 데미지 경로는 변경 없음.)
 		if (Pattern2ImpactBones.Num() > 0)
 		{
+			UE_LOG(LogTemp, Warning, TEXT("[PD Missile] ApplyPattern2Damage -> %s | bones=%d"),
+				*GetNameSafe(PlayerPawn), Pattern2ImpactBones.Num());
 			for (const FName& Bone : Pattern2ImpactBones)
 			{
+				// 본별 오버라이드 우선, 없으면 기본 데미지.
+				const float* Override = Pattern2BoneDamageOverrides.Find(Bone);
+				const float BoneDamage = Override ? *Override : Pattern2Damage;
+
 				FPDDamageInfo DamageInfo;
-				DamageInfo.BaseDamage = Pattern2Damage;
+				DamageInfo.BaseDamage = BoneDamage;
 				DamageInfo.Instigator = this;
 				DamageInfo.HitResult.BoneName = Bone;
+				UE_LOG(LogTemp, Warning, TEXT("[PD Missile]   bone=%s dmg=%.0f"), *Bone.ToString(), BoneDamage);
 				IPDDamageable::Execute_ApplyDamage(PlayerPawn, DamageInfo);
 			}
 		}
@@ -1005,7 +1011,6 @@ void APDJuggernaut::DrawBossDebug() const
 	{
 	case EPDJuggernautPattern::Pulverize:  PatternName = TEXT("Pulverize(MG)");  break;
 	case EPDJuggernautPattern::Annihilate: PatternName = TEXT("Annihilate(Swarm)"); break;
-	case EPDJuggernautPattern::Extinction: PatternName = TEXT("Extinction(Homing)"); break;
 	default: break;
 	}
 	Msg(2, bIsExecutingPattern ? FColor::Red : FColor(150, 150, 150),

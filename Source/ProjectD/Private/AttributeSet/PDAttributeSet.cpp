@@ -244,11 +244,21 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		const float OldHP=GetHPByPart(Part);
 		const float DamageToPart = FMath::Min(LocalDamage, OldHP);
 		const float OverflowDamage = LocalDamage - DamageToPart;
-		SetHPByPart(Part, FMath::Max(OldHP - DamageToPart, 0.f));
+		const float NewHP = FMath::Max(OldHP - DamageToPart, 0.f);
+		SetHPByPart(Part, NewHP);
 
 		if (Part != EBodyPart::Torso && OverflowDamage > 0.f)
 		{
 			SetTorsoHP(FMath::Max(GetTorsoHP() - OverflowDamage, 0.f));
+		}
+
+		// 피격 부위/데미지 추적 — 어느 부위에 얼마가 들어갔는지 확인.
+		if (const UEnum* PartEnum = StaticEnum<EBodyPart>())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[PD Damage Hit] %s | Part=%s | HP %.0f -> %.0f (dmg=%.0f) | mapped=%d"),
+				*GetNameSafe(OwnerActor),
+				*PartEnum->GetNameStringByValue(static_cast<int64>(Part)),
+				OldHP, NewHP, LocalDamage, bMappedBodyPart ? 1 : 0);
 		}
 
 		if (APDCharacterBase* Owner=Cast<APDCharacterBase>(OwnerActor))

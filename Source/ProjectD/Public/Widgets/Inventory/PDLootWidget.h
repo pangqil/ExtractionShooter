@@ -6,6 +6,7 @@
 
 class UPDLootComponent;
 class UPDInventorySlotWidget;
+class UPDInventoryDragDropOperation;
 class UUniformGridPanel;
 class UUserWidget;
 class USizeBox;
@@ -63,6 +64,10 @@ protected:
 
 	UFUNCTION()
 	void HandleLootSlotLeftClicked(UPDInventorySlotWidget* SlotWidget, int32 ClickedSlotIndex);
+
+	// 드롭 라우팅: Loot 소스→박스 내 재배치, Inventory 소스→박스에 넣기.
+	UFUNCTION()
+	void HandleLootSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 TargetSlotIndex, UPDInventoryDragDropOperation* DragOperation);
 
 private:
 	void ResolveGridPanel();

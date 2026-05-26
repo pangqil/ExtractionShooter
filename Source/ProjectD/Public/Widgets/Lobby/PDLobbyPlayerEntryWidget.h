@@ -7,13 +7,14 @@
 #include "PDLobbyPlayerEntryWidget.generated.h"
 
 class UTextBlock;
+class UWidget;
 class APlayerState;
 
 /**
- * Lobby PlayerList에 들어가는 한 줄짜리 엔트리.
- * SetPlayerState로 대상 PS를 주입받고 PlayerName을 표시한다.
- * 클라이언트에서 PlayerArray는 도착했지만 PlayerName이 아직 빈 문자열인 케이스를 대비해
- * 짧은 폴링으로 보정한다.
+ * Lobby PlayerList의 한 슬롯.
+ * 채워진 슬롯: SetPlayerState(PS, bIsHost) — PlayerName + (호스트면) HOST 뱃지.
+ * 빈 슬롯: SetEmpty() — "Empty" 표시, 뱃지 숨김.
+ * 클라이언트에서 PlayerName이 늦게 도착하는 케이스를 짧은 폴링으로 보정.
  */
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
 class PROJECTD_API UPDLobbyPlayerEntryWidget : public UUserWidget
@@ -21,7 +22,8 @@ class PROJECTD_API UPDLobbyPlayerEntryWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	void SetPlayerState(APlayerState* InPlayerState);
+	void SetPlayerState(APlayerState* InPlayerState, bool bInIsHost);
+	void SetEmpty();
 
 protected:
 	virtual void NativeDestruct() override;
@@ -29,9 +31,15 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TextBlock_PlayerName;
 
+	/** "HOST" 라벨. 호스트 슬롯에서만 Visible. */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> HostBadge;
+
 private:
 	UFUNCTION()
 	void RefreshName();
+
+	void SetHostBadgeVisible(bool bVisible);
 
 	UPROPERTY()
 	TWeakObjectPtr<APlayerState> CachedPlayerState;

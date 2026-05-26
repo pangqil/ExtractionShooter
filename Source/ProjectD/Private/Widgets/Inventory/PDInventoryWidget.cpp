@@ -20,6 +20,7 @@
 #include "Components/Button.h"
 #include "Core/PDPlayerComponentResolver.h"
 #include "Core/PDPlayerController.h"
+#include "Items/Containers/PDLootComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Items/Containers/PDInventoryComponent.h"
 #include "Items/Data/PDItemSlotTransfer.h"
@@ -59,6 +60,7 @@ void UPDInventoryWidget::NativeConstruct()
 	BindEquipmentChanged();
 	BindTabButtons();
 	BindSortButtons();
+	CacheFilterTabBaseLabels();
 	SetSortOptionsVisible(false);
 	ResolveEquipmentSlotWidgets();
 	RefreshEquipmentSlots();
@@ -301,6 +303,11 @@ void UPDInventoryWidget::BindSortButtons()
 
 void UPDInventoryWidget::UpdateTabButtonStyle()
 {
+	if (FilterTabBaseLabels.IsEmpty())
+	{
+		CacheFilterTabBaseLabels();
+	}
+
 	const FLinearColor SelectedColor(0.15f, 0.85f, 0.15f, 1.0f);
 	const FLinearColor NormalColor(0.02f, 0.02f, 0.02f, 0.85f);
 
@@ -312,19 +319,19 @@ void UPDInventoryWidget::UpdateTabButtonStyle()
 	if (Button_Equipment)
 	{
 		Button_Equipment->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Equipment ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Equipment, FText::FromString(TEXT("Equipment")), EquipmentUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Equipment, GetFilterTabBaseLabel(EPDItemFilterTab::Equipment), EquipmentUsedSlots, MaxSlots);
 	}
 
 	if (Button_Consumable)
 	{
 		Button_Consumable->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Consumable ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Consumable, FText::FromString(TEXT("Consumable")), ConsumableUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Consumable, GetFilterTabBaseLabel(EPDItemFilterTab::Consumable), ConsumableUsedSlots, MaxSlots);
 	}
 
 	if (Button_Misc)
 	{
 		Button_Misc->SetBackgroundColor(CurrentFilterTab == EPDItemFilterTab::Misc ? SelectedColor : NormalColor);
-		SetTabButtonLabel(Button_Misc, FText::FromString(TEXT("Misc")), MiscUsedSlots, MaxSlots);
+		SetTabButtonLabel(Button_Misc, GetFilterTabBaseLabel(EPDItemFilterTab::Misc), MiscUsedSlots, MaxSlots);
 	}
 }
 
@@ -359,6 +366,48 @@ int32 UPDInventoryWidget::GetInventoryDisplaySlotCount() const
 	return 16;
 }
 
+
+void UPDInventoryWidget::CacheFilterTabBaseLabels()
+{
+	FilterTabBaseLabels.Reset();
+	CacheFilterTabBaseLabel(EPDItemFilterTab::Equipment, Button_Equipment);
+	CacheFilterTabBaseLabel(EPDItemFilterTab::Consumable, Button_Consumable);
+	CacheFilterTabBaseLabel(EPDItemFilterTab::Misc, Button_Misc);
+}
+
+void UPDInventoryWidget::CacheFilterTabBaseLabel(EPDItemFilterTab FilterTab, UButton* TargetButton)
+{
+	if (UTextBlock* ButtonText = GetTabButtonTextBlock(TargetButton))
+	{
+		FString LabelString = ButtonText->GetText().ToString();
+		int32 CountStartIndex = INDEX_NONE;
+		if (LabelString.FindLastChar(TEXT('('), CountStartIndex))
+		{
+			LabelString = LabelString.Left(CountStartIndex).TrimEnd();
+		}
+
+		if (!LabelString.IsEmpty())
+		{
+			FilterTabBaseLabels.Add(FilterTab, FText::FromString(LabelString));
+		}
+	}
+}
+
+FText UPDInventoryWidget::GetFilterTabBaseLabel(EPDItemFilterTab FilterTab) const
+{
+	if (const FText* BaseLabel = FilterTabBaseLabels.Find(FilterTab))
+	{
+		return *BaseLabel;
+	}
+
+	return FText::GetEmpty();
+}
+
+UTextBlock* UPDInventoryWidget::GetTabButtonTextBlock(UButton* TargetButton) const
+{
+	return TargetButton ? Cast<UTextBlock>(TargetButton->GetContent()) : nullptr;
+}
+
 void UPDInventoryWidget::SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const
 {
 	if (!TargetButton)
@@ -366,7 +415,7 @@ void UPDInventoryWidget::SetTabButtonLabel(UButton* TargetButton, const FText& B
 		return;
 	}
 
-	if (UTextBlock* ButtonText = Cast<UTextBlock>(TargetButton->GetContent()))
+	if (UTextBlock* ButtonText = GetTabButtonTextBlock(TargetButton))
 	{
 		ButtonText->SetText(FText::FromString(FString::Printf(TEXT("%s (%d/%d)"), *BaseLabel.ToString(), UsedSlots, FMath::Max(1, MaxSlots))));
 	}
@@ -780,12 +829,12 @@ void UPDInventoryWidget::RefreshInventoryWeightBar()
 
 UPDInventoryComponent* UPDInventoryWidget::FindInventoryComponent() const
 {
-	// 2�?구조: InventoryComponent??PlayerState???�으므�?PlayerController ?�퍼 ?�용.
+	// 2�?구조: InventoryComponent??PlayerState???�으므�?PlayerController ?�퍼 ?�용.
 	if (UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer()))
 	{
 		return Inventory;
 	}
-	// Fallback: Pawn??직접 붙�? 경우???�래 구조 ?�환.
+	// Fallback: Pawn??직접 붙�? 경우???�래 구조 ?�환.
 	return FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
 }
 
@@ -824,7 +873,7 @@ UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 
 UPDSecureContainerComponent* UPDInventoryWidget::FindSecureContainerComponent() const
 {
-	// SecureContainerComponent??PlayerCharacter??붙어?�음.
+	// SecureContainerComponent??PlayerCharacter??붙어?�음.
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		return OwningPawn->FindComponentByClass<UPDSecureContainerComponent>();
@@ -887,6 +936,15 @@ const FPDInventorySlot* UPDInventoryWidget::FindSourceSlot(EPDItemContainerType 
 		if (const UPDSecureContainerComponent* SecureContainerComponent = FindSecureContainerComponent())
 		{
 			return SecureContainerComponent->GetSecureSlot(SlotIndex);
+		}
+		return nullptr;
+	case EPDItemContainerType::Loot:
+		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+		{
+			if (const UPDLootComponent* LootComponent = PlayerController->GetActiveLootComponent())
+			{
+				return LootComponent->LootItems.IsValidIndex(SlotIndex) ? &LootComponent->LootItems[SlotIndex] : nullptr;
+			}
 		}
 		return nullptr;
 	default:
@@ -1247,6 +1305,15 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 		if (UPDSecureContainerComponent* SecureContainerComponent = FindSecureContainerComponent())
 		{
 			SecureContainerComponent->TakeSecureSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+		}
+		break;
+	case EPDItemContainerType::Loot:
+		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
+		{
+			if (UPDLootComponent* LootComponent = PlayerController->GetActiveLootComponent())
+			{
+				LootComponent->TakeSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+			}
 		}
 		break;
 	default:

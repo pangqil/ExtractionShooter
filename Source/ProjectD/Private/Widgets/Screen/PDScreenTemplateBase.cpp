@@ -17,42 +17,15 @@ void UPDScreenTemplateBase::NativeOnDeactivated()
 	Super::NativeOnDeactivated();
 }
 
-FReply UPDScreenTemplateBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
-{
-	if (InKeyEvent.GetKey() == EKeys::Escape)
-	{
-		if (HandleEscape())
-		{
-			return FReply::Handled();
-		}
-	}
-	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
-}
-
 bool UPDScreenTemplateBase::HandleEscape_Implementation()
 {
+	// 화면 chrome 내부 모달이 떠있으면 그것부터 닫는다. layer pop은 모달이 없을 때만.
 	if (ActiveModalWidget)
 	{
 		DismissModal();
 		return true;
 	}
-
-	UPDFrontendUISubsystem* Subsystem = UPDFrontendUISubsystem::Get(this);
-	if (!Subsystem)
-	{
-		return false;
-	}
-
-	const EUILayer LayerSearchOrder[] = { EUILayer::Modal, EUILayer::GameMenu, EUILayer::Frontend };
-	for (EUILayer Layer : LayerSearchOrder)
-	{
-		if (Subsystem->GetTopOfLayer(Layer) == this)
-		{
-			Subsystem->PopFromLayer(Layer);
-			return true;
-		}
-	}
-	return false;
+	return Super::HandleEscape_Implementation();
 }
 
 void UPDScreenTemplateBase::SetDescription(const FText& NewDescription)

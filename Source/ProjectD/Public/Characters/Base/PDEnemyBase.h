@@ -210,7 +210,11 @@ private:
 	// 상태 전환 연출(BP 훅 + 오버헤드 위젯 + 사망 몽타주/사운드). 서버는 SetEnemyState, 원격 클라는 OnRep_EnemyState 에서 호출.
 	void ApplyEnemyStateCosmetics(EPDEnemyState NewState);
 
-	void OnTorsoHPChanged(const FOnAttributeChangeData& Data);
+	// Head/Torso 치명 부위 HP 변화 콜백 → 더 위험한 쪽을 단일 바에 반영.
+	void OnVitalHPChanged(const FOnAttributeChangeData& Data);
+
+	// Head/Torso 중 낮은 비율 부위를 체력바에 push + 첫 손상 시 노출.
+	void RefreshVitalHealthBar();
 
 	UPROPERTY()
 	TObjectPtr<UPDEnemyOverheadWidget> OverheadWidget;

@@ -22,6 +22,10 @@ class PROJECTD_API APDLobbyPlayerController : public APDPlayerController
 public:
 	virtual void BeginPlay() override;
 
+	/** LobbyScreen 진입/이탈 시 호출. 서버에서 GameState의 방 입장 목록을 갱신. */
+	UFUNCTION(Server, Reliable)
+	void Server_SetRoomJoined(bool bJoined);
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Lobby")
 	TSubclassOf<UPDActivatableBase> LobbyScreenClass;
