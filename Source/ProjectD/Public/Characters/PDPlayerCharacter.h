@@ -39,6 +39,9 @@ public:
 	UCameraComponent* GetTopDownCameraComponent() const { return TopDownCameraComponent.Get(); }
 	USpringArmComponent* GetCameraBoom() const { return CameraBoom.Get(); }
 
+	// 플레이어는 Downed(쓰러진) 상태일 때만 상호작용 대상(=Revive 프롬프트). 그 외엔 false.
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
