@@ -196,6 +196,8 @@ protected:
 
 
 private:
+	float LastHitReactCueTime = -1.0e30f;
+
 	void HandleAttributeClamp(const FGameplayAttribute& Attribute, float& NewValue) const;
 	void ApplyDamageToPart(EBodyPart Part, float DamageAmount);
 

@@ -7,6 +7,7 @@
 
 class APlayerController;
 class UPDSessionService;
+class UPDInventoryComponent;
 
 UCLASS()
 class PROJECTD_API UPDGameInstance : public UGameInstance
@@ -36,6 +37,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	const TArray<FPDInventorySlot>& GetStashItems() const;
+
+	// 공용 스태시에 슬롯 배열 병합 + 골드 가산. 서버 권한 전용(호스트 GI 가 권위 소스).
+	// 컴팩트 리스트로 유지 → 스태시 컴포넌트 InitializeStash 가 그리드로 패딩.
+	void MergeSlotsIntoStash(const TArray<FPDInventorySlot>& Slots, int32 GoldToAdd);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void SetStashUpgradeLevel(int32 InUpgradeLevel);
@@ -104,6 +109,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Session")
 	UPDSessionService* GetSessionService() const { return ActiveSessionService; }
 
+	/** Standalone/빌드에서 호스팅·참가로 LobbyLevel에 (재)진입할 때, MainMenu를 건너뛰고
+	 *  방 화면(RoomScreen)으로 바로 가도록 표시. SessionService 호출 직전에 set. */
+	UFUNCTION(BlueprintCallable, Category = "PD|Session")
+	void SetPendingRoomScreen() { bPendingRoomScreen = true; }
+
+	/** LobbyPC BeginPlay에서 1회 소비. true면 RoomScreen, 아니면 MainMenu를 push. */
+	UFUNCTION(BlueprintCallable, Category = "PD|Session")
+	bool ConsumePendingRoomScreen();
+
 protected:
 	UPROPERTY()
 	FPDPlayerData PlayerData;
@@ -131,6 +145,8 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Levels")
 	bool bPendingResetToBase = false;
+
+	bool bPendingRoomScreen = false;
 
 private:
 	FString MakePlayerSlotName(const FString& SaveKey) const;

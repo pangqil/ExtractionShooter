@@ -1,10 +1,13 @@
 #include "Core/PDGameInstance.h"
 #include "AbilitySystemGlobals.h"
+#include "Core/PDPlayerState.h"
+#include "Core/PDGameUserSettings.h"
 #include "Core/PDLocalSessionService.h"
 #include "Core/PDSaveGame.h"
 #include "Core/PDSessionService.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "Items/Containers/PDInventoryComponent.h"
 #include "Items/Data/PDItemSlotTransfer.h"
 #include "Misc/PackageName.h"
 #include "Kismet/GameplayStatics.h"
@@ -19,6 +22,12 @@ void UPDGameInstance::Init()
 	const TSubclassOf<UPDSessionService> ResolvedClass =
 		SessionServiceClass ? SessionServiceClass : TSubclassOf<UPDSessionService>(UPDLocalSessionService::StaticClass());
 	ActiveSessionService = NewObject<UPDSessionService>(this, ResolvedClass);
+
+	// 저장된 전체 볼륨을 게임 시작 시 오디오 디바이스에 반영(transient라 매 실행마다 재적용 필요).
+	if (UPDGameUserSettings* UserSettings = UPDGameUserSettings::Get())
+	{
+		UserSettings->ApplyAudioSettings();
+	}
 }
 
 void UPDGameInstance::SetPlayerData(const FPDPlayerData& InData)
@@ -35,6 +44,28 @@ FString UPDGameInstance::GetSaveKeyForController(const APlayerController* Player
 		return TEXT("LocalPlayer");
 	}
 
+	// 트래블 너머 안정 키 1순위: UniqueNetId (로그인 신원 — non-seamless 재접속에도 동일하게 재생성).
+	// PIE listen-server 는 seamless travel 이 동작하지 않아 CopyProperties 가 안 불리므로 UniqueNetId 를 우선.
+	if (const APlayerState* PlayerState = PlayerController->PlayerState)
+	{
+		const FUniqueNetIdRepl& UniqueId = PlayerState->GetUniqueId();
+		if (UniqueId.IsValid())
+		{
+			return UniqueId.ToString();
+		}
+	}
+
+	// 2순위: PersistentSaveId (seamless travel 환경에서 CopyProperties 로 보존되는 경우).
+	if (const APDPlayerState* PDPlayerState = Cast<APDPlayerState>(PlayerController->PlayerState))
+	{
+		const FString& SaveId = PDPlayerState->GetPersistentSaveId();
+		if (!SaveId.IsEmpty())
+		{
+			return SaveId;
+		}
+	}
+
+	// 3순위(불안정 폴백): PlayerName_PlayerId.
 	if (const APlayerState* PlayerState = PlayerController->PlayerState)
 	{
 		const FString PlayerName = PlayerState->GetPlayerName();
@@ -83,6 +114,75 @@ void UPDGameInstance::SetStashItems(const TArray<FPDInventorySlot>& InStashItems
 const TArray<FPDInventorySlot>& UPDGameInstance::GetStashItems() const
 {
 	return PlayerData.StashItems;
+}
+
+// 컴팩트 스태시 배열에 소스 슬롯들을 병합(스택 채우기 → 새 슬롯 append). 빈 슬롯은 무시.
+// 호출 전 Stash 는 컴팩트(빈 슬롯 제거) 상태여야 함.
+static void MergeSlotsIntoStashArray(TArray<FPDInventorySlot>& Stash, const TArray<FPDInventorySlot>& SourceSlots)
+{
+	for (const FPDInventorySlot& RaidSlot : SourceSlots)
+	{
+		if (RaidSlot.IsEmpty())
+		{
+			continue;
+		}
+
+		int32 RemainingQuantity = RaidSlot.Quantity;
+
+		if (RaidSlot.ItemData.MaxStack > 1)
+		{
+			for (FPDInventorySlot& StashSlot : Stash)
+			{
+				if (StashSlot.IsEmpty() || StashSlot.ItemData.ItemID != RaidSlot.ItemData.ItemID)
+				{
+					continue;
+				}
+
+				const int32 StackSpace = StashSlot.ItemData.MaxStack - StashSlot.Quantity;
+				if (StackSpace <= 0)
+				{
+					continue;
+				}
+
+				const int32 AddedQuantity = FMath::Min(StackSpace, RemainingQuantity);
+				StashSlot.Quantity += AddedQuantity;
+				StashSlot.bIsEmpty = false;
+				RemainingQuantity -= AddedQuantity;
+
+				if (RemainingQuantity <= 0)
+				{
+					break;
+				}
+			}
+		}
+
+		while (RemainingQuantity > 0)
+		{
+			FPDInventorySlot NewSlot;
+			NewSlot.ItemInstanceID = RaidSlot.ItemInstanceID;
+			NewSlot.ItemData = RaidSlot.ItemData;
+			NewSlot.ModificationLevel = RaidSlot.ModificationLevel;
+			NewSlot.Quantity = FMath::Min(RemainingQuantity, FMath::Max(1, RaidSlot.ItemData.MaxStack));
+			NewSlot.bIsEmpty = false;
+			NewSlot.EnsureInstanceID();
+
+			Stash.Add(NewSlot);
+			RemainingQuantity -= NewSlot.Quantity;
+		}
+	}
+}
+
+void UPDGameInstance::MergeSlotsIntoStash(const TArray<FPDInventorySlot>& Slots, int32 GoldToAdd)
+{
+	// 스태시 컴포넌트가 그리드 크기로 패딩한 빈 슬롯을 먼저 제거 → 컴팩트 상태에서 병합.
+	// (append 후 InitializeStash 의 SetNum 이 그리드 초과분을 잘라내는 문제 방지.)
+	TArray<FPDInventorySlot>& Stash = PlayerData.StashItems;
+	Stash.RemoveAll([](const FPDInventorySlot& Slot) { return Slot.IsEmpty(); });
+
+	MergeSlotsIntoStashArray(Stash, Slots);
+
+	PlayerData.Gold += GoldToAdd;
+	FPDItemContainerOps::EnsureInstanceIDs(PlayerData.StashItems);
 }
 
 void UPDGameInstance::SetStashUpgradeLevel(int32 InUpgradeLevel)
@@ -195,7 +295,7 @@ void UPDGameInstance::LoadFromDisk()
 	PlayerData=SaveObject->PlayerData;
 	FPDItemContainerOps::EnsureInstanceIDs(PlayerData.StashItems);
 	FPDItemContainerOps::EnsureInstanceIDs(PlayerData.RaidLoadout);
-	// SecureContainer???�이브파?�이 ?�닌 ?�션 ?��??�만 존재?�디?�크 로드?�는 리셋?�서 ?�이?�이 ?�아?��? ?�도�???
+	// SecureContainer???�이브파?�이 ?�닌 ?�션 ?��??�만 존재?�디?�크 로드?�는 리셋?�서 ?�이?�이 ?�아?��? ?�도�???
 	SecureContainerItems.Reset();
 }
 
@@ -253,6 +353,13 @@ bool UPDGameInstance::ConsumePendingResetToBase()
 	const bool bWasPending=bPendingResetToBase;
 	bPendingResetToBase=false;
 	return bWasPending;
+}
+
+bool UPDGameInstance::ConsumePendingRoomScreen()
+{
+	const bool bWas = bPendingRoomScreen;
+	bPendingRoomScreen = false;
+	return bWas;
 }
 
 FString UPDGameInstance::MakePlayerSlotName(const FString& SaveKey) const

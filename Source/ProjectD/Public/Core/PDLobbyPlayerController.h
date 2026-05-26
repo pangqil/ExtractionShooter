@@ -27,6 +27,12 @@ public:
 	void Server_SetRoomJoined(bool bJoined);
 
 protected:
+	/** 최초 진입 시 push할 화면 (= WBP_PDMainMenuScreen). */
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Lobby")
 	TSubclassOf<UPDActivatableBase> LobbyScreenClass;
+
+	/** Standalone/빌드에서 호스팅·참가로 재진입 시 MainMenu 대신 직행할 방 화면 (= WBP_PDLobbyScreenWidget).
+	 *  GameInstance.ConsumePendingRoomScreen()이 true일 때 사용. */
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Lobby")
+	TSubclassOf<UPDActivatableBase> RoomScreenClass;
 };

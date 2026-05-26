@@ -39,6 +39,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Menu")
 	TSubclassOf<UPDActivatableBase> PlayModeSelectScreenClass;
 
+	/** Settings 클릭 시 push할 옵션 화면(WBP_PDOptionsScreen). */
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Menu")
+	TSubclassOf<UPDActivatableBase> OptionsScreenClass;
+
 private:
 	UFUNCTION() void HandleNewGameClicked();
 	UFUNCTION() void HandleContinueClicked();

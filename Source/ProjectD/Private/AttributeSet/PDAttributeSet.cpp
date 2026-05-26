@@ -266,19 +266,25 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 			if (Owner->IsDead()) return;
 
 			const FHitResult* CueHitResult = Data.EffectSpec.GetContext().GetHitResult();
-			if (UAbilitySystemComponent* OwnerASC = GetOwningAbilitySystemComponent())
+			constexpr float HitReactCueInterval = 0.05f;
+			const float CurrentTime = Owner->GetWorld() ? Owner->GetWorld()->GetTimeSeconds() : 0.f;
+			if (CurrentTime - LastHitReactCueTime >= HitReactCueInterval)
 			{
-				const FHitResult DamageHitResult = CueHitResult ? *CueHitResult : FHitResult();
-				const FVector HitLocation = DamageHitResult.bBlockingHit ? FVector(DamageHitResult.ImpactPoint) : Owner->GetActorLocation();
-				const FVector HitNormal = DamageHitResult.bBlockingHit ? FVector(DamageHitResult.ImpactNormal) : FVector::UpVector;
+				LastHitReactCueTime = CurrentTime;
+				if (UAbilitySystemComponent* OwnerASC = GetOwningAbilitySystemComponent())
+				{
+					const FHitResult DamageHitResult = CueHitResult ? *CueHitResult : FHitResult();
+					const FVector HitLocation = DamageHitResult.bBlockingHit ? FVector(DamageHitResult.ImpactPoint) : Owner->GetActorLocation();
+					const FVector HitNormal = DamageHitResult.bBlockingHit ? FVector(DamageHitResult.ImpactNormal) : FVector::UpVector;
 
-				FGameplayCueParameters Params;
-				Params.RawMagnitude = LocalDamage;
-				Params.Location = HitLocation;
-				Params.Normal = HitNormal;
-				Params.Instigator = Data.EffectSpec.GetContext().GetInstigator();
+					FGameplayCueParameters Params;
+					Params.RawMagnitude = LocalDamage;
+					Params.Location = HitLocation;
+					Params.Normal = HitNormal;
+					Params.Instigator = Data.EffectSpec.GetContext().GetInstigator();
 
-				OwnerASC->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Character_HitReact, Params);
+					OwnerASC->ExecuteGameplayCue(PDGameplayTags::GameplayCue_Character_HitReact, Params);
+				}
 			}
 
 			if (GetTorsoHP()<=0.f||GetHeadHP()<=0.f)
