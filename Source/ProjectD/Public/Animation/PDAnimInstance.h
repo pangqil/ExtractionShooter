@@ -41,10 +41,12 @@ struct FPDAnimInstanceCache
 
 	float MovementSpeed=0.f;
 	float Direction=0.f;
+	bool bIsAcc=false;
 	bool bIsAiming=false;
 	bool bIsJumping=false;
 	float AimYaw=0.f;
 	float AimPitch=0.f;
+	float YawDeltaA=0.f;
 
 	EWeaponType WeaponType=EWeaponType::None;
 
@@ -72,6 +74,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Animation")
 	float Direction=0.f;
 
+	UPROPERTY(BlueprintReadOnly, Category="Animation", meta=(DisplayName="Is Acc"))
+	bool bIsAcc=false;
+
 	UPROPERTY(BlueprintReadOnly, Category="Animation")
 	bool bIsAiming=false;
 
@@ -83,6 +88,9 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category="Animation")
 	float AimPitch=0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Animation", meta=(DisplayName="Yaw Delta A"))
+	float YawDeltaA=0.f;
 
 	UPROPERTY(BlueprintReadOnly, Category="Animation")
 	EWeaponType WeaponType=EWeaponType::None;
@@ -166,6 +174,8 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<APDRangedWeaponBase> BoundWeapon;
 
+	float PreviousActorYaw=0.f;
+	bool bHasPreviousActorYaw=false;
 
 	const FPDWeaponAnimSet* GetAnimSetForWeapon(APDWeaponBase* Weapon) const;
 
