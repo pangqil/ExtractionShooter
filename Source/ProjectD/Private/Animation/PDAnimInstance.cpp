@@ -2,22 +2,11 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Characters/Base/PDCharacterBase.h"
-#include "Engine/Engine.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
-#include "HAL/IConsoleManager.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
-
-namespace
-{
-static TAutoConsoleVariable<int32> CVarPDAnimDebugYawDeltaA(
-	TEXT("pd.Anim.DebugYawDeltaA"),
-	1,
-	TEXT("Show Yaw Delta A debug for PDAnimInstance. 0=off, 1=on."),
-	ECVF_Default);
-}
 
 void UPDAnimInstance::NativeInitializeAnimation()
 {
@@ -45,15 +34,6 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		: 0.f;
 	PreviousActorYaw = CurrentActorYaw;
 	bHasPreviousActorYaw = true;
-
-	if (CVarPDAnimDebugYawDeltaA.GetValueOnGameThread() != 0 && GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(
-			static_cast<uint64>(GetUniqueID()),
-			0.f,
-			FColor::Cyan,
-			FString::Printf(TEXT("Yaw Delta A: %.2f"), Cache.YawDeltaA));
-	}
 
 	Cache.bIsJumping = OwnerCharacter->GetCharacterMovement()->IsFalling();
 	Cache.Direction = UKismetMathLibrary::NormalizedDeltaRotator(

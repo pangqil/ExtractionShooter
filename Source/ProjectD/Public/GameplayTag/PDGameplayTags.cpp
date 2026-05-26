@@ -37,6 +37,7 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Input_Quickslot6, "Input.Quickslot6");
 
 	UE_DEFINE_GAMEPLAY_TAG(Input_CancelConsumableUse, "Input.CancelConsumableUse");
+	UE_DEFINE_GAMEPLAY_TAG(Input_Bombing, "Input.Bombing");
 
 	UE_DEFINE_GAMEPLAY_TAG(Input_SpectateNext, "Input.SpectateNext");
 	UE_DEFINE_GAMEPLAY_TAG(Input_SpectatePrev, "Input.SpectatePrev");
@@ -101,6 +102,8 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Character_Bleeding, "GameplayCue.Character.Bleeding");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Character_Roll, "GameplayCue.Character.Roll");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Character_Footstep, "GameplayCue.Character.Footstep");
+
+	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Ability_Bombing, "GameplayCue.Ability.Bombing");
 
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Item_Pickup, "GameplayCue.Item.Pickup");
 

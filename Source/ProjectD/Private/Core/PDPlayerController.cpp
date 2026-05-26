@@ -747,7 +747,9 @@ void APDPlayerController::OnAbilityInputPressed(FGameplayTag InputTag)
 
 	if (UAbilitySystemComponent* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
-		if (InputTag == PDGameplayTags::Input_Roll || InputTag == PDGameplayTags::Input_Sprint)
+		if (InputTag == PDGameplayTags::Input_Roll ||
+			InputTag == PDGameplayTags::Input_Sprint ||
+			InputTag == PDGameplayTags::Input_Bombing)
 		{
 			if (InputTag == PDGameplayTags::Input_Sprint &&
 				ASC->HasMatchingGameplayTag(PDGameplayTags::State_Sprinting))

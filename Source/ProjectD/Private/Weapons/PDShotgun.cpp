@@ -2,19 +2,11 @@
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Core/PDPlayerController.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "DrawDebugHelpers.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
-#include "HAL/IConsoleManager.h"
 
 namespace
 {
-static TAutoConsoleVariable<int32> CVarPDShotgunDebugTraces(
-    TEXT("pd.Shotgun.DebugTraces"),
-    1,
-    TEXT("Draw shotgun pellet traces. 0=off, 1=on."),
-    ECVF_Default);
-
 bool RefineShotgunCharacterHitToMesh(const FHitResult& SourceHit, const FVector& Start, const FVector& End,
     const FCollisionQueryParams& QueryParams, FHitResult& OutHit)
 {
@@ -177,25 +169,6 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
             if (RefineShotgunCharacterHitToMesh(Hit, Start, End, Params, MeshHit))
             {
                 Hit = MeshHit;
-            }
-        }
-
-        if (CVarPDShotgunDebugTraces.GetValueOnGameThread() != 0)
-        {
-            const FVector DebugEnd = bHit ? Hit.ImpactPoint : End;
-            DrawDebugLine(GetWorld(), Start, DebugEnd, bHit ? FColor::Red : FColor::Green, false, 2.f, 0, 1.5f);
-
-            if (bHit)
-            {
-                DrawDebugSphere(GetWorld(), Hit.ImpactPoint, 6.f, 8, FColor::Yellow, false, 2.f);
-                DrawDebugString(
-                    GetWorld(),
-                    Hit.ImpactPoint + FVector(0.f, 0.f, 12.f),
-                    FString::Printf(TEXT("Pellet %d: %s"), i + 1, *Hit.BoneName.ToString()),
-                    nullptr,
-                    FColor::Yellow,
-                    2.f,
-                    true);
             }
         }
 

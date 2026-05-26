@@ -5,6 +5,8 @@
 #include "PDWeaponGameplayCues.generated.h"
 
 class USoundBase;
+class UNiagaraSystem;
+class UParticleSystem;
 
 UCLASS(Blueprintable)
 class PROJECTD_API UGCN_Weapon_Fire : public UGameplayCueNotify_Static
@@ -135,4 +137,23 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item|FX")
 	TObjectPtr<USoundBase> PickupSound;
+};
+
+UCLASS(Blueprintable)
+class PROJECTD_API UGCN_Ability_Bombing : public UGameplayCueNotify_Static
+{
+	GENERATED_BODY()
+public:
+	UGCN_Ability_Bombing();
+	virtual bool OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const override;
+
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ability|Bombing|FX")
+	TObjectPtr<UNiagaraSystem> BombingNiagara;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ability|Bombing|FX")
+	TObjectPtr<UParticleSystem> BombingParticle;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ability|Bombing|FX")
+	TObjectPtr<USoundBase> BombingSound;
 };

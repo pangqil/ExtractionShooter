@@ -290,6 +290,52 @@ bool UGCN_Item_Pickup::OnExecute_Implementation(AActor* MyTarget, const FGamepla
 	return true;
 }
 
+UGCN_Ability_Bombing::UGCN_Ability_Bombing()
+{
+	GameplayCueTag = FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Ability.Bombing"));
+}
+
+bool UGCN_Ability_Bombing::OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const
+{
+	const FVector Location = Parameters.Location;
+	const FRotator Rotation = Parameters.Normal.IsNearlyZero()
+		? FRotator::ZeroRotator
+		: Parameters.Normal.Rotation();
+	const float RadiusScale = Parameters.RawMagnitude > KINDA_SMALL_NUMBER
+		? Parameters.RawMagnitude / 100.f
+		: 1.f;
+
+	if (BombingNiagara)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			MyTarget,
+			BombingNiagara,
+			Location,
+			Rotation,
+			FVector(RadiusScale),
+			true,
+			true,
+			ENCPoolMethod::AutoRelease);
+	}
+
+	if (BombingParticle)
+	{
+		UGameplayStatics::SpawnEmitterAtLocation(
+			MyTarget,
+			BombingParticle,
+			Location,
+			Rotation,
+			FVector(RadiusScale));
+	}
+
+	if (BombingSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(MyTarget, BombingSound, Location);
+	}
+
+	return true;
+}
+
 
 
 UGCN_Weapon_Impact::UGCN_Weapon_Impact()
