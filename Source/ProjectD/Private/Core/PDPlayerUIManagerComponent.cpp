@@ -610,6 +610,10 @@ void UPDPlayerUIManagerComponent::ToggleHub()
 			}
 		}
 		Subsystem->PopFromLayer(EUILayer::GameMenu);
+		if (HUDInstance)
+		{
+			HUDInstance->SetVisibility(ESlateVisibility::Visible);
+		}
 		return;
 	}
 
@@ -621,6 +625,10 @@ void UPDPlayerUIManagerComponent::ToggleHub()
 
 	// 마�?�???�� ?�으�?�??�그 ?�달 ??base가 DA??DefaultTabId�?fallback.
 	UPDTabbedScreenBase::OpenAtTab(PC, HubScreenClass, LastHubTabId, EUILayer::GameMenu);
+	if (HUDInstance)
+	{
+		HUDInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 bool UPDPlayerUIManagerComponent::CanOpenHub() const
@@ -730,6 +738,10 @@ void UPDPlayerUIManagerComponent::HandleRaidParticipationChanged(bool bIsExtract
 		}
 	}
 	Subsystem->PopFromLayer(EUILayer::GameMenu);
+	if (HUDInstance)
+	{
+		HUDInstance->SetVisibility(ESlateVisibility::Visible);
+	}
 }
 
 void UPDPlayerUIManagerComponent::ShowNotification(const FText& Message, float Duration)
