@@ -30,7 +30,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Loot")
 	TObjectPtr<UDataTable> ItemDataTable;
 
-	UPROPERTY(ReplicatedUsing = OnRep_LootItems, EditAnywhere, BlueprintReadWrite, Category = "PD|Loot")
+	// 런타임 박스 내용물(복제). 저작은 LootBox 의 LootTable 로 일원화 — 에디터 직접 편집 차단(표시 전용).
+	UPROPERTY(ReplicatedUsing = OnRep_LootItems, VisibleAnywhere, BlueprintReadWrite, Category = "PD|Loot")
 	TArray<FPDInventorySlot> LootItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Loot", meta = (ClampMin = "1"))
