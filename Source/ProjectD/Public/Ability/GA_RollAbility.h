@@ -33,9 +33,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Roll")
 	bool bUseInputDirection = true;
 
+	UPROPERTY(EditDefaultsOnly, Category="Roll", meta=(ClampMin="0.05", ForceUnits="s"))
+	float MaxRollDuration = 0.9f;
+
 	UPROPERTY(EditDefaultsOnly, Category="Roll")
 	TObjectPtr<USoundBase> RollSound;
 
 private:
 	FVector GetRollDirection() const;
+	void AutoFinishRoll();
+
+	FTimerHandle AutoFinishRollTimerHandle;
 };
