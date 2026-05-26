@@ -298,6 +298,12 @@ void APDCharacterBase::Interact_Implementation(AActor* Interactor)
 	SendReviveGameplayEvent(Interactor, this, PDGameplayTags::Event_Revive_Start);
 }
 
+bool APDCharacterBase::CanInteract_Implementation(AActor* Interactor) const
+{
+	// 캐릭터 기본은 상호작용 대상 아님(적 등). 플레이어는 PDPlayerCharacter 에서 Downed 일 때만 허용.
+	return false;
+}
+
 void APDCharacterBase::BeginReviveDisplay(AActor* Reviver, float Duration)
 {
 	if (!HasAuthority()) return;

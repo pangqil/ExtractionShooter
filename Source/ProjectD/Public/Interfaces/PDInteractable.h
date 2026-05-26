@@ -18,6 +18,12 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "PD|Interact")
 	void Interact(AActor* Interactor);
 
+	// 현재 이 대상이 상호작용(프롬프트 표시) 가능한지. false면 탐지/프롬프트에서 제외.
+	// 기본 true(루트박스/스테이션 등). 캐릭터는 오버라이드해 적=false, 플레이어=Downed 일 때만 true.
+	UFUNCTION(BlueprintNativeEvent, Category = "PD|Interact")
+	bool CanInteract(AActor* Interactor) const;
+	virtual bool CanInteract_Implementation(AActor* Interactor) const { return true; }
+
 	UFUNCTION(BlueprintNativeEvent, Category = "PD|Interact")
 	FText GetInteractDisplayText() const;
 

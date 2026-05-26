@@ -169,6 +169,12 @@ AActor* UPDInteractionComponent::FindInteractTarget() const
 			return;
 		}
 
+		// 현재 상호작용 불가(적, 비다운 플레이어 등)면 대상에서 제외 → 프롬프트도 안 뜸.
+		if (!IPDInteractable::Execute_CanInteract(HitActor, OwnerActor))
+		{
+			return;
+		}
+
 		const float DistanceSq = FVector::DistSquared(Start, HitLocation);
 
 		if (DistanceSq < ClosestDistanceSq)

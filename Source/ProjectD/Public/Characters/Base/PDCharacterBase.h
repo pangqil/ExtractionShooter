@@ -110,6 +110,8 @@ public:
 	virtual float GetMaxHealth_Implementation() const override;
 	virtual bool IsAlive_Implementation() const override;
 	virtual void Interact_Implementation(AActor* Interactor) override;
+	// 캐릭터 기본: 상호작용 대상 아님(적 포함). 플레이어는 Downed 일 때만 가능하도록 오버라이드.
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override { return ASC; }
 
 
