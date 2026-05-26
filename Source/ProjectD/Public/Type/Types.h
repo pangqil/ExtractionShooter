@@ -296,6 +296,29 @@ struct FPDModificationPreview
 
 
 USTRUCT(BlueprintType)
+struct FPDEquippedItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPDEquipmentSlotType SlotType = EPDEquipmentSlotType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPDInventorySlot ItemSlot;
+
+	bool IsEmpty() const
+	{
+		return SlotType == EPDEquipmentSlotType::None || ItemSlot.IsEmpty();
+	}
+
+	void Clear()
+	{
+		SlotType = EPDEquipmentSlotType::None;
+		ItemSlot.Clear();
+	}
+};
+
+USTRUCT(BlueprintType)
 struct FPDPlayerData
 {
 	GENERATED_BODY()
@@ -317,35 +340,21 @@ struct FPDPlayerData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TraderReputationLevel = 1;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FPDInventorySlot> RaidLoadout;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 RaidGold = 0;
-};
 
-USTRUCT(BlueprintType)
-struct FPDEquippedItem
-{
-	GENERATED_BODY()
-
+	// per-player 영속 장착 장비. 탈출 시 캡처 → 진입 시 재장착 (공용 스태시와 별개).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EPDEquipmentSlotType SlotType = EPDEquipmentSlotType::None;
+	TArray<FPDEquippedItem> EquippedItems;
 
+	// per-player 영속 퀵슬롯 아이템(보조무기/소모품). 인덱스 = 퀵슬롯 슬롯 번호, 빈 슬롯 = 미할당.
+	// 탈출 시 캡처(스태시 제외) → 진입 시 인벤토리+퀵슬롯 복원.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FPDInventorySlot ItemSlot;
-
-	bool IsEmpty() const
-	{
-		return SlotType == EPDEquipmentSlotType::None || ItemSlot.IsEmpty();
-	}
-
-	void Clear()
-	{
-		SlotType = EPDEquipmentSlotType::None;
-		ItemSlot.Clear();
-	}
+	TArray<FPDInventorySlot> QuickSlotKeptItems;
 };
 
 USTRUCT(BlueprintType)
