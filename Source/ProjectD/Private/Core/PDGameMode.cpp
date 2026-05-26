@@ -19,6 +19,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogPDRaid, Log, All);
 APDGameMode::APDGameMode()
 {
 	PlayerStateClass = APDPlayerState::StaticClass();
+	GameStateClass = APDGameState::StaticClass();
 	bUseSeamlessTravel = true;
 }
 
@@ -950,4 +951,162 @@ int32 APDGameMode::CountDeadPlayers() const
 		if (PS && PS->IsRaidDead()) ++Count;
 	}
 	return Count;
+}
+
+APDGameState* APDGameMode::GetPDGameState() const
+{
+	return GetGameState<APDGameState>();
+}
+
+void APDGameMode::NotifyZoneOccupancy(EPDZoneTravelType ZoneType, APlayerController* PC, bool bEntered, TSoftObjectPtr<UWorld> RaidLevel)
+{
+	UE_LOG(LogTemp, Warning, TEXT("[Diag-Zone] NotifyZoneOccupancy: Type=%d PC=%s Entered=%d HasAuth=%d"),
+		static_cast<int32>(ZoneType), *GetNameSafe(PC), bEntered ? 1 : 0, HasAuthority() ? 1 : 0);
+
+	if (!HasAuthority() || !PC || ZoneType == EPDZoneTravelType::None) return;
+
+	if (bEntered)
+	{
+		ZoneOccupants.Add(PC);
+		CurrentZoneType = ZoneType;
+		if (ZoneType == EPDZoneTravelType::RaidEntry && !RaidLevel.IsNull())
+		{
+			PendingRaidLevel = RaidLevel;
+		}
+	}
+	else
+	{
+		ZoneOccupants.Remove(PC);
+	}
+
+	EvaluateZoneCountdown();
+}
+
+void APDGameMode::EvaluateZoneCountdown()
+{
+	APDGameState* GS = GetPDGameState();
+	UWorld* World = GetWorld();
+	if (!GS || !World) return;
+
+	// 무효(파괴/로그아웃) 점유자 정리 + 유효 인원 카운트.
+	int32 InZone = 0;
+	for (auto It = ZoneOccupants.CreateIterator(); It; ++It)
+	{
+		if (It->IsValid()) { ++InZone; }
+		else { It.RemoveCurrent(); }
+	}
+
+	// 참가자 총원: Extraction 은 살아있는 인원, RaidEntry(Base) 는 접속 인원.
+	int32 Total = 0;
+	if (CurrentZoneType == EPDZoneTravelType::Extraction)
+	{
+		Total = CountAlivePlayers();
+	}
+	else
+	{
+		for (APlayerState* PSBase : GS->PlayerArray)
+		{
+			if (Cast<APDPlayerState>(PSBase)) { ++Total; }
+		}
+	}
+
+	const bool bThresholdMet = Total > 0 && InZone * 2 >= Total;
+	const bool bAllIn = Total > 0 && InZone >= Total;
+
+	UE_LOG(LogTemp, Warning, TEXT("[Diag-Zone] EvaluateZoneCountdown: Type=%d InZone=%d Total=%d ThresholdMet=%d AllIn=%d"),
+		static_cast<int32>(CurrentZoneType), InZone, Total, bThresholdMet ? 1 : 0, bAllIn ? 1 : 0);
+
+	FTimerManager& TM = World->GetTimerManager();
+
+	if (!bThresholdMet)
+	{
+		// 절반 미만 → 취소.
+		TM.ClearTimer(ZoneCountdownTimerHandle);
+		CurrentZoneType = EPDZoneTravelType::None;
+		bZoneFinalCountdownActive = false;
+		ZoneEndServerTime = -1.f;
+		GS->ClearZoneCountdown();
+		return;
+	}
+
+	const float ServerNow = GS->GetServerWorldTimeSeconds();
+	const bool bAlreadyCounting = TM.IsTimerActive(ZoneCountdownTimerHandle);
+
+	if (!bAlreadyCounting)
+	{
+		// 절반 이상 최초 도달 → 20초 카운트 시작.
+		bZoneFinalCountdownActive = false;
+		ZoneEndServerTime = ServerNow + ZoneCountdownSeconds;
+		TM.SetTimer(ZoneCountdownTimerHandle, this, &APDGameMode::OnZoneCountdownFired, ZoneCountdownSeconds, false);
+	}
+	else if (bAllIn && !bZoneFinalCountdownActive)
+	{
+		// 전원 진입 → 3초로 즉시 단축.
+		bZoneFinalCountdownActive = true;
+		ZoneEndServerTime = ServerNow + ZoneFinalCountdownSeconds;
+		TM.SetTimer(ZoneCountdownTimerHandle, this, &APDGameMode::OnZoneCountdownFired, ZoneFinalCountdownSeconds, false);
+	}
+	// else: 진행 중 + 인원만 변동 → 타이머 유지, 표시 인원만 갱신.
+
+	UE_LOG(LogTemp, Warning, TEXT("[Diag-Zone] -> GS->SetZoneCountdown: Type=%d InZone=%d Total=%d EndServerTime=%.1f Final=%d (ServerNow=%.1f)"),
+		static_cast<int32>(CurrentZoneType), InZone, Total, ZoneEndServerTime, bZoneFinalCountdownActive ? 1 : 0, ServerNow);
+
+	GS->SetZoneCountdown(CurrentZoneType, InZone, Total, ZoneEndServerTime, bZoneFinalCountdownActive);
+}
+
+void APDGameMode::OnZoneCountdownFired()
+{
+	const EPDZoneTravelType FiredType = CurrentZoneType;
+
+	// 발동 시점 점유 인원 스냅샷(추출 대상).
+	TArray<APlayerController*> Occupants;
+	for (const TWeakObjectPtr<APlayerController>& Weak : ZoneOccupants)
+	{
+		if (APlayerController* PC = Weak.Get()) { Occupants.Add(PC); }
+	}
+
+	// 상태 정리(위젯 숨김).
+	ZoneOccupants.Empty();
+	CurrentZoneType = EPDZoneTravelType::None;
+	bZoneFinalCountdownActive = false;
+	ZoneEndServerTime = -1.f;
+	if (APDGameState* GS = GetPDGameState())
+	{
+		GS->ClearZoneCountdown();
+	}
+
+	if (FiredType == EPDZoneTravelType::RaidEntry)
+	{
+		// 레벨 에셋으로 트래블(로딩스크린 + 1프레임 지연 ServerTravel 은 GI 가 처리).
+		if (UPDGameInstance* GI = GetGameInstance<UPDGameInstance>())
+		{
+			GI->TravelToLevel(PendingRaidLevel, /*bMarkBaseResetPending*/ false);
+		}
+	}
+	else if (FiredType == EPDZoneTravelType::Extraction)
+	{
+		// 존 안 인원: 추출 성공(아이템 유지).
+		for (APlayerController* PC : Occupants)
+		{
+			RequestExtraction(PC);
+		}
+
+		// 존 밖 생존자: 추출 실패(사망 마감, 아이템 손실). 전원 마감시켜야 EndRaid 가 트래블함.
+		if (UWorld* World = GetWorld())
+		{
+			for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+			{
+				APlayerController* PC = It->Get();
+				if (!PC) continue;
+				APDPlayerState* PS = PC->GetPlayerState<APDPlayerState>();
+				if (!PS || PS->IsExtracted() || PS->IsRaidDead()) continue;
+
+				PS->SetRaidDead(true);
+				FinalizeRaidStatsOnDeath(PC);
+			}
+		}
+
+		// 전원 마감 → EndRaid(1명이라도 추출 시 성공) → 결산 위젯 → Base 트래블.
+		EvaluateRaidEnd();
+	}
 }
