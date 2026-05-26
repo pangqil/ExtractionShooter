@@ -278,7 +278,7 @@ void UPDPlayerUIManagerComponent::OpenMarket(UPDMarketComponent* MarketComponent
 	if (MarketWidgetInstance)
 	{
 		MarketWidgetInstance->InitializeMarket(MarketComponent);
-		AddWidgetToViewportIfNeeded(MarketWidgetInstance);
+		AddWidgetToViewportIfNeeded(MarketWidgetInstance, GameplayOverlayZOrder);
 	}
 
 	SetGameplayInputBlockedByModalUI(true, MarketWidgetInstance);
@@ -346,7 +346,7 @@ void UPDPlayerUIManagerComponent::OpenStash(UPDStashComponent* StashSource)
 	if (InventoryWidgetInstance)
 	{
 		InventoryWidgetInstance->SetActiveStashComponent(StashSource);
-		AddWidgetToViewportIfNeeded(InventoryWidgetInstance);
+		AddWidgetToViewportIfNeeded(InventoryWidgetInstance, GameplayOverlayZOrder);
 	}
 
 	if (!StashWidgetInstance)
@@ -356,7 +356,7 @@ void UPDPlayerUIManagerComponent::OpenStash(UPDStashComponent* StashSource)
 	if (StashWidgetInstance)
 	{
 		StashWidgetInstance->InitializeStash(StashSource);
-		AddWidgetToViewportIfNeeded(StashWidgetInstance);
+		AddWidgetToViewportIfNeeded(StashWidgetInstance, GameplayOverlayZOrder);
 	}
 
 	SetGameplayInputBlockedByModalUI(true, StashWidgetInstance);
@@ -415,7 +415,7 @@ void UPDPlayerUIManagerComponent::OpenInventoryForLoot()
 	}
 	if (InventoryWidgetInstance)
 	{
-		AddWidgetToViewportIfNeeded(InventoryWidgetInstance);
+		AddWidgetToViewportIfNeeded(InventoryWidgetInstance, GameplayOverlayZOrder);
 		InventoryWidgetInstance->SetLootCompanionMode(true);
 	}
 }
@@ -459,7 +459,7 @@ void UPDPlayerUIManagerComponent::OpenEquipmentModification()
 		return;
 	}
 
-	AddWidgetToViewportIfNeeded(EquipmentModificationWidgetInstance);
+	AddWidgetToViewportIfNeeded(EquipmentModificationWidgetInstance, GameplayOverlayZOrder);
 	SetGameplayInputBlockedByModalUI(true, EquipmentModificationWidgetInstance);
 }
 
@@ -530,7 +530,7 @@ void UPDPlayerUIManagerComponent::OpenQuest()
 	}
 
 	QuestWindowWidgetInstance->InitializeQuestWindow(PC->GetPlayerQuestComponent(), PC->GetPlayerInventoryComponent());
-	AddWidgetToViewportIfNeeded(QuestWindowWidgetInstance);
+	AddWidgetToViewportIfNeeded(QuestWindowWidgetInstance, GameplayOverlayZOrder);
 	SetGameplayInputBlockedByModalUI(true, QuestWindowWidgetInstance);
 }
 
@@ -908,7 +908,7 @@ void UPDPlayerUIManagerComponent::ToggleWorldMap()
 	WorldMapInstance = CreateWidget<UPDWorldMapWidget>(PC, WorldMapClass);
 	if (WorldMapInstance)
 	{
-		AddWidgetToViewportIfNeeded(WorldMapInstance, 10);
+		AddWidgetToViewportIfNeeded(WorldMapInstance, WorldMapViewportZOrder);
 		SetGameplayInputBlockedByModalUI(true, WorldMapInstance);
 	}
 }

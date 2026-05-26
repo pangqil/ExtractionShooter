@@ -147,6 +147,12 @@ private:
 	int32 RootLayoutViewportZOrder = 5;
 
 	UPROPERTY(EditDefaultsOnly, Category="PD|UI")
+	int32 GameplayOverlayZOrder = 20;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|UI")
+	int32 WorldMapViewportZOrder = 20;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|UI")
 	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, Category="PD|UI")
