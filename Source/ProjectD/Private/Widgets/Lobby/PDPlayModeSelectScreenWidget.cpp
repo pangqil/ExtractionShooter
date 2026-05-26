@@ -60,7 +60,7 @@ void UPDPlayModeSelectScreenWidget::HandleHostClicked()
 		return;
 	}
 
-	// Standalone(빌드/Steam) → 실제 호스팅.
+	// Standalone(빌드/Steam) → 실제 호스팅. 레벨 트래블 후 방 화면으로 직행하도록 플래그 set.
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
 	if (!GI)
 	{
@@ -73,6 +73,7 @@ void UPDPlayModeSelectScreenWidget::HandleHostClicked()
 		return;
 	}
 
+	GI->SetPendingRoomScreen();
 	Service->HostSession(MaxLobbyPlayers, GI->GetLobbyLevel());
 }
 
@@ -97,6 +98,7 @@ void UPDPlayModeSelectScreenWidget::HandleJoinClicked()
 		return;
 	}
 
+	GI->SetPendingRoomScreen();
 	Service->JoinSession(GetOwningPlayer());
 }
 

@@ -46,6 +46,10 @@ void APDGameMode::HandleSeamlessTravelPlayer(AController*& C)
 	APlayerController* PC = Cast<APlayerController>(C);
 	if (!PC) return;
 
+	// PostLogin 과 동일하게 디스크에서 영구 데이터(stash/loadout 등) 재로드.
+	// 이게 없으면 seamless travel 시 추출한 stash/로드아웃이 트래블 너머로 유실됨.
+	InitializePlayerStateFromSave(PC);
+
 	UE_LOG(LogPDRaid, Log, TEXT("HandleSeamlessTravelPlayer: PC=%s NumPlayers=%d"),
 		*GetNameSafe(PC),
 		GetWorld() ? GetWorld()->GetNumPlayerControllers() : -1);
@@ -131,6 +135,11 @@ void APDGameMode::StartRaid()
 		if (APDPlayerState* PS = PC ? PC->GetPlayerState<APDPlayerState>() : nullptr)
 		{
 			PS->ResetRaidParticipationState();
+
+			// 로드아웃 리셋(ResetInventory)이 인벤토리 기반 퀵슬롯 보관 아이템을 지우므로 여기서 재복원.
+			// 장비는 인벤토리 리셋에 영향 없지만 idempotent 하게 한 번 더 호출(이미 장착 시 skip).
+			PS->RestoreEquippedItemsFromPersistent();
+			PS->RestoreQuickSlotItemsFromPersistent();
 		}
 
 		// Step 2-C: 초기 골드/?�이???�량 ?�냅??(?�망/추출 ?�점??Delta 계산??.
@@ -475,8 +484,22 @@ void APDGameMode::ProcessExtractionForPlayer(APlayerController* PC)
 	UE_LOG(LogPDRaid, Log, TEXT("ProcessExtraction: PC=%s -> transfer inventory to stash"),
 		*PC->GetName());
 
+	// 1. 키트(장비 + 퀵슬롯 보관 아이템) 캡처 → per-player. BuildStashTransferItems 가 이걸 참조해 스태시에서 제외하므로
+	//    반드시 TransferPlayerInventoryToStash 보다 먼저 호출.
+	PS->CaptureEquippedItemsToPersistent();
+	PS->CaptureQuickSlotItemsToPersistent();
+
+	// 2. 키트 제외한 나머지 인벤토리만 공용 스태시로.
 	TransferPlayerInventoryToStash(PC);
+
+	// 3. per-player(장비/퀵슬롯 등 PersistentData) 디스크 저장 — 진입 시 재장착/재할당.
 	SavePlayerStateToDisk(PC);
+
+	// 4. 공용 스태시는 GI 단일 슬롯에 저장(per-player 아님). GI 는 트래블 너머 호스트에서 유지됨.
+	if (UPDGameInstance* GI = GetGameInstance<UPDGameInstance>())
+	{
+		GI->SaveToDisk();
+	}
 
 	// SecureContainer ???�존(추출) ???�음 ?�이?�로 ?�월.
 	if (APawn* Pawn = PC->GetPawn())
@@ -738,7 +761,18 @@ void APDGameMode::InitializePlayerStateFromSave(APlayerController* PC)
 		return;
 	}
 
-	PDPlayerState->InitializePersistentData(GI->LoadPlayerDataFromDisk(GI->GetSaveKeyForController(PC), PC->IsLocalController()));
+	// 로드/세이브 키가 안정적이도록 최초 1회 SaveId 보장 (CopyProperties 로 트래블 너머 유지됨).
+	PDPlayerState->EnsurePersistentSaveId();
+
+	const FString LoadKey = GI->GetSaveKeyForController(PC);
+	const FPDPlayerData Loaded = GI->LoadPlayerDataFromDisk(LoadKey, PC->IsLocalController());
+	PDPlayerState->InitializePersistentData(Loaded);
+
+	// per-player 키트 복원. PostLogin 에서 Super 가 이미 폰을 소유시킨 뒤 이 함수가 불리므로 폰이 준비됨.
+	// (없으면 no-op, 이미 적용돼 있으면 skip — idempotent.)
+	// 베이스에서는 인벤토리 리셋이 없어 그대로 유지. 레이드는 StartRaid 의 로드아웃 리셋 후 재복원됨.
+	PDPlayerState->RestoreEquippedItemsFromPersistent();
+	PDPlayerState->RestoreQuickSlotItemsFromPersistent();
 }
 
 void APDGameMode::SavePlayerStateToDisk(APlayerController* PC)
@@ -755,7 +789,9 @@ void APDGameMode::SavePlayerStateToDisk(APlayerController* PC)
 		return;
 	}
 
-	GI->SavePlayerDataToDisk(GI->GetSaveKeyForController(PC), PDPlayerState->GetPersistentData());
+	const FString SaveKey = GI->GetSaveKeyForController(PC);
+	const FPDPlayerData& Data = PDPlayerState->GetPersistentData();
+	GI->SavePlayerDataToDisk(SaveKey, Data);
 }
 
 void APDGameMode::InitializePlayerInventoryFromLoadout(APlayerController* PC)
@@ -788,7 +824,15 @@ void APDGameMode::TransferPlayerInventoryToStash(APlayerController* PC)
 	UPDInventoryComponent* Inventory = PDPlayerState ? PDPlayerState->GetInventoryComponent() : nullptr;
 	if (!Inventory) return;
 
-	PDPlayerState->TransferInventoryToPersistentStash(Inventory);
+	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
+	if (!GI) return;
+
+	// 키트(퀵슬롯 보관 + 장착 장비) 제외한 나머지 인벤토리만 공용 스태시로.
+	// 장착 장비는 인벤토리에 없어 자연 제외, 퀵슬롯 보관분은 BuildStashTransferItems 가 제외.
+	// 선행조건: ProcessExtractionForPlayer 에서 CaptureEquipped/CaptureQuickSlot 이 먼저 호출됨.
+	TArray<FPDInventorySlot> ToStash;
+	PDPlayerState->BuildStashTransferItems(ToStash);
+	GI->MergeSlotsIntoStash(ToStash, Inventory->Gold);
 }
 
 void APDGameMode::NotifyPlayerReadyForTravel(APlayerController* PC)

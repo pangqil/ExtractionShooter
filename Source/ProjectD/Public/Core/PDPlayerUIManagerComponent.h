@@ -141,6 +141,12 @@ private:
 	int32 NotificationZOrder = 50;
 
 	UPROPERTY(EditDefaultsOnly, Category="PD|UI")
+	int32 HUDViewportZOrder = 10;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|UI")
+	int32 RootLayoutViewportZOrder = 5;
+
+	UPROPERTY(EditDefaultsOnly, Category="PD|UI")
 	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, Category="PD|UI")

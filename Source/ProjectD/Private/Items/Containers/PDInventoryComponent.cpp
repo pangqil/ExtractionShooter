@@ -592,7 +592,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 	if (RemainingQuantity > 0)
 	{
-		BroadcastInventoryMessage(FText::FromString(TEXT("?�벤?�리가 가??찼습?�다.")));
+		BroadcastInventoryMessage(FText::FromString(TEXT("인벤토리가 가득 찼습니다.")));
 	}
 
 	if (AddedQuantity > 0)
@@ -626,7 +626,7 @@ int32 UPDInventoryComponent::AddSlotPartial(const FPDInventorySlot& SourceSlot)
 	const int32 AddedQuantity = FPDItemContainerOps::AddSlot(Items, SourceSlot);
 	if (AddedQuantity <= 0)
 	{
-		BroadcastInventoryMessage(FText::FromString(TEXT("?�벤?�리가 가??찼습?�다.")));
+		BroadcastInventoryMessage(FText::FromString(TEXT("인벤토리가 가득 찼습니다.")));
 		return 0;
 	}
 

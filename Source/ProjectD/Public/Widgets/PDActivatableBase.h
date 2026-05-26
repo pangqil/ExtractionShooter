@@ -85,6 +85,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	bool bAllowEscapeDismiss{true};
 
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	bool bAllowHitTestPassThroughOnRoot{false};
+
+public:
+	virtual bool ShouldPassThroughRootHitTest() const { return bAllowHitTestPassThroughOnRoot; }
+
 private:
 	void ApplyInputMode();
 

@@ -26,6 +26,9 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	// seamless travel 시 새 PlayerState 로 PersistentSaveId + PersistentData 보존.
+	virtual void CopyProperties(APlayerState* PlayerState) override;
+
 	UFUNCTION(BlueprintPure, Category="PD|PlayerState")
 	UPDInventoryComponent* GetInventoryComponent() const { return InventoryComponent; }
 
@@ -46,6 +49,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|PlayerState|Save")
 	FPDPlayerData GetPersistentData() const { return PersistentData; }
+
+	// 트래블 너머로 안정적인 저장 슬롯 키. PlayerName/PlayerId 는 seamless travel 시 바뀌므로 사용 불가.
+	// 서버에서 최초 1회 할당 후 CopyProperties 로 트래블 너머 보존.
+	UFUNCTION(BlueprintPure, Category="PD|PlayerState|Save")
+	const FString& GetPersistentSaveId() const { return PersistentSaveId; }
+
+	// 서버 전용: 비어있으면 새 GUID 할당. 최초 로그인 시 1회.
+	void EnsurePersistentSaveId();
 
 	UFUNCTION(BlueprintPure, Category="PD|PlayerState|Market")
 	int32 GetTraderReputationExp() const;
@@ -128,6 +139,22 @@ public:
 	int32 RemovePersistentStashItems(FName ItemID, int32 Quantity, bool bRemoveAnyItem);
 	void TransferInventoryToPersistentStash(const UPDInventoryComponent* InventoryComponent);
 
+	// 서버 전용: 현재 EquipmentComponent 장착 항목을 PersistentData.EquippedItems 에 캡처(탈출 시).
+	void CaptureEquippedItemsToPersistent();
+
+	// 서버 전용: PersistentData.EquippedItems 를 기존 장착 API 로 재장착(진입 시). 폰 소유 후 호출.
+	void RestoreEquippedItemsFromPersistent();
+
+	// 서버 전용: 퀵슬롯이 참조하는 인벤토리 아이템(보조무기/소모품)을 슬롯 위치와 함께 캡처(탈출 시).
+	// 장착 무기를 참조하는 슬롯은 제외(장비 복원이 처리). BuildStashTransferItems 보다 먼저 호출.
+	void CaptureQuickSlotItemsToPersistent();
+
+	// 서버 전용: 인벤토리에서 스태시로 보낼 항목(= 퀵슬롯 보관 항목 제외)을 산출.
+	void BuildStashTransferItems(TArray<FPDInventorySlot>& OutItems) const;
+
+	// 서버 전용: PersistentData.QuickSlotKeptItems 를 인벤토리에 복원 + 퀵슬롯 재할당(진입 시). idempotent.
+	void RestoreQuickSlotItemsFromPersistent();
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -151,6 +178,10 @@ private:
 
 	UPROPERTY(ReplicatedUsing=OnRep_PersistentData, VisibleAnywhere, BlueprintReadOnly, Category="PD|PlayerState|Save", meta=(AllowPrivateAccess="true"))
 	FPDPlayerData PersistentData;
+
+	// 트래블 너머 안정적인 저장 키. 서버 최초 1회 할당, CopyProperties 로 보존.
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="PD|PlayerState|Save", meta=(AllowPrivateAccess="true"))
+	FString PersistentSaveId;
 
 	UPROPERTY(ReplicatedUsing=OnRep_RaidParticipation, VisibleAnywhere, BlueprintReadOnly, Category="PD|PlayerState|Raid", meta=(AllowPrivateAccess="true"))
 	bool bIsExtracted = false;

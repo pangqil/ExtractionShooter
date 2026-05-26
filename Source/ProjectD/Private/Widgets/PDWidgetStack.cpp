@@ -39,7 +39,9 @@ UPDActivatableBase* UPDWidgetStack::Push(TSubclassOf<UPDActivatableBase> ScreenC
 	else
 	{
 	}
-	NewScreen->SetVisibility(ESlateVisibility::Visible);
+	NewScreen->SetVisibility(NewScreen->ShouldPassThroughRootHitTest()
+		? ESlateVisibility::SelfHitTestInvisible
+		: ESlateVisibility::Visible);
 	NewScreen->Activate();
 	Stack.Add(NewScreen);
 
@@ -66,7 +68,9 @@ void UPDWidgetStack::Pop()
 
 	if (UPDActivatableBase* NewTop = GetTop())
 	{
-		NewTop->SetVisibility(ESlateVisibility::Visible);
+		NewTop->SetVisibility(NewTop->ShouldPassThroughRootHitTest()
+			? ESlateVisibility::SelfHitTestInvisible
+			: ESlateVisibility::Visible);
 		NewTop->Activate();
 	}
 

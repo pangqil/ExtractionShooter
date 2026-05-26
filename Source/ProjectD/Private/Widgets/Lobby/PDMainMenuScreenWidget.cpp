@@ -78,6 +78,16 @@ void UPDMainMenuScreenWidget::HandleContinueClicked()
 
 void UPDMainMenuScreenWidget::HandleSettingsClicked()
 {
+	if (!OptionsScreenClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UPDMainMenuScreenWidget: OptionsScreenClass not set"));
+		return;
+	}
+
+	if (UPDFrontendUISubsystem* Sub = UPDFrontendUISubsystem::Get(this))
+	{
+		Sub->PushToLayer(EUILayer::Frontend, OptionsScreenClass);
+	}
 }
 
 void UPDMainMenuScreenWidget::HandleQuitClicked()

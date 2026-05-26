@@ -47,6 +47,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Tabbed")
 	FGameplayTag GetActiveTabId() const { return ActiveTabId; }
 
+	virtual bool ShouldPassThroughRootHitTest() const override { return true; }
+
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeOnActivated() override;

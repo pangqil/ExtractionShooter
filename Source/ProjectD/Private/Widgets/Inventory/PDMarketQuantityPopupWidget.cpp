@@ -191,7 +191,7 @@ void UPDMarketQuantityPopupWidget::RefreshVisuals()
 
 	if (TextTitleWidget)
 	{
-		TextTitleWidget->SetText(NSLOCTEXT("PDMarket", "BuyPopupTitle", "구매?�기"));
+		TextTitleWidget->SetText(NSLOCTEXT("PDMarket", "BuyPopupTitle", "구매하기"));
 	}
 
 	if (TextItemNameWidget)

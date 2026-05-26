@@ -91,7 +91,7 @@ void UPDPlayerUIManagerComponent::InitializeUI(APDPlayerController* InOwnerContr
 		RootLayoutInstance = CreateWidget<UPDRootLayout>(PC, RootLayoutClass);
 		if (RootLayoutInstance)
 		{
-			RootLayoutInstance->AddToViewport(5);
+			RootLayoutInstance->AddToViewport(RootLayoutViewportZOrder);
 			if (UPDFrontendUISubsystem* UISubsystem = UPDFrontendUISubsystem::Get(PC))
 			{
 				UISubsystem->RegisterRootLayout(RootLayoutInstance);
@@ -164,7 +164,7 @@ void UPDPlayerUIManagerComponent::CreateAndAddHUDWidget()
 		HUDInstance = CreateWidget<UPDHUDWidget>(PC, HUDClass);
 	}
 
-	AddWidgetToViewportIfNeeded(HUDInstance, 0);
+	AddWidgetToViewportIfNeeded(HUDInstance, HUDViewportZOrder);
 	if (HUDInstance)
 	{
 		HUDInstance->Activate();
